@@ -1,0 +1,9 @@
+[submodule "3rd_party/vcpkg"]
+	path = 3rd_party/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+[submodule "3rd_party/sokol_gp"]
+	path = 3rd_party/sokol_gp
+	url = https://github.com/edubart/sokol_gp
+[submodule "3rd_party/sokol"]
+	path = 3rd_party/sokol
+	url = https://github.com/floooh/sokol.git
