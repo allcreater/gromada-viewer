@@ -148,61 +148,69 @@ public:
         loadDynamicObjects(reader, resourceNavigator);
     }
 
-    void readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader, DynamicObject& object) const {
-        switch (vids[nvid].behave) {
-            // StaticObj
-        case 0:
-        case 1:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 11:
-        case 14:
-        case 15:
-        case 16:
-        case 18:
-        case 20: {
-            auto unused_hp = reader.read<std::uint8_t>();
-            object.extras["unused_hp"] = unused_hp;
-        } return;
+	void readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader, DynamicObject& object) const {
+		const auto readStaticObj = [&]() {
+			auto unused_hp = reader.read<std::uint8_t>();
+			object.extras["unused_hp"] = unused_hp;
+		};
 
-               // Object2
-        case 2:
-        case 3:
-        case 4:
-        case 13:
-        case 17: {
-            if (m_header.mapVersion < 2) {
-                auto buildTime = reader.read<std::uint8_t>();
-                object.extras["buildTime"] = buildTime;
-            }
-            if (m_header.mapVersion < 1) {
-                auto army = reader.read<std::uint8_t>();
-                object.extras["army"] = army;
-            }
-            auto behave = reader.read<std::uint8_t>();
-            object.extras["behave"] = behave;
+		const auto readObject2 = [&]() {
+			if (m_header.mapVersion > 2) {
+				auto buildTime = reader.read<std::uint8_t>();
+				object.extras["buildTime"] = buildTime;
+			}
+			if (m_header.mapVersion > 1) {
+				auto army = reader.read<std::uint8_t>();
+				object.extras["army"] = army;
+			}
+			auto behave = reader.read<std::uint8_t>();
+			object.extras["behave"] = behave;
 
-            if (m_header.mapVersion == 0)
-                return;
+			if (m_header.mapVersion == 0)
+				return;
 
-            for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(); ++itemId) {
+			for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0; ) {
 				object.extras["items"].append(itemId);
-            }
+			}
+		};
 
-        } return;
+		switch (vids[nvid].behave) {
+			// StaticObj
+		case 0:
+		case 1:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 11:
+		case 14:
+		case 15:
+		case 16:
+		case 18:
+		case 20: {
+			readStaticObj();
+		} return;
+
+			   // Object2
+		case 2:
+		case 3:
+		case 4:
+		case 13:
+		case 17: {
+			readStaticObj();
+			readObject2();
+		} return;
 
 		case 9:
-        case 10:
-        case 12:
-        case 19:
-            return;
+		case 10:
+		case 12:
+		case 19:
+			return;
 
-        default:
+		default:
 			assert(false);
 			return;
-        }
+		}
 	}
 
 	void loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
@@ -215,7 +223,7 @@ public:
 			reader.read_to(result.e);
 			reader.read_to(result.f);
 			reader.read_to(result.startTimer);
-			if (reader.size() < 31) {
+			if (reader.size() < 28) {
 				result.mapVersion = 0;
 				return result;
 			}
@@ -361,17 +369,7 @@ export class Application {
 public:
     Application(const argparse::ArgumentParser& arguments)
         : resources{ arguments.get<std::filesystem::path>("res_path")}
-        //, resReader{"D:\\Games\\Gromada\\maps\\levels\\19.map"}
     {
-        //reader{ "D:\\Games\\Gromada\\maps\\levels\\19.map" }
-        // reader{ "D:\\Games\\Gromada\\maps\\levels\\01.map" }
-        // reader{ "D:\\Games\\Gromada\\fw.res" }
-
-        //navigator = GromadaResourceNavigator{ resReader };
-        //resReader.goStart();
-
-        //auto _ = MapLoader{ resReader };
-        
 		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
 			resources.write_csv(*arg);
 		}
@@ -409,7 +407,15 @@ public:
             ImGui::End();
         }
 
-        ImGui::ShowDemoWindow();
+        ImGui::Begin("Map");
+		if (ImGui::Button("Export JSON")) {
+			auto cwd = std::filesystem::current_path();
+			std::ofstream stream{ "map.json", std::ios_base::out };
+			map.write_json(stream);
+		}
+        ImGui::End();
+
+        //ImGui::ShowDemoWindow();
 	}
     
     void on_event(const sapp_event& event) {
