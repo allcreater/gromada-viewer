@@ -11,7 +11,9 @@ add_executable (GromadaEditor
 	FILES
 		"resource_reader.cpp"
 		"application.cpp"
-  "imgui_utils.cpp")
+		"imgui_utils.cpp"
+		"resources.cpp"
+ )
 
 #find_package(SFML REQUIRED)
 find_package(argparse CONFIG REQUIRED)

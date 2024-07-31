@@ -9,7 +9,7 @@ module;
 #include <ranges>
 #endif
 
-export module GromadaResourceReader;
+export module Gromada.ResourceReader;
 import std;
 
 export {
