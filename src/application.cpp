@@ -39,90 +39,179 @@ struct Resources {
             | std::views::transform([this](const Section& section) { VidRawData result;  result.read(reader.beginRead(section)); return result; })
             | std::ranges::to<std::vector>();
 
-        vidsHeaders = vids
-            | std::views::enumerate
-            | std::views::transform([](const auto& pair) {
-                static std::array<char, 256> buffer;
-                
-                const auto [index, data] = pair;
-
-                auto offset = std::snprintf(buffer.data(), buffer.size(), "%i:\t", index);
-                offset += data.print(std::span{ buffer.data() + offset, buffer.size() - offset });
-
-                return std::string{ buffer.begin(), buffer.begin() + offset};
-                })
-            | std::ranges::to<std::vector>();
-    }
-
-    void write_csv(std::filesystem::path path) {
-        std::ofstream stream{ path, std::ios_base::out /*|| std::ios_base::binary*/ };
-        stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-		stream << "NVID,Name,UnitType,Behave,Flags,CollisionMask,AnotherWidth,AnotherHeight,Z_or_height,MaxHP,GridRadius,P6,Speed,Hz1,Hz2,Hz3,Army,SomeWeaponIndex,Hz4,DeathSizeMargin,SomethingAboutDeath,sX,sY,sZ,Hz5,Hz6,Direction,Z,InterestingNumber,VisualBehavior,Hz7,NumOfFrames,DataSize,ImgWidth,ImgHeight" << std::endl;
-		for (const auto& [index, vid] : vids | std::views::enumerate) {
-			stream << index << ',';
-            vid.write_csv_line(stream);
-		}
     }
 
     GromadaResourceReader reader;
     GromadaResourceNavigator navigator;
 
     std::vector<VidRawData> vids;
-    std::vector <std::string > vidsHeaders;
+};
+
+class Model {
+public:
+	explicit Model(std::filesystem::path path) : m_resources{ path } { }
+
+	const std::span<const VidRawData> vids() const {
+		return m_resources.vids;
+	}
+
+    void exportMap() {
+        auto cwd = std::filesystem::current_path();
+        std::ofstream stream{ "map.json", std::ios_base::out };
+        m_map.write_json(stream);
+    }
+
+	void loadMap(std::filesystem::path path) {
+        GromadaResourceReader mapReader{ path };
+        GromadaResourceNavigator mapNavigator{ mapReader };
+        m_map = Map{ m_resources.vids, mapReader, mapNavigator };
+	}
+
+    void write_csv(std::filesystem::path path) {
+        std::ofstream stream{ path, std::ios_base::out /*|| std::ios_base::binary*/ };
+        stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+        stream << "NVID,Name,UnitType,Behave,Flags,CollisionMask,AnotherWidth,AnotherHeight,Z_or_height,MaxHP,GridRadius,P6,Speed,Hz1,Hz2,Hz3,Army,SomeWeaponIndex,Hz4,DeathSizeMargin,SomethingAboutDeath,sX,sY,sZ,Hz5,Hz6,Direction,Z,InterestingNumber,VisualBehavior,Hz7,NumOfFrames,DataSize,ImgWidth,ImgHeight" << std::endl;
+        for (const auto& [index, vid] : vids() | std::views::enumerate) {
+            stream << index << ',';
+            vid.write_csv_line(stream);
+        }
+    }
+
+private:
+    Resources m_resources;
+    Map m_map;
+};
+
+class VidsWindowViewModel {
+public:
+    explicit VidsWindowViewModel(Model& model) : m_model{ model } {
+        m_vidsHeaders = m_model.vids()
+            | std::views::enumerate
+            | std::views::transform([](const auto& pair) {
+            static std::array<char, 256> buffer;
+
+            const auto [index, data] = pair;
+
+            auto offset = std::snprintf(buffer.data(), buffer.size(), "%i:\t", index);
+            offset += data.print(std::span{ buffer.data() + offset, buffer.size() - offset });
+
+            return std::string{ buffer.begin(), buffer.begin() + offset };
+                })
+            | std::ranges::to<std::vector>();
+    }
+
+    void updateUI() {
+        // By default, if we don't enable ScrollX the sizing policy for each column is "Stretch"
+        // All columns maintain a sizing weight, and they will occupy all available width.
+        static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_ContextMenuInBody;
+
+        ImGui::Begin("Vids");
+        if (ImGui::BeginTable("table1", 2, flags)) {
+            ImGui::TableNextColumn();
+
+            ImVec2 listBoxSize{ -FLT_MIN, ImGui::GetWindowHeight() - 80.0f };
+            bool changed = ListBox("Vids", &m_selectedSection, std::span{ m_vidsHeaders }, [](const auto& str) { return str.c_str(); }, listBoxSize);
+
+            if (changed || !m_sectionUI) {
+                m_sectionUI = [vid = m_model.vids()[m_selectedSection]] {
+                    VidRawData_ui(vid);
+                    };
+            }
+
+            if (m_sectionUI) {
+                ImGui::TableNextColumn();
+                m_sectionUI();
+            }
+            ImGui::EndTable();
+
+			if (ImGui::Button("Export CSV")) {
+				m_model.write_csv("vids.csv");
+			}
+        }
+        ImGui::End();
+
+    }
+
+private:
+    Model& m_model;
+
+    std::vector <std::string > m_vidsHeaders;
+    std::function<void()> m_sectionUI;
+    int m_selectedSection = 0;
+};
+
+
+class ViewModel {
+public:
+    explicit ViewModel(Model& model) : m_model{ model } {}
+
+    void updateUI() {
+        drawMenu();
+
+        if (m_showVidsWindow) {
+            if (!m_vidsViewModel) {
+                m_vidsViewModel.emplace(m_model);
+            }
+
+            if (m_vidsViewModel) {
+                m_vidsViewModel->updateUI();
+            }
+        }
+    }
+
+    void drawMenu()
+    {
+        ImGui::BeginMainMenuBar();
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Open")) {
+                //open();
+            }
+
+            if (ImGui::MenuItem("Export map JSON")) {
+				m_model.exportMap();
+            }
+
+            if (ImGui::MenuItem("Exit")) {
+                sapp_request_quit();
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Windows")) {
+            ImGui::MenuItem("Vids", "ALT+V", &m_showVidsWindow);
+            
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+private:
+    Model& m_model;
+
+    bool m_showVidsWindow = false;
+    std::optional<VidsWindowViewModel> m_vidsViewModel;
 };
 
 export class Application {
 public:
     Application(const argparse::ArgumentParser& arguments)
-        : resources{ arguments.get<std::filesystem::path>("res_path")}
+        : m_model{ arguments.get<std::filesystem::path>("res_path")}
+		, m_viewModel{ m_model }
     {
 		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
-			resources.write_csv(*arg);
+            m_model.write_csv(*arg);
 		}
 
 		if (auto arg = arguments.present<std::filesystem::path>("--map")) {
-            GromadaResourceReader mapReader{*arg};
-            GromadaResourceNavigator mapNavigator{ mapReader };
-			map = Map{resources.vids, mapReader, mapNavigator };
+			m_model.loadMap(*arg);
 		}
 
     }
 
 	void on_frame() {
-        ImGui::SetNextWindowPos({ 50, 100 });
-        ImGui::SetNextWindowSize({ 500, 700 });
-        ImGui::Begin("Header");
-        ImGui::PushTabStop(true);
-        bool changed = ListBox("Vids", &selected_section, std::span{ resources.vidsHeaders }, [](const auto& str) { return str.c_str(); });
+		m_viewModel.updateUI();
 
-        if (changed || !sectionUI) {
-            sectionUI = [vid= resources.vids[selected_section]] {
-				VidRawData_ui(vid);
-            };
-        }
-        ImGui::PopTabStop();
-
-        ImGui::End();
-
-
-        if (sectionUI) {
-            ImGui::SetNextWindowPos({ 800, 100 });
-            ImGui::SetNextWindowSize({ 300, 500 });
-            ImGui::Begin("Details");
-            sectionUI();
-            ImGui::End();
-        }
-
-        ImGui::Begin("Map");
-		if (ImGui::Button("Export JSON")) {
-			auto cwd = std::filesystem::current_path();
-			std::ofstream stream{ "map.json", std::ios_base::out };
-			map.write_json(stream);
-		}
-        ImGui::End();
-
-        //ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
 	}
     
     void on_event(const sapp_event& event) {
@@ -130,14 +219,10 @@ public:
     }
 
 private:
-    int selected_section = 0;
-    Resources resources;
-    Map map;
-	//GromadaResourceReader resReader;
- //   GromadaResourceNavigator navigator;
-
-    std::function<void()> sectionUI;
+    Model m_model;
+	ViewModel m_viewModel;
 };
+
 
 void VidRawData_ui(const VidRawData& self)
 {

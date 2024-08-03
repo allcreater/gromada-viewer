@@ -17,7 +17,7 @@ import sokol.imgui;
 
 
 export template<typename T, typename Fn = std::identity>
-bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textToStr = {})
+bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
 {
     const auto items_count = items.size();
     //using namespace ImGui
@@ -29,8 +29,6 @@ bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textTo
     //float height_in_items_f = height_in_items + 0.25f;
     //ImVec2 size(0.0f, ImTrunc(GetTextLineHeightWithSpacing() * height_in_items_f + g.Style.FramePadding.y * 2.0f));
 
-
-    const ImVec2 size{ -FLT_MIN, -FLT_MIN };
     if (!ImGui::BeginListBox(label, size))
         return false;
 
