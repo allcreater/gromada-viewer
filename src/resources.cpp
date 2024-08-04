@@ -1,12 +1,6 @@
 module;
 
 #if __INTELLISENSE__
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
-
 #include <array>
 #include <bitset>
 #include <filesystem>
@@ -294,18 +288,13 @@ public:
 		stream << root;
 	}
 
-	//void ui() {
-	//	ImGui::Text("Dynamic objects: %i", dynamicObjects.size());
-	//	for (const auto& obj : dynamicObjects) {
-	//		ImGui::Text("NVID: %i", obj.nvid);
-	//		ImGui::Text("X: %i", obj.x);
-	//		ImGui::Text("Y: %i", obj.y);
-	//		ImGui::Text("Z: %i", obj.z);
-	//		ImGui::Text("Direction: %i", obj.direction);
-	//	}
+	const MapHeaderRawData& header() const noexcept {
+		return m_header;
+	}
 
-
-	//}
+	std::span<const DynamicObject> objects() const noexcept {
+		return dynamicObjects;
+	}
 
 private:
 	//GromadaResourceNavigator navigator;

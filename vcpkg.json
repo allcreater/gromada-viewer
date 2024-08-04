@@ -4,6 +4,7 @@
   "dependencies": [
     "imgui",
     "argparse",
-    "jsoncpp"
+    "jsoncpp",
+    "glm"
   ]
 }
