@@ -296,8 +296,11 @@ public:
 		return dynamicObjects;
 	}
 
+	std::filesystem::path& filename() noexcept { return m_filename; }
+	const std::filesystem::path& filename() const noexcept { return m_filename; }
+
 private:
-	//GromadaResourceNavigator navigator;
+	std::filesystem::path m_filename;
 	std::span<const VidRawData> vids;
 
 	MapHeaderRawData m_header;

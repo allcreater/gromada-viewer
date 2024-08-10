@@ -57,7 +57,9 @@ struct Resources {
 
 class Model {
 public:
-	explicit Model(std::filesystem::path path) : m_resources{ path } { }
+    explicit Model(std::filesystem::path path)
+        : m_resources{ path }
+        , m_gamePath{ path.parent_path()} { }
 
 	const std::span<const VidRawData> vids() const {
 		return m_resources.vids;
@@ -67,19 +69,23 @@ public:
 		return m_map;
 	}
 
-    void exportMap() {
-        auto cwd = std::filesystem::current_path();
-        std::ofstream stream{ "map.json", std::ios_base::out };
+	const std::filesystem::path& gamePath() const {
+		return m_gamePath;
+	}
+
+    void exportMap(const std::filesystem::path& path) {
+        std::ofstream stream{ path, std::ios_base::out };
         m_map.write_json(stream);
     }
 
-	void loadMap(std::filesystem::path path) {
+	void loadMap(const std::filesystem::path& path) {
         GromadaResourceReader mapReader{ path };
         GromadaResourceNavigator mapNavigator{ mapReader };
         m_map = Map{ m_resources.vids, mapReader, mapNavigator };
+		m_map.filename() = std::move(path);
 	}
 
-    void write_csv(std::filesystem::path path) {
+    void write_csv(const std::filesystem::path& path) {
         std::ofstream stream{ path, std::ios_base::out /*|| std::ios_base::binary*/ };
         stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
@@ -93,6 +99,7 @@ public:
 private:
     Resources m_resources;
     Map m_map;
+	std::filesystem::path m_gamePath;
 };
 
 class VidsWindowViewModel {
@@ -209,6 +216,46 @@ private:
     glm::ivec2 m_camPos;
 };
 
+class MapsSelectorViewModel {
+public:
+	explicit MapsSelectorViewModel(Model& model)
+        : m_model{ model }
+		, m_mapsBaseDirectory{ model.gamePath() / "maps" }
+    {}
+
+    void update() {
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(300, 500));
+		ImGui::Begin("Maps");
+
+        auto pathToCStr = [this, currentStr = std::u8string{}](const auto& path) mutable { 
+            currentStr = std::filesystem::relative(path, m_mapsBaseDirectory).u8string();
+            return reinterpret_cast<const char*>(currentStr.c_str());
+        };
+
+        if (ListBox("Maps", &m_selectedMap, std::span{ m_maps }, std::move(pathToCStr))) {
+			const auto& selectedMap = m_maps[m_selectedMap];
+			if (selectedMap != m_model.map().filename()) {
+				m_model.loadMap(selectedMap);
+			}
+        }
+		ImGui::End();
+		ImGui::PopStyleVar();
+    }
+
+	static std::vector<std::filesystem::path> getMaps(const Model& model, const std::filesystem::path& mapsDirectory) {
+        return std::filesystem::recursive_directory_iterator{ mapsDirectory }
+		| std::views::transform([](const auto& entry) { return entry.path(); })
+			| std::views::filter([](const auto& path) { return path.extension() == ".map"; })
+			| std::ranges::to<std::vector>();
+	}
+
+private:
+	Model& m_model;
+	int m_selectedMap = 0;
+
+    std::filesystem::path m_mapsBaseDirectory;
+	std::vector<std::filesystem::path> m_maps = getMaps(m_model, m_mapsBaseDirectory);
+};
 
 class ViewModel {
 public:
@@ -227,19 +274,24 @@ public:
                 m_vidsViewModel->updateUI();
             }
         }
+
+		if (m_showMapsSelector) {
+			m_mapsSelectorViewModel.update();
+		}
     }
 
 
     void drawMenu()
     {
+        constexpr const char* ExportPopup = "Export map JSON";
+        const char* openPopup = nullptr;
+
         ImGui::BeginMainMenuBar();
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Open")) {
-                //open();
-            }
-
             if (ImGui::MenuItem("Export map JSON")) {
-				m_model.exportMap();
+                openPopup = ExportPopup;
+				m_savePopupfilenameBuffer.emplace();
+                std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", m_model.map().filename().stem().u8string().c_str());
             }
 
             if (ImGui::MenuItem("Exit")) {
@@ -250,17 +302,38 @@ public:
 
         if (ImGui::BeginMenu("Windows")) {
             ImGui::MenuItem("Vids", "ALT+V", &m_showVidsWindow);
+            ImGui::MenuItem("Maps", "ALT+M", &m_showMapsSelector);
             
             ImGui::EndMenu();
         }
+
+		if (openPopup != nullptr) {
+			ImGui::OpenPopup(openPopup);
+		}
+
+        if (ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+            //ImGui::Text("Exporting map to", filename.c_str());
+            assert(m_savePopupfilenameBuffer.has_value());
+            ImGui::InputText("Exporting map to", m_savePopupfilenameBuffer->data(), m_savePopupfilenameBuffer->size());
+            if (ImGui::Button("OK", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+                m_model.exportMap(std::filesystem::path{ m_savePopupfilenameBuffer->data()});
+            }
+            ImGui::EndPopup();
+        }
+
         ImGui::EndMainMenuBar();
     }
 private:
     Model& m_model;
 
     bool m_showVidsWindow = false;
+	bool m_showMapsSelector = true;
+    std::optional <std::array<char, 256>> m_savePopupfilenameBuffer;
+
     std::optional<VidsWindowViewModel> m_vidsViewModel;
 	MapViewModel m_mapViewModel{ m_model };
+	MapsSelectorViewModel m_mapsSelectorViewModel{ m_model };
 };
 
 export class Application {
@@ -282,7 +355,7 @@ public:
 	void on_frame() {
 		m_viewModel.updateUI();
 
-        ImGui::ShowDemoWindow();
+        //ImGui::ShowDemoWindow();
 	}
     
     void on_event(const sapp_event& event) {
