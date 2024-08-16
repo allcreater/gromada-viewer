@@ -42,10 +42,12 @@ struct Resources {
         : reader{ path }
         , navigator{ reader }
     {
+		// clang-format off
         vids = navigator.getSections()
-            | std::views::filter([](const Section& section) {return section.header().type == SectionType::Vid; })
+            | std::views::filter([](const Section& section) { return section.header().type == SectionType::Vid; })
             | std::views::transform([this](const Section& section) { VidRawData result;  result.read(reader.beginRead(section)); return result; })
             | std::ranges::to<std::vector>();
+		// clang-format on
 
     }
 
@@ -104,21 +106,7 @@ private:
 
 class VidsWindowViewModel {
 public:
-    explicit VidsWindowViewModel(Model& model) : m_model{ model } {
-        m_vidsHeaders = m_model.vids()
-            | std::views::enumerate
-            | std::views::transform([](const auto& pair) {
-            static std::array<char, 256> buffer;
-
-            const auto [index, data] = pair;
-
-            auto offset = std::snprintf(buffer.data(), buffer.size(), "%i:\t", index);
-            offset += data.print(std::span{ buffer.data() + offset, buffer.size() - offset });
-
-            return std::string{ buffer.begin(), buffer.begin() + offset };
-                })
-            | std::ranges::to<std::vector>();
-    }
+    explicit VidsWindowViewModel(Model& model) : m_model{ model } {}
 
     void updateUI() {
         // By default, if we don't enable ScrollX the sizing policy for each column is "Stretch"
@@ -130,17 +118,30 @@ public:
             ImGui::TableNextColumn();
 
             ImVec2 listBoxSize{ -FLT_MIN, ImGui::GetWindowHeight() - 80.0f };
-            bool changed = ListBox("Vids", &m_selectedSection, std::span{ m_vidsHeaders }, [](const auto& str) { return str.c_str(); }, listBoxSize);
+			bool changed = true;
+            {
+				if (ImGui::BeginTable("vids_list_table", 2, ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter, listBoxSize)) {
+					ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+					for (auto [index, vid] : m_model.vids() | std::views::enumerate) {
+						ImGui::TableNextColumn();
 
-            if (changed || !m_sectionUI) {
-                m_sectionUI = [vid = m_model.vids()[m_selectedSection]] {
-                    VidRawData_ui(vid);
-                    };
+						if (ImGui::Selectable(std::to_string(index).c_str(), m_selectedSection == index, ImGuiSelectableFlags_SpanAllColumns)) {
+							m_selectedSection = index;
+						}
+						ImGui::TableNextColumn();
+						ImGui::Text("%s", vid.name.data());
+
+                        ImGui::TableNextRow();
+					}
+
+					ImGui::EndTable();
+				}
             }
 
-            if (m_sectionUI) {
+            if (m_selectedSection >= 0 && m_selectedSection < m_model.vids().size()) {
                 ImGui::TableNextColumn();
-                m_sectionUI();
+				VidRawData_ui(m_model.vids()[m_selectedSection]);
             }
             ImGui::EndTable();
 
@@ -155,8 +156,6 @@ public:
 private:
     Model& m_model;
 
-    std::vector <std::string > m_vidsHeaders;
-    std::function<void()> m_sectionUI;
     int m_selectedSection = 0;
 };
 
@@ -177,9 +176,7 @@ public:
 
 	static std::vector<VidView> getVids(const Model& model) {
 		return model.vids()
-			| std::views::transform([](const VidRawData& vid) {
-			return VidView{ &vid };
-				})
+			| std::views::transform([](const VidRawData& vid) { return VidView{ &vid }; })
 			| std::ranges::to<std::vector>();
 	}
 
@@ -244,7 +241,7 @@ public:
 
 	static std::vector<std::filesystem::path> getMaps(const Model& model, const std::filesystem::path& mapsDirectory) {
         return std::filesystem::recursive_directory_iterator{ mapsDirectory }
-		| std::views::transform([](const auto& entry) { return entry.path(); })
+		    | std::views::transform([](const auto& entry) { return entry.path(); })
 			| std::views::filter([](const auto& path) { return path.extension() == ".map"; })
 			| std::ranges::to<std::vector>();
 	}
@@ -312,7 +309,6 @@ public:
 		}
 
         if (ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
-            //ImGui::Text("Exporting map to", filename.c_str());
             assert(m_savePopupfilenameBuffer.has_value());
             ImGui::InputText("Exporting map to", m_savePopupfilenameBuffer->data(), m_savePopupfilenameBuffer->size());
             if (ImGui::Button("OK", ImVec2(120, 0))) {
@@ -355,7 +351,7 @@ public:
 	void on_frame() {
 		m_viewModel.updateUI();
 
-        //ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
 	}
     
     void on_event(const sapp_event& event) {
@@ -401,13 +397,26 @@ void VidRawData_ui(const VidRawData& self)
     ImGui::Text("z2 : % i", self.z);
 
 
-    ImGui::Text("interestingNumber : % i", self.interestingNumber);
+constexpr auto classifyVisualBehavior = [](std::uint8_t behavior) -> const char* {
+		switch (behavior & 0x3F) {
+		case 0:
+			return "unpack mode 1";
+		case 6:
+			return "unpack mode 2";
+		case 8:
+			return "unpack mode 3";
+		default:
+			return "not packed";
+		}
+	};
 
     if (!self.vid) {
+		ImGui::Text("Source nVid: %i", -self.dataSizeOrNvid);
         return;
     }
 
-    ImGui::Text("Visual behavior: %i", self.visualBehavior);
+    ImGui::Text("frames size: %i", self.dataSizeOrNvid);
+	ImGui::Text("Visual behavior: %x (%s)", self.visualBehavior, classifyVisualBehavior(self.visualBehavior));
     ImGui::Text("???: %i", self.hz7);
     ImGui::Text("numOfFrames: %i", self.numOfFrames);
     ImGui::Text("dataSize: %i", self.dataSize);

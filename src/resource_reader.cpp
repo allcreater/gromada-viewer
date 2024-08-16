@@ -29,12 +29,6 @@ export {
 
 		template <typename T>
 		void read_to(T& out) {
-			//if (m_count + sizeof T > m_dataLength)
-			//	throw std::overflow_error("");
-
-			//m_stream.read(reinterpret_cast<char*>(&out), sizeof T);
-
-			//m_count += sizeof T;
 			read_to(std::span{ reinterpret_cast<std::byte*>(&out), sizeof T });
 		}
 
@@ -110,7 +104,6 @@ export {
 		}
 	private:
 		SectionHeader m_header;
-		//std::istream& m_stream;
 		std::streampos m_beginPos, m_dataPos, m_endPos;
 	};
 
@@ -153,8 +146,6 @@ export {
 			return section.beginRead(m_stream);
 		}
 
-		//std::istream& getStream() { return m_stream; }
-
 		std::uint32_t getNumSections() const { return m_sectionsCount;  }
 
 	private:
@@ -168,50 +159,17 @@ export {
 
 	class GromadaResourceNavigator {
 	public:
-		//struct Section
-		//{
-		//	SectionHeader rawHeader;
-		//	std::streampos beginPos;
-		//	std::streampos dataPos;
-
-		//	//std::vector<char> readSectionData(std::istream& stream) {
-		//	//	stream.seekg(dataPos, std::ios_base::beg);
-
-		//	//	auto dataSize = rawHeader.dataOffset - 6;
-		//	//	std::vector<char> result(dataSize);
-		//	//	stream.read(reinterpret_cast<char*>(result.data()), result.size());
-
-		//	//	//(std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{});
-
-		//	//	return result;
-		//	//}
-		//};
-
-
-	public:
 		GromadaResourceNavigator() = default;
 		GromadaResourceNavigator(GromadaResourceReader& reader) {
 			reader.goStart();
 
 			m_sections.reserve(reader.getNumSections());
 			for (int i = 0; i < reader.getNumSections(); ++i) {
-			//	auto beginPos = reader.getStream().tellg();
-
-			//	reader.goToNextSection();
-			//	auto& currentSection = m_sections.emplace_back(
-			//		reader.getHeader(), beginPos, reader.getStream().tellg()
-			//	);
-
-			//	if (currentSection.rawHeader.nextSectionOffset == 0)
-			//		break;
-
-			//}
 				auto section = reader.nextSection();
 				if (!section)
 					break;
 
 				m_sections.push_back(std::move(*section));
-
 			}
 		}
 
@@ -220,38 +178,5 @@ export {
 	private:
 		std::vector<Section> m_sections;
 	};
-
-	struct Section1Data {
-		std::uint32_t width;
-		std::uint32_t height;
-		std::uint16_t observerX;
-		std::uint16_t observerY;
-		std::uint32_t e;
-		std::uint32_t f;
-		std::uint32_t g;
-
-		static Section1Data read(std::istream& stream) {
-			Section1Data data;
-			auto pos = stream.tellg();
-			stream.read(reinterpret_cast<char*>(&data.width), 4);
-			stream.read(reinterpret_cast<char*>(&data.height), 4);
-			stream.read(reinterpret_cast<char*>(&data.observerX), 2);
-			stream.read(reinterpret_cast<char*>(&data.observerY), 2);
-			stream.read(reinterpret_cast<char*>(&data.e), 4);
-			stream.read(reinterpret_cast<char*>(&data.f), 4);
-			stream.read(reinterpret_cast<char*>(&data.g), 4);
-
-			//stream.seekg(pos, std::ios_base::beg);
-			//std::byte buf[24];
-			//stream.read(reinterpret_cast<char*>(buf), 24);
-
-			//auto x = data.width;
-
-			//std::memcpy(reinterpret_cast<char*>(&data.width), buf, 4);
-
-			return data;
-		}
-	};
-
 
 }

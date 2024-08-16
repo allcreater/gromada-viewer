@@ -54,7 +54,7 @@ export struct VidRawData {
 	std::array<std::uint16_t, 16> children;
 	std::array<std::uint8_t, 16> something;
 
-	std::int32_t interestingNumber;
+	std::int32_t dataSizeOrNvid; // if < 0 then it's nvid
 
 	std::uint8_t visualBehavior;
 	std::uint16_t hz7;
@@ -67,9 +67,6 @@ export struct VidRawData {
 
 	//
 	void read(BinaryStreamReader reader);
-	int print(std::span<char> buffer) const {
-		return std::snprintf(buffer.data(), buffer.size(), "%s", name.data());
-	}
 
 	std::ostream& write_csv_line(std::ostream& stream) const {
 		auto prettyName = std::string_view{ name.data(), strnlen(name.data(), name.size()) };
@@ -80,7 +77,7 @@ export struct VidRawData {
 			<< hz1 << ',' << hz2 << ',' << +hz3 << ',' << +army << ',' << +someWeaponIndex << ',' << +hz4 << ',' << deathSizeMargin << ',' << +somethingAboutDeath << ',' << +sX << ',' << +sY << ',' << +sZ << ','
 			<< hz5 << ',' << hz6 << ',' << +direction << ',' << +z << ','
 			//<< supportedActions << ',' << children << ',' << something << ','
-			<< interestingNumber;
+			   << dataSizeOrNvid;
 
 		if (vid) {
 			stream << ',' << +visualBehavior << ',' << hz7 << ',' << numOfFrames << ',' << dataSize << ',' << imgWidth << ',' << imgHeight;
@@ -139,17 +136,19 @@ public:
 		const auto readStaticObj = [&]() {
 			auto unused_hp = reader.read<std::uint8_t>();
 			object.extras["unused_hp"] = unused_hp;
-			};
+		};
 
 		const auto readObject2 = [&]() {
 			if (m_header.mapVersion > 2) {
 				auto buildTime = reader.read<std::uint8_t>();
 				object.extras["buildTime"] = buildTime;
 			}
+
 			if (m_header.mapVersion > 1) {
 				auto army = reader.read<std::uint8_t>();
 				object.extras["army"] = army;
 			}
+
 			auto behave = reader.read<std::uint8_t>();
 			object.extras["behave"] = behave;
 
@@ -159,7 +158,7 @@ public:
 			for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0; ) {
 				object.extras["items"].append(itemId);
 			}
-			};
+		};
 
 		switch (vids[nvid].behave) {
 			// StaticObj
@@ -245,11 +244,11 @@ public:
 				readObjectPayload(nvid, reader, result.back());
 			}
 			return result;
-			};
+		};
 
 
 		auto dynamicObjectsSection = resourceNavigator.getSections()
-			| std::views::filter([](const Section& section) {return section.header().type == SectionType::Objects; })
+			| std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; })
 			| std::views::transform([&](const Section& section) { return readDynamicObjects(reader.beginRead(section)); })
 			| std::views::join
 			| std::ranges::to<std::vector>();
@@ -345,9 +344,9 @@ void VidRawData::read(BinaryStreamReader reader)
 	reader.read_to(children);
 	reader.read_to(something);
 
-	reader.read_to(interestingNumber);
+	reader.read_to(dataSizeOrNvid);
 
-	if (interestingNumber < 0) {
+	if (dataSizeOrNvid < 0) {
 		return;
 	}
 
