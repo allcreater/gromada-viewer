@@ -13,6 +13,11 @@ add_executable (GromadaEditor
 		"application.cpp"
 		"imgui_utils.cpp"
 		"resources.cpp"
+		"view_models/vids.cpp"
+		"view_models/map.cpp"
+		"view_models/map_selector.cpp"
+		"application_view_model.cpp"
+		"application_model.cpp"
  )
 
 #find_package(SFML REQUIRED)
