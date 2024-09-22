@@ -383,3 +383,22 @@ void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
 		frameBegin += offset;
 	}
 }
+
+export std::vector<StreamSpan> getSounds(GromadaResourceReader& reader, const Section& soundSection) {
+	assert(soundSection.header().type == SectionType::Sound);
+
+	std::vector<StreamSpan> result;
+	result.reserve(soundSection.header().elementCount);
+
+	BinaryStreamReader soundReader = reader.beginRead(soundSection);
+	for (int i = 0; i < soundSection.header().elementCount; ++i) {
+		const auto _ = soundReader.read<std::uint8_t>();
+		const auto offset = soundReader.read<std::uint32_t>();
+
+		result.emplace_back(soundReader.tellg(), static_cast<std::streamoff>(offset));
+
+		soundReader.skip(offset);
+	}
+
+	return result;
+}

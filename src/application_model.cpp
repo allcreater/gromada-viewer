@@ -16,7 +16,20 @@ struct Resources {
             | std::views::transform([this](const Section& section) { VidRawData result;  result.read(reader.beginRead(section)); return result; })
             | std::ranges::to<std::vector>();
 		// clang-format on
+
+		auto sounds = navigator.getSections() 
+			| std::views::filter([](const Section& section) { return section.header().type == SectionType::Sound; }) 
+			| std::views::transform(std::bind_front(getSounds, std::ref(reader)))
+			| std::views::join
+			| std::ranges::to<std::vector>();
+
+		//for (const auto& [i,sound] : sounds | std::views::enumerate) {
+		//	auto data = reader.beginRead(sound).readAll();
+		//	std::ofstream stream{std::string("out/sound") + std::to_string(i) + ".wav", std::ios_base::out | std::ios_base::binary};
+		//	stream.write(reinterpret_cast<const char*>(data.data()), data.size());
+		//}
 	}
+
 
 	GromadaResourceReader reader;
 	GromadaResourceNavigator navigator;

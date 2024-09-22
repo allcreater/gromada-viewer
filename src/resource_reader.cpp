@@ -47,7 +47,15 @@ export {
 			m_count += bytes;
 		}
 
+		std::vector<std::byte> readAll() && {
+			std::vector<std::byte> result(m_dataLength - m_count);
+			read_to(std::span{result});
+			return result;
+		}
+
 		size_t size() const noexcept { return m_dataLength; }
+		std::streampos tellg() const noexcept { return m_stream.tellg(); }
+		//std::istream& stream() const&& noexcept { return m_stream; }
 
 	private:
 		std::istream& m_stream;
@@ -87,24 +95,34 @@ export {
 		}
 	};
 
-	class Section {
+	class StreamSpan {
+	public:
+		StreamSpan(std::streampos beginPos, std::streampos endPos)
+			: m_beginPos{beginPos}, m_endPos{endPos} {}
+		StreamSpan(std::streampos beginPos, std::streamoff offset)
+			: StreamSpan{beginPos, beginPos + offset} {}
+
+		BinaryStreamReader beginRead(std::istream& stream) const noexcept {
+			stream.seekg(m_beginPos, std::ios_base::beg);
+			return BinaryStreamReader{stream, static_cast<size_t>(m_endPos - m_beginPos)};
+		}
+
+	private:
+		std::streampos m_beginPos, m_endPos;
+	};
+
+	class Section : public StreamSpan {
 	public:
 		Section(const SectionHeader& header, std::streampos beginPos) 
-			: m_header{ header }
-			//, m_stream { stream }
-			, m_beginPos{ beginPos }
-			, m_dataPos{ beginPos + static_cast<std::streampos>(11 + header.dataOffset) }
-			, m_endPos{ beginPos + static_cast<std::streamoff>(5 + header.nextSectionOffset) } {}
+			: StreamSpan{beginPos + static_cast<std::streampos>(11 + header.dataOffset), beginPos + static_cast<std::streamoff>(5 + header.nextSectionOffset)}
+			, m_header{ header }
+			, m_beginPos{ beginPos } {}
 
 		const SectionHeader& header() const noexcept { return m_header; }
 
-		BinaryStreamReader beginRead(std::istream& stream) const noexcept {
-			stream.seekg(m_dataPos, std::ios_base::beg);
-			return BinaryStreamReader{ stream, static_cast<size_t>(m_endPos - m_dataPos) };
-		}
 	private:
 		SectionHeader m_header;
-		std::streampos m_beginPos, m_dataPos, m_endPos;
+		std::streampos m_beginPos;
 	};
 
 	class GromadaResourceReader {
@@ -129,9 +147,7 @@ export {
 			// skip unused bytes
 			m_stream.seekg(currentSection.dataOffset, std::ios_base::cur);
 
-			m_currentSectionIndex++;
-
-			if (currentSection.nextSectionOffset == 0 || m_currentSectionIndex == m_sectionsCount) {
+			if (m_currentSectionIndex++ == m_sectionsCount || currentSection.nextSectionOffset == 0) {
 				return std::nullopt;
 			}
 
@@ -142,9 +158,15 @@ export {
 			};
 		}
 
-		BinaryStreamReader beginRead(const Section& section) {
+		BinaryStreamReader beginRead(const StreamSpan& section) {
 			return section.beginRead(m_stream);
 		}
+
+		//void borrowStream(std::function<void(std::istream&)> func) {
+		//	auto pos = m_stream.tellg();
+		//	func(m_stream);
+		//	m_stream.seekg(pos);
+		//}
 
 		std::uint32_t getNumSections() const { return m_sectionsCount;  }
 
