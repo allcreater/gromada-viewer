@@ -68,9 +68,40 @@ private:
 	int m_selectedSection = 0;
 };
 
+namespace {
+	constexpr auto classifyVisualBehavior (std::uint8_t behavior) -> const char* {
+		switch (behavior & 0x3F) {
+		case 0:
+			return "unpack mode 1";
+		case 6:
+			return "unpack mode 2";
+		case 8:
+			return "unpack mode 3";
+		default:
+			return "not packed";
+		}
+	};
+
+	constexpr auto classifyUnitType(UnitType unitType) -> const char* {
+		using enum UnitType;
+		switch (unitType) {
+			case Terrain: return "Terrain";
+			case Object: return "Object";
+			case Monster: return "Monster";
+			case Avia: return "Avia";
+			case Cannon: return "Cannon";
+			case Sprite: return "Sprite";
+			case Item: return "Item";
+			default:
+				return "???";
+		}
+	}
+}
+
+
 void VidRawData_ui(const VidRawData& self) {
 	ImGui::Text("%s", self.name.data());
-	ImGui::Text("unitType: %i ", self.unitType);
+	ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
 	ImGui::Text("Behave: %i ", self.behave);
 	ImGui::Text("Flags % i", self.flags);
 	ImGui::Text("Collision mask: %x", self.collisionMask);
@@ -98,20 +129,6 @@ void VidRawData_ui(const VidRawData& self) {
 	ImGui::Text("???: %i", self.hz6);
 	ImGui::Text("direction? % i", self.direction);
 	ImGui::Text("z2 : % i", self.z);
-
-
-	constexpr auto classifyVisualBehavior = [](std::uint8_t behavior) -> const char* {
-		switch (behavior & 0x3F) {
-		case 0:
-			return "unpack mode 1";
-		case 6:
-			return "unpack mode 2";
-		case 8:
-			return "unpack mode 3";
-		default:
-			return "not packed";
-		}
-	};
 
 	if (!self.vid) {
 		ImGui::Text("Source nVid: %i", -self.dataSizeOrNvid);

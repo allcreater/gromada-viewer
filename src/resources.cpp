@@ -18,9 +18,19 @@ import std;
 
 struct Vid;
 
+export enum class UnitType : std::uint8_t {
+	Terrain = 0x1,
+	Object = 0x2,
+	Monster = 0x4,
+	Avia = 0x8,
+	Cannon = 0x10,
+	Sprite = 0x20,
+	Item = 0x40,
+};
+
 export struct VidRawData {
 	std::array<char, 34> name;
-	std::uint8_t unitType;
+	UnitType unitType;
 	std::uint8_t behave;
 	std::uint16_t flags;
 
@@ -71,7 +81,7 @@ export struct VidRawData {
 	std::ostream& write_csv_line(std::ostream& stream) const {
 		auto prettyName = std::string_view{ name.data(), strnlen(name.data(), name.size()) };
 
-		stream << prettyName << ',' << +unitType << ',' << +behave << ',' << flags << ','
+		stream << prettyName << ',' << +std::to_underlying(unitType) << ',' << +behave << ',' << flags << ','
 			<< +collisionMask << ',' << anotherWidth << ',' << anotherHeight << ',' << z_or_height << ','
 			<< +maxHP << ',' << gridRadius << ',' << +p6 << ',' << speed << ','
 			<< hz1 << ',' << hz2 << ',' << +hz3 << ',' << +army << ',' << +someWeaponIndex << ',' << +hz4 << ',' << deathSizeMargin << ',' << +somethingAboutDeath << ',' << +sX << ',' << +sY << ',' << +sZ << ','

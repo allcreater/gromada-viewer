@@ -29,7 +29,7 @@ export {
 
 		template <typename T>
 		void read_to(T& out) {
-			read_to(std::span{ reinterpret_cast<std::byte*>(&out), sizeof T });
+			read_to(std::span{ reinterpret_cast<std::byte*>(&out), sizeof (T) });
 		}
 
 		template <typename T>
