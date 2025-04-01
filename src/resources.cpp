@@ -6,6 +6,7 @@ module;
 #include <filesystem>
 #include <functional>
 #include <ranges>
+#include <mdspan>
 #endif
 
 #include <cassert>
@@ -28,6 +29,12 @@ export enum class UnitType : std::uint8_t {
 	Item = 0x40,
 };
 
+export struct RGBA8 {
+	std::uint8_t r;
+	std::uint8_t g;
+	std::uint8_t b;
+	std::uint8_t a;
+};
 export struct VidRawData {
 	std::array<char, 34> name;
 	UnitType unitType;
@@ -100,12 +107,25 @@ export struct VidRawData {
 
 		return stream << std::endl;
 	}
+
+	using DecodedData = std::vector<std::vector<RGBA8>>;
+	DecodedData decode() const;
+
+private:
+	void decodeFormat0(DecodedData& out) const;
+	void decodeFormat2(DecodedData& out) const;
 };
 
 export struct Vid {
 	std::array<std::uint8_t, 0x300> palette;
 	std::vector<std::byte> data;
 	std::vector<std::span<std::byte>> frames;
+
+	// TODO: move out of there
+	RGBA8 getPaletteColor(std::uint8_t index) const {
+		auto offset = index * 3;
+		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
+	}
 
 	void read(const VidRawData& header, BinaryStreamReader& reader);
 };
@@ -379,6 +399,8 @@ void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
 	frames.resize(header.numOfFrames);
 
 	reader.read_to(palette);
+	
+	frames.resize(header.numOfFrames);
 	reader.read_to(std::span{ data });
 
 	std::byte* frameBegin = data.data();
@@ -391,6 +413,116 @@ void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
 		frames[i] = { frameBegin, offset };
 
 		frameBegin += offset;
+	}
+}
+
+VidRawData::DecodedData VidRawData::decode() const {
+	std::vector<std::vector<RGBA8>> result;
+	result.reserve(vid->frames.size());
+
+	switch (visualBehavior) {
+	case 0:
+		decodeFormat0(result);
+		break;
+	case 2:
+		decodeFormat2(result);
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+
+void VidRawData::decodeFormat0(VidRawData::DecodedData& result) const {
+	assert(visualBehavior == 0);
+
+	for (const auto& srcData : vid->frames) {
+		if (srcData.size() > 2) {
+
+			std::vector<RGBA8> frame =  srcData.subspan(2) | std::views::transform([&](std::byte color_index) {
+				return vid->getPaletteColor(std::to_underlying(color_index));
+			}) | std::ranges::to<std::vector<RGBA8>>();
+
+			assert(frame.size() == imgWidth * imgHeight);
+			result.push_back(std::move(frame));
+		}
+		else {
+			std::uint16_t frameIndex;
+			std::memcpy(&frameIndex, srcData.data(), sizeof frameIndex);
+			result.push_back(result[frameIndex]);
+		}
+	}
+}
+
+struct SpanStreamReader {
+	SpanStreamReader(std::span<const std::byte> data)
+		: data{data} {}
+	template <typename T> T read() {
+		T result;
+		std::memcpy(&result, data.data(), sizeof result);
+		data = data.subspan(sizeof result);
+		return result;
+	}
+
+private:
+	std::span<const std::byte> data;
+};
+
+void VidRawData::decodeFormat2(VidRawData::DecodedData& result) const {
+	assert(visualBehavior == 2);
+
+	for (auto srcData : vid->frames) {
+		if (srcData.size() > 2) {
+			std::vector<RGBA8> frameData(imgWidth * imgHeight);
+			std::mdspan frame{frameData.data(), imgWidth, imgHeight};
+
+			SpanStreamReader reader{srcData.subspan(2)};
+
+			const auto startY = reader.read<std::uint16_t>();
+			const auto height = reader.read<std::uint16_t>();
+
+			for (size_t y = startY; y < startY + height; ++y) {
+				size_t x = 0;
+				while (true) {
+					const auto currentByte = reader.read<std::uint8_t>();
+					if (currentByte == 0)
+						break;
+					
+					const auto count = currentByte & 0x3F;
+					if ((currentByte & 0x80) == 0) {
+						if ((currentByte & 0x40) == 0) {
+							x += count;
+						}
+						else {
+							for (auto i = 0; i < count; ++i) {
+								frame[x++, y] = {0, 0, 0, 128};
+							}
+						}
+					} else {
+						if ((currentByte & 0x40) == 0) {
+							for (auto i = 0; i < count; ++i) {
+								const auto index = reader.read<std::uint8_t>();
+								frame[x++,y] = vid->getPaletteColor(index);
+							}
+						}
+						else {
+							const auto index = reader.read<std::uint8_t>();
+							for (auto i = 0; i < count; ++i) {
+								frame[x++,y] = vid->getPaletteColor(index);
+							}
+						}
+					}
+				}
+			}
+
+			result.push_back(std::move(frameData));
+		}
+		else {
+			std::uint16_t frameIndex;
+			std::memcpy(&frameIndex, srcData.data(), sizeof frameIndex);
+			result.push_back(result[frameIndex]);
+		}
 	}
 }
 
