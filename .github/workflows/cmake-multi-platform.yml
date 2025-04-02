@@ -25,20 +25,21 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        c_compiler: [gcc, clang, cl]
+        c_compiler: [clang, cl] #TODO: add gcc
         include:
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
+          # - os: ubuntu-latest
+          #   c_compiler: gcc
+          #   cpp_compiler: g++
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
+            cmake_flags: -DCMAKE_CXX_FLAGS=-stdlib=libc++
         exclude:
-          - os: windows-latest
-            c_compiler: gcc
+          # - os: windows-latest
+          #   c_compiler: gcc
           - os: windows-latest
             c_compiler: clang
           - os: ubuntu-latest
@@ -56,10 +57,15 @@ jobs:
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-
     - name: Enable Developer Command Prompt (Windows)
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1.13.0
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libc++-dev libc++abi-dev libgl1-mesa-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -72,6 +78,7 @@ jobs:
         -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/3rd_party/vcpkg/scripts/buildsystems/vcpkg.cmake
         -DCMAKE_POLICY_VERSION_MINIMUM="3.5"
         -DCMAKE_GENERATOR=Ninja
+        ${{ matrix.cmake_flags }}
         -S ${{ github.workspace }}
 
     - name: Build
