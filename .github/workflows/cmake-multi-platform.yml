@@ -65,6 +65,7 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/3rd_party/vcpkg/scripts/buildsystems/vcpkg.cmake
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -S ${{ github.workspace }}
 
     - name: Build
