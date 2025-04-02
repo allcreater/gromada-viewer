@@ -106,7 +106,6 @@ private:
 	}};
 	struct DecodedFrames {
 		std::vector<SgUniqueImage> images;
-		std::vector<SimguiUniqueImage> simguiImages;
 	};
 	std::optional<DecodedFrames> m_decodedFrames;
 };
@@ -194,7 +193,7 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
 		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / (self.imgWidth + 2.0f)));
-		for (const auto& [index, image] : m_decodedFrames->simguiImages | std::views::enumerate) {
+		for (const auto& [index, image] : m_decodedFrames->images | std::views::enumerate) {
 			ImGui::Image(simgui_imtextureid(image), {static_cast<float>(self.imgWidth), static_cast<float>(self.imgHeight)});
 
 			if ((index+1) % imagesPerLine != 0)
@@ -217,12 +216,7 @@ VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const Vi
 			.data = {{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}};
 	}) | std::ranges::to<std::vector>();
 
-	auto simguiImages = images |
-						std::views::transform([&](sg_image image) -> SimguiUniqueImage { return simgui_image_desc_t{.image = image, .sampler = sampler}; }) |
-						std::ranges::to<std::vector>();
-
 	return {
 		.images = std::move(images),
-		.simguiImages = std::move(simguiImages),
 	};
 }
