@@ -63,7 +63,9 @@ class App {
 
 	void init() {
 		// setup sokol-gfx, sokol-time and sokol-imgui
-		sg_desc desc = { };
+		sg_desc desc = {
+			.image_pool_size = 512,
+		};
 		desc.environment = sglue_environment();
 		desc.logger.func = slog_func;
 		sg_setup(&desc);

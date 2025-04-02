@@ -7,6 +7,8 @@ module;
 #include <sokol_log.h>
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
+
+#include <span>
 #endif
 
 export module imgui_utils;

@@ -48,7 +48,7 @@ public:
 	void on_frame() {
 		m_viewModel.updateUI();
 
-        ImGui::ShowDemoWindow();
+        //ImGui::ShowDemoWindow();
 	}
     
     void on_event(const sapp_event& event) {

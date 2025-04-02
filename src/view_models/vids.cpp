@@ -5,12 +5,11 @@ export module application.view_model:vids_window;
 
 import std;
 import sokol;
+import sokol.helpers;
 import sokol.imgui;
 import imgui_utils;
 
 import application.model;
-
-void VidRawData_ui(const VidRawData& self);
 
 export class VidsWindowViewModel {
 public:
@@ -24,48 +23,90 @@ public:
 									   ImGuiTableFlags_ContextMenuInBody;
 
 		ImGui::Begin("Vids");
-		if (ImGui::BeginTable("table1", 2, flags)) {
-			ImGui::TableNextColumn();
 
-			ImVec2 listBoxSize{-FLT_MIN, ImGui::GetWindowHeight() - 80.0f};
-			bool changed = true;
-			{
-				if (ImGui::BeginTable("vids_list_table", 2, ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter, listBoxSize)) {
-					ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-					for (auto [index, vid] : m_model.vids() | std::views::enumerate) {
-						ImGui::TableNextColumn();
+		const auto prevSelectedSection = m_selectedSection;
 
-						if (ImGui::Selectable(std::to_string(index).c_str(), m_selectedSection == index, ImGuiSelectableFlags_SpanAllColumns)) {
-							m_selectedSection = index;
-						}
-						ImGui::TableNextColumn();
-						ImGui::Text("%s", vid.name.data());
+		if (ImGui::IsWindowFocused()) {
+			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
+				m_selectedSection = std::max(m_selectedSection - 1, 0);
+			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
+				m_selectedSection = std::min(m_selectedSection + 1, static_cast<int>(m_model.vids().size()));
+		}
 
-						ImGui::TableNextRow();
-					}
+		if (ImGui::BeginTable("vids_list_table", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
+			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+			ImGui::TableSetupColumn("Graphics format", ImGuiTableColumnFlags_WidthFixed, 50.0f);
 
-					ImGui::EndTable();
-				}
-			}
+			ImGui::TableHeadersRow();
 
-			if (m_selectedSection >= 0 && m_selectedSection < m_model.vids().size()) {
+
+			// ImGui::TableGetSortSpecs()
+			// TODO: add sorting
+
+			for (auto [index, vid] : m_model.vids() | std::views::enumerate) {
 				ImGui::TableNextColumn();
-				VidRawData_ui(m_model.vids()[m_selectedSection]);
+
+				bool isElementSelected = m_selectedSection == index;
+				if (ImGui::Selectable(std::to_string(index).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
+					m_selectedSection = index;
+				}
+				if (isElementSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%s", vid.name.data());
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%i", vid.behave);
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%i", vid.visualBehavior);
+
+
+				ImGui::TableNextRow();
 			}
+
 			ImGui::EndTable();
 
-			if (ImGui::Button("Export CSV")) {
-				m_model.write_csv("vids.csv");
+			ImGui::Begin("Vid details");
+			if (m_selectedSection >= 0 && m_selectedSection < m_model.vids().size()) {
+				const auto& vid = m_model.vids()[m_selectedSection];
+				if (prevSelectedSection != m_selectedSection)
+					m_decodedFrames = DecodeVidFrames(vid, m_guiImagesSampler);
+
+				VidUI(vid);
 			}
+			ImGui::End();
 		}
 		ImGui::End();
 	}
 
 private:
+	void VidUI(const VidRawData& self);
+	
+	struct DecodedFrames;
+	static DecodedFrames DecodeVidFrames(const VidRawData& vid, sg_sampler sampler);
+
+private:
 	Model& m_model;
 
 	int m_selectedSection = 0;
+
+	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
+		.min_filter = SG_FILTER_LINEAR,
+		.mag_filter = SG_FILTER_LINEAR,
+		.wrap_u = SG_WRAP_REPEAT,
+		.wrap_v = SG_WRAP_REPEAT,
+		.wrap_w = SG_WRAP_REPEAT,
+	}};
+	struct DecodedFrames {
+		std::vector<SgUniqueImage> images;
+		std::vector<SimguiUniqueImage> simguiImages;
+	};
+	std::optional<DecodedFrames> m_decodedFrames;
 };
 
 namespace {
@@ -99,7 +140,7 @@ namespace {
 }
 
 
-void VidRawData_ui(const VidRawData& self) {
+void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	ImGui::Text("%s", self.name.data());
 	ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
 	ImGui::Text("Behave: %i ", self.behave);
@@ -142,4 +183,40 @@ void VidRawData_ui(const VidRawData& self) {
 	ImGui::Text("dataSize: %i", self.dataSize);
 	ImGui::Text("imgWidth: %i", self.imgWidth);
 	ImGui::Text("imgHeight: %i", self.imgHeight);
+	
+
+	if (!m_decodedFrames)
+		return;
+
+	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
+		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / (self.imgWidth + 2.0f)));
+		for (const auto& [index, image] : m_decodedFrames->simguiImages | std::views::enumerate) {
+			ImGui::Image(simgui_imtextureid(image), {static_cast<float>(self.imgWidth), static_cast<float>(self.imgHeight)});
+
+			if ((index+1) % imagesPerLine != 0)
+				ImGui::SameLine();
+		}
+	}
+	ImGui::End();
+
+}
+
+VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const VidRawData& vid, sg_sampler sampler) {
+	auto images = vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
+		return sg_image_desc{.type = SG_IMAGETYPE_2D,
+			.width = static_cast<int>(vid.imgWidth),
+			.height = static_cast<int>(vid.imgHeight),
+			.num_slices = 1,
+			.pixel_format = SG_PIXELFORMAT_RGBA8,
+			.data = {{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}};
+	}) | std::ranges::to<std::vector>();
+
+	auto simguiImages = images |
+						std::views::transform([&](sg_image image) -> SimguiUniqueImage { return simgui_image_desc_t{.image = image, .sampler = sampler}; }) |
+						std::ranges::to<std::vector>();
+
+	return {
+		.images = std::move(images),
+		.simguiImages = std::move(simguiImages),
+	};
 }

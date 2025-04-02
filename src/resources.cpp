@@ -418,6 +418,9 @@ void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
 
 VidRawData::DecodedData VidRawData::decode() const {
 	std::vector<std::vector<RGBA8>> result;
+	if (!vid)
+		return result;
+
 	result.reserve(vid->frames.size());
 
 	switch (visualBehavior) {
@@ -475,7 +478,7 @@ void VidRawData::decodeFormat2(VidRawData::DecodedData& result) const {
 	for (auto srcData : vid->frames) {
 		if (srcData.size() > 2) {
 			std::vector<RGBA8> frameData(imgWidth * imgHeight);
-			std::mdspan frame{frameData.data(), imgWidth, imgHeight};
+			std::mdspan frame{frameData.data(), imgHeight, imgWidth};
 
 			SpanStreamReader reader{srcData.subspan(2)};
 
@@ -496,20 +499,20 @@ void VidRawData::decodeFormat2(VidRawData::DecodedData& result) const {
 						}
 						else {
 							for (auto i = 0; i < count; ++i) {
-								frame[x++, y] = {0, 0, 0, 128};
+								frame[y, x++] = {0, 0, 0, 128};
 							}
 						}
 					} else {
 						if ((currentByte & 0x40) == 0) {
 							for (auto i = 0; i < count; ++i) {
 								const auto index = reader.read<std::uint8_t>();
-								frame[x++,y] = vid->getPaletteColor(index);
+								frame[y, x++] = vid->getPaletteColor(index);
 							}
 						}
 						else {
 							const auto index = reader.read<std::uint8_t>();
 							for (auto i = 0; i < count; ++i) {
-								frame[x++,y] = vid->getPaletteColor(index);
+								frame[y, x++] = vid->getPaletteColor(index);
 							}
 						}
 					}
