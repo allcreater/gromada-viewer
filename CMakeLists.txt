@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.29)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CXX_SCAN_FOR_MODULES ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD
@@ -9,6 +9,8 @@ set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD
   # `Help/dev/experimental.rst` in the CMake source corresponding to
   # your CMake build for the exact value to use.
   "0e5b6991-d74f-4b3d-a41c-cf096e0b2508")
+
+set(CMAKE_CXX_MODULE_STD ON)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -20,8 +22,6 @@ project(GromadaEditor
     VERSION 0.0.1
     LANGUAGES CXX
 )
-
-set(CMAKE_CXX_MODULE_STD 1)
 
 add_subdirectory(3rd_party/)
 add_subdirectory(src/)
