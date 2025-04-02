@@ -26,7 +26,7 @@ public:
 
 		const auto prevSelectedSection = m_selectedSection;
 
-		if (ImGui::IsWindowFocused()) {
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
 			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
 				m_selectedSection = std::max(m_selectedSection - 1, 0);
 			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
@@ -74,8 +74,10 @@ public:
 			ImGui::Begin("Vid details");
 			if (m_selectedSection >= 0 && m_selectedSection < m_model.vids().size()) {
 				const auto& vid = m_model.vids()[m_selectedSection];
-				if (prevSelectedSection != m_selectedSection)
+				if (prevSelectedSection != m_selectedSection) {
+					m_decodedFrames.reset(); // To reduce sokol's pool size
 					m_decodedFrames = DecodeVidFrames(vid, m_guiImagesSampler);
+				}
 
 				VidUI(vid);
 			}
@@ -188,6 +190,8 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	if (!m_decodedFrames)
 		return;
 
+	static ImVec2 lastWindowSize = {100, 100};
+	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
 		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / (self.imgWidth + 2.0f)));
 		for (const auto& [index, image] : m_decodedFrames->simguiImages | std::views::enumerate) {
@@ -196,6 +200,8 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 			if ((index+1) % imagesPerLine != 0)
 				ImGui::SameLine();
 		}
+
+		lastWindowSize = ImGui::GetWindowSize();
 	}
 	ImGui::End();
 

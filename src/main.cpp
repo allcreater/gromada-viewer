@@ -64,7 +64,7 @@ class App {
 	void init() {
 		// setup sokol-gfx, sokol-time and sokol-imgui
 		sg_desc desc = {
-			.image_pool_size = 512,
+			.image_pool_size = 1024,
 		};
 		desc.environment = sglue_environment();
 		desc.logger.func = slog_func;
@@ -72,7 +72,9 @@ class App {
 
 		// use sokol-imgui with all default-options (we're not doing
 		// multi-sampled rendering or using non-default pixel formats)
-		simgui_desc_t simgui_desc = { };
+		simgui_desc_t simgui_desc = { 
+			.image_pool_size = 1024,
+		};
 		simgui_desc.logger.func = slog_func;
 		simgui_setup(&simgui_desc);
 
