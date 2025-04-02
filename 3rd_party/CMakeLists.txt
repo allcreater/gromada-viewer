@@ -12,5 +12,5 @@ target_sources( sokol PUBLIC
   FILES
 	"sokol.cppm"
 	"sokol-imgui.cppm"
-
+	"helper_classes.cppm"
 )
