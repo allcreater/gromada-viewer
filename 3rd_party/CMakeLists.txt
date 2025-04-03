@@ -1,6 +1,6 @@
-cmake_minimum_required (VERSION 3.29)
+cmake_minimum_required (VERSION 3.30)
 
-find_package(IMGUI REQUIRED)
+find_package(IMGUI REQUIRED CONFIG)
 
 add_library(sokol)
 target_include_directories(sokol PUBLIC sokol)
