@@ -25,7 +25,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        c_compiler: [clang, cl] #TODO: add gcc
+        c_compiler: [clang-20, cl] #TODO: add gcc
         include:
           - os: windows-latest
             c_compiler: cl
@@ -34,14 +34,14 @@ jobs:
           #   c_compiler: gcc
           #   cpp_compiler: g++
           - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+            c_compiler: clang-20
+            cpp_compiler: clang++-20
             cmake_flags: -DCMAKE_CXX_FLAGS=-stdlib=libc++
         exclude:
           # - os: windows-latest
           #   c_compiler: gcc
           - os: windows-latest
-            c_compiler: clang
+            c_compiler: clang-20
           - os: ubuntu-latest
             c_compiler: cl
 
@@ -61,9 +61,12 @@ jobs:
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1.13.0
 
-    - name: Install clang (Ubuntu)
+    - name: Install clang-20 (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
-      uses: egor-tensin/setup-clang@v1.4
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 20
 
     - name: Install dependencies (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
