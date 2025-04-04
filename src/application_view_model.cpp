@@ -1,11 +1,10 @@
 module;
 #include <imgui.h>
+#include <sokol_app.h>
 
 export module application.view_model;
 
 import std;
-import sokol;
-import sokol.imgui;
 import imgui_utils;
 
 import application.model;

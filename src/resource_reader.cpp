@@ -132,7 +132,7 @@ export {
 		explicit GromadaResourceReader(std::filesystem::path path) : m_stream{ path, std::ios_base::in | std::ios_base::binary } {
 			m_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-			m_stream.read(reinterpret_cast<char*>(&m_sectionsCount), sizeof(uint32_t));
+			m_stream.read(reinterpret_cast<char*>(&m_sectionsCount), sizeof(std::uint32_t));
 			m_currentSectionBegin = m_stream.tellg();
 		}
 

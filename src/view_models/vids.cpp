@@ -1,12 +1,15 @@
 module;
 #include <imgui.h>
+#include <sokol_gfx.h>
+#include <sokol_app.h>
+#include <sokol_log.h>
+#include <sokol_glue.h>
+#include <util/sokol_imgui.h>
 
 export module application.view_model:vids_window;
 
 import std;
-import sokol;
 import sokol.helpers;
-import sokol.imgui;
 import imgui_utils;
 
 import application.model;

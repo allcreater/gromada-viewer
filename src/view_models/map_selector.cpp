@@ -1,11 +1,15 @@
 module;
 #include <imgui.h>
+#include <sokol_gfx.h>
+#include <sokol_app.h>
+#include <sokol_log.h>
+#include <sokol_glue.h>
+#include <util/sokol_imgui.h>
 
 export module application.view_model:map_selector;
 
 import std;
-import sokol;
-import sokol.imgui;
+import sokol.helpers;
 import imgui_utils;
 
 import application.model;

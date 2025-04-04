@@ -3,14 +3,14 @@ module;
 #include <argparse/argparse.hpp>
 #include <json/json.h>
 #include <glm/glm.hpp>
-
-#if __INTELLISENSE__
 #include <sokol_gfx.h>
 #include <sokol_app.h>
 #include <sokol_log.h>
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
+
+#if __INTELLISENSE__
 #include <array>
 #include <bitset>
 #include <filesystem>
@@ -21,8 +21,6 @@ module;
 export module application;
 
 import std;
-import sokol;
-import sokol.imgui;
 
 import application.model;
 import application.view_model;

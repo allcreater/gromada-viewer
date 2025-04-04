@@ -1,21 +1,18 @@
 module;
 #include <imgui.h>
-
-#if __INTELLISENSE__
 #include <sokol_gfx.h>
 #include <sokol_app.h>
 #include <sokol_log.h>
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
+#if __INTELLISENSE__
 #include <span>
 #endif
 
 export module imgui_utils;
 
 import std;
-import sokol;
-import sokol.imgui;
 
 
 export template<typename T, typename Fn = std::identity>

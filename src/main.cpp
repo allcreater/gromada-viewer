@@ -1,16 +1,15 @@
 #include <argparse/argparse.hpp>
 
-#if __INTELLISENSE__
 #include <sokol_gfx.h>
 #include <sokol_app.h>
 #include <sokol_log.h>
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
+
+#if __INTELLISENSE__
 #endif
 
 
-import sokol;
-import sokol.imgui;
 import application;
 
 static sg_pass_action pass_action;
