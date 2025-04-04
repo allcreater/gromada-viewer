@@ -8,11 +8,12 @@
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "FILEPATH",
           "value": "${sourceDir}/3rd_party/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        }
+        },
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
       }
     },
     {
-      "name": "windows-base",
+      "name": "base-cl",
       "inherits": "base",
       "hidden": true,
       "generator": "Ninja",
@@ -25,7 +26,6 @@
       "environment": {
         "CXXFLAGS": "/W4 /Wall /extern:W2 /external:anglebrackets"
       },
-      "cmakeExecutable": "C:\\Program Files\\CMake\\bin\\cmake.exe",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -33,9 +33,26 @@
       }
     },
     {
-      "name": "x64-debug",
-      "displayName": "x64 Debug",
-      "inherits": "windows-base",
+      "name": "base-clang",
+      "inherits": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build-clang/${presetName}",
+      "installDir": "${sourceDir}/out/build-clang/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++"
+      },
+      "environment": {
+        "CXXFLAGS": "",
+        "PATH": "/usr/bin:$penv{PATH}"
+      }
+    },
+    {
+      "name": "cl-x64-debug",
+      "displayName": "MSVC x64 Debug",
+      "inherits": "base-cl",
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -48,9 +65,21 @@
       }
     },
     {
-      "name": "x64-release",
-      "displayName": "x64 Release",
-      "inherits": "windows-base",
+      "name": "cl-x64-release",
+      "displayName": "MSVC x64 Release",
+      "inherits": "base-cl",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "clang-x64-release",
+      "displayName": "Clang x64 Release",
+      "inherits": "base-clang",
       "architecture": {
         "value": "x64",
         "strategy": "external"
