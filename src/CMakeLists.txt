@@ -28,7 +28,7 @@ target_link_libraries(GromadaEditor
 	PRIVATE
 		sokol
 		argparse::argparse
-		jsoncpp_lib
+		JsonCpp::JsonCpp
 )
 
 
