@@ -53,7 +53,7 @@ public:
 			// ImGui::TableGetSortSpecs()
 			// TODO: add sorting
 
-			for (auto [index, vid] : m_model.vids() | std::views::enumerate) {
+			for (int index = 0; const auto& vid : m_model.vids()) {
 				ImGui::TableNextColumn();
 
 				bool isElementSelected = m_selectedSection == index;
@@ -79,6 +79,7 @@ public:
 					vid.graphicsData);
 
 				ImGui::TableNextRow();
+				index++;
 			}
 
 			ImGui::EndTable();
@@ -209,11 +210,13 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
 		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->imgWidth + 2.0f)));
-		for (const auto& [index, image] : m_decodedFrames->images | std::views::enumerate) {
+		for (int index = 0; const auto& image : m_decodedFrames->images) {
 			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->imgWidth), static_cast<float>((*framesData)->imgHeight)});
 
 			if ((index+1) % imagesPerLine != 0)
 				ImGui::SameLine();
+
+			index++;
 		}
 
 		lastWindowSize = ImGui::GetWindowSize();

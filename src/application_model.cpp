@@ -68,9 +68,10 @@ public:
 				  "SomeWeaponIndex,Hz4,DeathSizeMargin,SomethingAboutDeath,sX,sY,sZ,Hz5,Hz6,Direction,Z,InterestingNumber,VisualBehavior,Hz7,NumOfFrames,"
 				  "DataSize,ImgWidth,ImgHeight"
 			   << std::endl;
-		for (const auto& [index, vid] : vids() | std::views::enumerate) {
+		for (int index = 0; const auto& vid : vids()) {
 			stream << index << ',';
 			vid.write_csv_line(stream);
+			index++;
 		}
 	}
 
