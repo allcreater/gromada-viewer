@@ -14,6 +14,11 @@ import imgui_utils;
 
 import application.model;
 
+//TODO: move to utils
+template <typename... Ts> struct overloaded : Ts... {
+	using Ts::operator()...;
+};
+
 export class VidsWindowViewModel {
 public:
 	explicit VidsWindowViewModel(Model& model)
@@ -66,8 +71,12 @@ public:
 				ImGui::Text("%i", vid.behave);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%i", vid.visualBehavior);
 
+				std::visit(overloaded{
+							   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
+							   [](const VidRawData::Graphics& arg) { ImGui::Text("%i", arg->visualBehavior); },
+						   },
+					vid.graphicsData);
 
 				ImGui::TableNextRow();
 			}
@@ -79,7 +88,10 @@ public:
 				const auto& vid = m_model.vids()[m_selectedSection];
 				if (prevSelectedSection != m_selectedSection) {
 					m_decodedFrames.reset(); // To reduce sokol's pool size
-					m_decodedFrames = DecodeVidFrames(vid, m_guiImagesSampler);
+
+					if (const auto pFramesData = std::get_if<VidRawData::Graphics>(&vid.graphicsData); pFramesData && *pFramesData) {
+						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
+					}
 				}
 
 				VidUI(vid);
@@ -93,7 +105,7 @@ private:
 	void VidUI(const VidRawData& self);
 	
 	struct DecodedFrames;
-	static DecodedFrames DecodeVidFrames(const VidRawData& vid, sg_sampler sampler);
+	static DecodedFrames DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
 private:
 	Model& m_model;
@@ -175,29 +187,30 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	ImGui::Text("direction? % i", self.direction);
 	ImGui::Text("z2 : % i", self.z);
 
-	if (!self.vid) {
-		ImGui::Text("Source nVid: %i", -self.dataSizeOrNvid);
-		return;
-	}
-
-	ImGui::Text("frames size: %i", self.dataSizeOrNvid);
-	ImGui::Text("Visual behavior: %x (%s)", self.visualBehavior, classifyVisualBehavior(self.visualBehavior));
-	ImGui::Text("???: %i", self.hz7);
-	ImGui::Text("numOfFrames: %i", self.numOfFrames);
-	ImGui::Text("dataSize: %i", self.dataSize);
-	ImGui::Text("imgWidth: %i", self.imgWidth);
-	ImGui::Text("imgHeight: %i", self.imgHeight);
-	
+	std::visit(overloaded{
+				   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
+				   [&self](const VidRawData::Graphics& arg) {
+					   ImGui::Text("frames size: %i", self.dataSizeOrNvid);
+					   ImGui::Text("Visual behavior: %x (%s)", arg->visualBehavior, classifyVisualBehavior(arg->visualBehavior));
+					   ImGui::Text("???: %i", arg->hz7);
+					   ImGui::Text("numOfFrames: %i", arg->numOfFrames);
+					   ImGui::Text("dataSize: %i", arg->dataSize);
+					   ImGui::Text("imgWidth: %i", arg->imgWidth);
+					   ImGui::Text("imgHeight: %i", arg->imgHeight);
+				   },
+			   },
+		self.graphicsData);
 
 	if (!m_decodedFrames)
 		return;
 
+	const auto framesData = std::get_if<VidRawData::Graphics>(&self.graphicsData);
 	static ImVec2 lastWindowSize = {100, 100};
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
-		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / (self.imgWidth + 2.0f)));
+		size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->imgWidth + 2.0f)));
 		for (const auto& [index, image] : m_decodedFrames->images | std::views::enumerate) {
-			ImGui::Image(simgui_imtextureid(image), {static_cast<float>(self.imgWidth), static_cast<float>(self.imgHeight)});
+			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->imgWidth), static_cast<float>((*framesData)->imgHeight)});
 
 			if ((index+1) % imagesPerLine != 0)
 				ImGui::SameLine();
@@ -209,7 +222,8 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 
 }
 
-VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const VidRawData& vid, sg_sampler sampler) {
+VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
+
 	auto images = vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
 		return sg_image_desc{.type = SG_IMAGETYPE_2D,
 			.width = static_cast<int>(vid.imgWidth),

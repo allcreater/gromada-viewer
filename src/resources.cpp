@@ -17,8 +17,6 @@ export module Gromada.Resources;
 import Gromada.ResourceReader;
 import std;
 
-struct Vid;
-
 export enum class UnitType : std::uint8_t {
 	Terrain = 0x1,
 	Object = 0x2,
@@ -35,6 +33,34 @@ export struct RGBA8 {
 	std::uint8_t b;
 	std::uint8_t a;
 };
+export struct VidGraphics {
+	std::uint8_t visualBehavior;
+	std::uint16_t hz7;
+	std::uint16_t numOfFrames;
+	std::uint32_t dataSize;
+	std::uint16_t imgWidth;
+	std::uint16_t imgHeight;
+
+	std::array<std::uint8_t, 0x300> palette;
+	std::vector<std::byte> data;
+	std::vector<std::span<std::byte>> frames;
+
+	// TODO: move out of there
+	RGBA8 getPaletteColor(std::uint8_t index) const {
+		auto offset = index * 3;
+		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
+	}
+
+	void read(BinaryStreamReader& reader);
+
+	using DecodedData = std::vector<std::vector<RGBA8>>;
+	DecodedData decode() const;
+
+private:
+	void decodeFormat0(DecodedData& out) const;
+	void decodeFormat2(DecodedData& out) const;
+};
+
 export struct VidRawData {
 	std::array<char, 34> name;
 	UnitType unitType;
@@ -73,14 +99,8 @@ export struct VidRawData {
 
 	std::int32_t dataSizeOrNvid; // if < 0 then it's nvid
 
-	std::uint8_t visualBehavior;
-	std::uint16_t hz7;
-	std::uint16_t numOfFrames;
-	std::uint32_t dataSize;
-	std::uint16_t imgWidth;
-	std::uint16_t imgHeight;
-
-	std::shared_ptr<Vid> vid;
+	using Graphics = std::shared_ptr<VidGraphics>;
+	std::variant<std::int32_t, Graphics> graphicsData;
 
 	//
 	void read(BinaryStreamReader reader);
@@ -96,8 +116,9 @@ export struct VidRawData {
 			//<< supportedActions << ',' << children << ',' << something << ','
 			   << dataSizeOrNvid;
 
-		if (vid) {
-			stream << ',' << +visualBehavior << ',' << hz7 << ',' << numOfFrames << ',' << dataSize << ',' << imgWidth << ',' << imgHeight;
+		if (const auto vid = std::get_if<Graphics>(&graphicsData)) {
+			stream << ',' << +(*vid)->visualBehavior << ',' << (*vid)->hz7 << ',' << (*vid)->numOfFrames << ',' << (*vid)->dataSize << ',' << (*vid)->imgWidth
+				   << ',' << (*vid)->imgHeight;
 		}
 		else {
 			stream << ",-,-,-,-,-,-";
@@ -108,26 +129,6 @@ export struct VidRawData {
 		return stream << std::endl;
 	}
 
-	using DecodedData = std::vector<std::vector<RGBA8>>;
-	DecodedData decode() const;
-
-private:
-	void decodeFormat0(DecodedData& out) const;
-	void decodeFormat2(DecodedData& out) const;
-};
-
-export struct Vid {
-	std::array<std::uint8_t, 0x300> palette;
-	std::vector<std::byte> data;
-	std::vector<std::span<std::byte>> frames;
-
-	// TODO: move out of there
-	RGBA8 getPaletteColor(std::uint8_t index) const {
-		auto offset = index * 3;
-		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
-	}
-
-	void read(const VidRawData& header, BinaryStreamReader& reader);
 };
 
 export struct DynamicObject {
@@ -380,6 +381,12 @@ void VidRawData::read(BinaryStreamReader reader)
 		return;
 	}
 
+	graphicsData = std::make_shared<VidGraphics>();
+	std::get<Graphics>(graphicsData)->read(reader);
+}
+
+
+void VidGraphics::read(BinaryStreamReader& reader) {
 	reader.read_to(visualBehavior);
 	reader.read_to(hz7);
 	reader.read_to(numOfFrames);
@@ -387,20 +394,10 @@ void VidRawData::read(BinaryStreamReader reader)
 	reader.read_to(imgWidth);
 	reader.read_to(imgHeight);
 
-	vid = std::make_shared<Vid>();
-	vid->read(*this, reader);
-
-}
-
-
-void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
-{
-	data.resize(header.dataSize - sizeof(palette));
-	frames.resize(header.numOfFrames);
-
+	data.resize(dataSize - sizeof(palette));
 	reader.read_to(palette);
 	
-	frames.resize(header.numOfFrames);
+	frames.resize(numOfFrames);
 	reader.read_to(std::span{ data });
 
 	std::byte* frameBegin = data.data();
@@ -416,12 +413,9 @@ void Vid::read(const VidRawData& header, BinaryStreamReader& reader)
 	}
 }
 
-VidRawData::DecodedData VidRawData::decode() const {
+VidGraphics::DecodedData VidGraphics::decode() const {
 	std::vector<std::vector<RGBA8>> result;
-	if (!vid)
-		return result;
-
-	result.reserve(vid->frames.size());
+	result.reserve(frames.size());
 
 	switch (visualBehavior) {
 	case 0:
@@ -437,14 +431,14 @@ VidRawData::DecodedData VidRawData::decode() const {
 	return result;
 }
 
-void VidRawData::decodeFormat0(VidRawData::DecodedData& result) const {
+void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
 	assert(visualBehavior == 0);
 
-	for (const auto& srcData : vid->frames) {
+	for (const auto& srcData : frames) {
 		if (srcData.size() > 2) {
 
-			std::vector<RGBA8> frame =  srcData.subspan(2) | std::views::transform([&](std::byte color_index) {
-				return vid->getPaletteColor(std::to_underlying(color_index));
+			std::vector<RGBA8> frame =  srcData.subspan(2) | std::views::transform([this](std::byte color_index) {
+				return getPaletteColor(std::to_underlying(color_index));
 			}) | std::ranges::to<std::vector<RGBA8>>();
 
 			assert(frame.size() == imgWidth * imgHeight);
@@ -472,10 +466,10 @@ private:
 	std::span<const std::byte> data;
 };
 
-void VidRawData::decodeFormat2(VidRawData::DecodedData& result) const {
+void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
 	assert(visualBehavior == 2);
 
-	for (auto srcData : vid->frames) {
+	for (auto srcData : frames) {
 		if (srcData.size() > 2) {
 			std::vector<RGBA8> frameData(imgWidth * imgHeight);
 			std::mdspan frame{frameData.data(), imgHeight, imgWidth};
@@ -506,13 +500,13 @@ void VidRawData::decodeFormat2(VidRawData::DecodedData& result) const {
 						if ((currentByte & 0x40) == 0) {
 							for (auto i = 0; i < count; ++i) {
 								const auto index = reader.read<std::uint8_t>();
-								frame[y, x++] = vid->getPaletteColor(index);
+								frame[y, x++] = getPaletteColor(index);
 							}
 						}
 						else {
 							const auto index = reader.read<std::uint8_t>();
 							for (auto i = 0; i < count; ++i) {
-								frame[y, x++] = vid->getPaletteColor(index);
+								frame[y, x++] = getPaletteColor(index);
 							}
 						}
 					}
