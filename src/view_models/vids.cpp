@@ -14,10 +14,8 @@ import imgui_utils;
 
 import application.model;
 
-//TODO: move to utils
-template <typename... Ts> struct overloaded : Ts... {
-	using Ts::operator()...;
-};
+import utils;
+
 
 export class VidsWindowViewModel {
 public:

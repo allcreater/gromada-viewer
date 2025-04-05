@@ -16,6 +16,7 @@ export module Gromada.Resources;
 
 import Gromada.ResourceReader;
 import std;
+import utils;
 
 export enum class UnitType : std::uint8_t {
 	Terrain = 0x1,
@@ -138,7 +139,17 @@ export struct DynamicObject {
 	int z;
 	int direction;
 
-	Json::Value extras;
+	struct BasePayload {
+		std::uint8_t hp;
+};
+	struct AdvancedPayload : BasePayload {
+		std::optional<std::uint8_t> buildTime;
+		std::optional<std::uint8_t> army;
+		std::uint8_t behave;
+		std::vector<std::int16_t> items;
+	};
+	using Payload = std::variant<std::monostate, BasePayload, AdvancedPayload>;
+	Payload payload;
 };
 
 export struct MapHeaderRawData {
@@ -163,71 +174,53 @@ public:
 		loadDynamicObjects(reader, resourceNavigator);
 	}
 
-	void readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader, DynamicObject& object) const {
-		const auto readStaticObj = [&]() {
-			auto unused_hp = reader.read<std::uint8_t>();
-			object.extras["unused_hp"] = unused_hp;
+	DynamicObject::Payload readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader, DynamicObject& object) const {
+		const auto readStaticObj = [&](DynamicObject::BasePayload& result) {
+			result.hp = reader.read<std::uint8_t>();
 		};
 
-		const auto readObject2 = [&]() {
+		const auto readObject2 = [&](DynamicObject::AdvancedPayload& result) {
+			readStaticObj(result);
+
 			if (m_header.mapVersion > 2) {
-				auto buildTime = reader.read<std::uint8_t>();
-				object.extras["buildTime"] = buildTime;
+				result.buildTime = reader.read<std::uint8_t>();
 			}
 
 			if (m_header.mapVersion > 1) {
-				auto army = reader.read<std::uint8_t>();
-				object.extras["army"] = army;
+				result.army = reader.read<std::uint8_t>();
 			}
 
-			auto behave = reader.read<std::uint8_t>();
-			object.extras["behave"] = behave;
+			result.behave = reader.read<std::uint8_t>();
 
 			if (m_header.mapVersion == 0)
 				return;
 
 			for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0; ) {
-				object.extras["items"].append(itemId);
+				result.items.push_back(itemId);
 			}
 		};
 
-		switch (vids[nvid].behave) {
-			// StaticObj
-		case 0:
-		case 1:
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-		case 11:
-		case 14:
-		case 15:
-		case 16:
-		case 18:
-		case 20: {
-			readStaticObj();
-		} return;
+		static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
+		static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
+		static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
 
-			   // Object2
-		case 2:
-		case 3:
-		case 4:
-		case 13:
-		case 17: {
-			readStaticObj();
-			readObject2();
-		} return;
 
-		case 9:
-		case 10:
-		case 12:
-		case 19:
-			return;
-
-		default:
-			assert(false);
-			return;
+		const auto containsClassPredicate = [id = vids[nvid].behave](std::uint8_t x) { return x == id; };
+		if (std::ranges::any_of(staticClasses, containsClassPredicate)) {
+			DynamicObject::BasePayload result;
+			readStaticObj(result);
+			return result;
 		}
+		else if (std::ranges::any_of(dynamicClasses, containsClassPredicate)) {
+			DynamicObject::AdvancedPayload result;
+			readObject2(result);
+			return result;
+	}
+		else if (std::ranges::any_of(otherClasses, containsClassPredicate)) {
+			return std::monostate{};
+		}
+
+		throw std::runtime_error("Unknown object class");
 	}
 
 	void loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
@@ -306,7 +299,28 @@ public:
 			object["y"] = obj.y;
 			object["z"] = obj.z;
 			object["direction"] = obj.direction;
-			object["extras"] = obj.extras;
+			object["payload"] = std::visit(overloaded{
+											   [](const DynamicObject::BasePayload& payload) {
+												   Json::Value object;
+												   object["hp"] = payload.hp;
+												   return object;
+											   },
+											   [](const DynamicObject::AdvancedPayload& payload) {
+												   Json::Value object;
+												   object["hp"] = payload.hp;
+												   if (payload.buildTime)
+													   object["buildTime"] = *payload.buildTime;
+												   if (payload.army)
+													   object["army"] = *payload.army;
+												   object["behave"] = payload.behave;
+												   for (const auto item : payload.items) {
+													   object["items"].append(item);
+												   }
+												   return object;
+											   },
+											   [](const std::monostate&) { return Json::Value{}; },
+										   },
+				obj.payload);
 
 			objects.append(object);
 		}
