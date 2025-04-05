@@ -9,7 +9,6 @@ module;
 #include <ranges>
 #endif
 
-#include <cstddef>
 
 export module Gromada.ResourceReader;
 import std;
@@ -18,7 +17,7 @@ export {
 
 	class BinaryStreamReader {
 	public:
-		explicit BinaryStreamReader(std::istream& stream, size_t length) : m_stream{ stream }, m_dataLength{ length } {}
+		explicit BinaryStreamReader(std::istream& stream, std::size_t length) : m_stream{ stream }, m_dataLength{ length } {}
 
 		void read_to(std::span<std::byte> out) {
 			if (m_count + out.size() > m_dataLength)
@@ -41,7 +40,7 @@ export {
 			return result;
 		}
 
-		void skip(size_t bytes) { 
+		void skip(std::size_t bytes) { 
 			if (m_count + bytes > m_dataLength)
 				throw std::overflow_error("");
 
@@ -55,14 +54,14 @@ export {
 			return result;
 		}
 
-		size_t size() const noexcept { return m_dataLength; }
+		std::size_t size() const noexcept { return m_dataLength; }
 		std::streampos tellg() const noexcept { return m_stream.tellg(); }
 		//std::istream& stream() const&& noexcept { return m_stream; }
 
 	private:
 		std::istream& m_stream;
-		size_t m_dataLength;
-		size_t m_count = 0;
+		std::size_t m_dataLength;
+		std::size_t m_count = 0;
 	};
 
 
@@ -106,7 +105,7 @@ export {
 
 		BinaryStreamReader beginRead(std::istream& stream) const noexcept {
 			stream.seekg(m_beginPos, std::ios_base::beg);
-			return BinaryStreamReader{stream, static_cast<size_t>(m_endPos - m_beginPos)};
+			return BinaryStreamReader{stream, static_cast<std::size_t>(m_endPos - m_beginPos)};
 		}
 
 	private:

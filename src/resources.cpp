@@ -416,7 +416,7 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 	reader.read_to(std::span{ data });
 
 	std::byte* frameBegin = data.data();
-	for (size_t i = 0; i < frames.size(); ++i) {
+	for (std::size_t i = 0; i < frames.size(); ++i) {
 		//auto offset = *std::start_lifetime_as<std::uint32_t>(frameBegin);
 		std::uint32_t offset;
 		std::memcpy(&offset, frameBegin, sizeof offset);
@@ -494,8 +494,8 @@ void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
 			const auto startY = reader.read<std::uint16_t>();
 			const auto height = reader.read<std::uint16_t>();
 
-			for (size_t y = startY; y < startY + height; ++y) {
-				size_t x = 0;
+			for (std::size_t y = startY; y < startY + height; ++y) {
+				std::size_t x = 0;
 				while (true) {
 					const auto currentByte = reader.read<std::uint8_t>();
 					if (currentByte == 0)
