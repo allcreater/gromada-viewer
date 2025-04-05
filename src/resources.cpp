@@ -17,6 +17,7 @@ export module Gromada.Resources;
 import Gromada.ResourceReader;
 import std;
 import utils;
+import nlohmann_json_adapter;
 
 export enum class UnitType : std::uint8_t {
 	Terrain = 0x1,
@@ -280,56 +281,51 @@ public:
 	}
 
 	void write_json(std::ostream& stream) {
-		//Json::Value header;
-		//header["width"] = m_header.width;
-		//header["height"] = m_header.height;
-		//header["observerX"] = m_header.observerX;
-		//header["observerY"] = m_header.observerY;
-		//header["e"] = m_header.e;
-		//header["f"] = m_header.f;
-		//header["startTimer"] = m_header.startTimer;
-		//header["mapVersion"] = m_header.mapVersion;
+		auto objectToJson = [](const DynamicObject& obj) {
+			overloaded payloadVisitor{
+				[](const DynamicObject::BasePayload& payload) { return nlohmann::json{{"hp", payload.hp}}; },
+				[](const DynamicObject::AdvancedPayload& payload) {
+					return nlohmann::json{
+						{"hp", payload.hp},
+						//{"buildTime", payload.buildTime},
+						//{"army", payload.army},
+						payload.buildTime.transform([](std::uint8_t x) { return nlohmann::json{"buildTime", x}; }).value_or(nlohmann::json{}),
+						payload.army.transform([](std::uint8_t x) { return nlohmann::json{"army", x}; }).value_or(nlohmann::json{}),
+						{"buildTime", payload.buildTime.value_or(0)},
+						{"behave", payload.behave},
+						{"items", payload.items},
+					};
+				},
+				[](const std::monostate&) { return nlohmann::json{}; },
+			};
+
+			return nlohmann::json{
+				{"nvid", obj.nvid},
+				{"x", obj.x},
+				{"y", obj.y},
+				{"z", obj.z},
+				{"direction", obj.direction},
+				{"payload", std::visit(payloadVisitor, obj.payload)},
+			};
+		};
 
 
-		//Json::Value objects;
-		//for (const auto& obj : dynamicObjects) {
-		//	Json::Value object;
-		//	object["nvid"] = obj.nvid;
-		//	object["x"] = obj.x;
-		//	object["y"] = obj.y;
-		//	object["z"] = obj.z;
-		//	object["direction"] = obj.direction;
-		//	object["payload"] = std::visit(overloaded{
-		//									   [](const DynamicObject::BasePayload& payload) {
-		//										   Json::Value object;
-		//										   object["hp"] = payload.hp;
-		//										   return object;
-		//									   },
-		//									   [](const DynamicObject::AdvancedPayload& payload) {
-		//										   Json::Value object;
-		//										   object["hp"] = payload.hp;
-		//										   if (payload.buildTime)
-		//											   object["buildTime"] = *payload.buildTime;
-		//										   if (payload.army)
-		//											   object["army"] = *payload.army;
-		//										   object["behave"] = payload.behave;
-		//										   for (const auto item : payload.items) {
-		//											   object["items"].append(item);
-		//										   }
-		//										   return object;
-		//									   },
-		//									   [](const std::monostate&) { return Json::Value{}; },
-		//								   },
-		//		obj.payload);
+		nlohmann::json document{
+			{"header",
+				nlohmann::json{
+					{"width", m_header.width},
+					{"height", m_header.height},
+					{"observerX", m_header.observerX},
+					{"observerY", m_header.observerY},
+					{"e", m_header.e},
+					{"f", m_header.f},
+					{"startTimer", m_header.startTimer},
+					{"mapVersion", m_header.mapVersion},
+				}},
+			{"objects", dynamicObjects | std::views::transform(objectToJson) | std::views::common | std::ranges::to<std::vector>() },
+		};
 
-		//	objects.append(object);
-		//}
-
-		//Json::Value root;
-		//root["header"] = header;
-		//root["objects"] = objects;
-
-		//stream << root;
+		stream << document;
 	}
 
 	const MapHeaderRawData& header() const noexcept {

@@ -23,13 +23,12 @@ add_executable (GromadaEditor
 
 #find_package(SFML REQUIRED)
 find_package(argparse CONFIG REQUIRED)
-find_package(jsoncpp CONFIG REQUIRED)
 
 target_link_libraries(GromadaEditor
 	PRIVATE
 		third_party_libs
 		argparse::argparse
-		JsonCpp::JsonCpp
+		nlohmann_json_adapter
 )
 
 
