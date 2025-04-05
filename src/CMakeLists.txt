@@ -26,7 +26,7 @@ find_package(jsoncpp CONFIG REQUIRED)
 
 target_link_libraries(GromadaEditor
 	PRIVATE
-		sokol
+		third_party_libs
 		argparse::argparse
 		JsonCpp::JsonCpp
 )
