@@ -1,7 +1,7 @@
 module;
 #include <imgui.h>
 #include <argparse/argparse.hpp>
-#include <json/json.h>
+
 #include <glm/glm.hpp>
 #include <sokol_gfx.h>
 #include <sokol_app.h>

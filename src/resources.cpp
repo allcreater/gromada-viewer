@@ -174,7 +174,7 @@ public:
 		loadDynamicObjects(reader, resourceNavigator);
 	}
 
-	DynamicObject::Payload readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader, DynamicObject& object) const {
+	DynamicObject::Payload readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader) const {
 		const auto readStaticObj = [&](DynamicObject::BasePayload& result) {
 			result.hp = reader.read<std::uint8_t>();
 		};
@@ -262,10 +262,9 @@ public:
 					.x = rawData[0],
 					.y = rawData[1],
 					.z = rawData[2],
-					.direction = rawData[3] //maybe it's direction + action (1 + 1 b)
+					.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
+						.payload = readObjectPayload(nvid, reader),
 					});
-
-				readObjectPayload(nvid, reader, result.back());
 			}
 			return result;
 		};
@@ -393,11 +392,12 @@ void VidRawData::read(BinaryStreamReader reader)
 	reader.read_to(dataSizeOrNvid);
 
 	if (dataSizeOrNvid < 0) {
-		return;
+		graphicsData = std::int32_t{-dataSizeOrNvid};
 	}
-
+	else {
 	graphicsData = std::make_shared<VidGraphics>();
 	std::get<Graphics>(graphicsData)->read(reader);
+}
 }
 
 
