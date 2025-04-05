@@ -19,6 +19,7 @@ add_executable (GromadaEditor
 		"application_view_model.cpp"
 		"application_model.cpp"
 		"utils.cppm"
+		"data_exporters.cppm"
  )
 
 #find_package(SFML REQUIRED)

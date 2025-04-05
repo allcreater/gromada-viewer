@@ -10,7 +10,6 @@ module;
 #endif
 
 #include <cassert>
-//#include <json/json.h>
 
 export module Gromada.Resources;
 
@@ -106,31 +105,6 @@ export struct VidRawData {
 
 	//
 	void read(BinaryStreamReader reader);
-
-	std::ostream& write_csv_line(std::ostream& stream) const {
-		auto prettyName = std::string_view{ name.data(),  name.size() };
-
-		stream << prettyName << ',' << +std::to_underlying(unitType) << ',' << +behave << ',' << flags << ','
-			<< +collisionMask << ',' << anotherWidth << ',' << anotherHeight << ',' << z_or_height << ','
-			<< +maxHP << ',' << gridRadius << ',' << +p6 << ',' << speed << ','
-			<< hz1 << ',' << hz2 << ',' << +hz3 << ',' << +army << ',' << +someWeaponIndex << ',' << +hz4 << ',' << deathSizeMargin << ',' << +somethingAboutDeath << ',' << +sX << ',' << +sY << ',' << +sZ << ','
-			<< hz5 << ',' << hz6 << ',' << +direction << ',' << +z << ','
-			//<< supportedActions << ',' << children << ',' << something << ','
-			   << dataSizeOrNvid;
-
-		if (const auto vid = std::get_if<Graphics>(&graphicsData)) {
-			stream << ',' << +(*vid)->visualBehavior << ',' << (*vid)->hz7 << ',' << (*vid)->numOfFrames << ',' << (*vid)->dataSize << ',' << (*vid)->imgWidth
-				   << ',' << (*vid)->imgHeight;
-		}
-		else {
-			stream << ",-,-,-,-,-,-";
-		}
-
-		//std::format("Hello");
-
-		return stream << std::endl;
-	}
-
 };
 
 export struct DynamicObject {
@@ -278,54 +252,6 @@ public:
 			| std::ranges::to<std::vector>();
 
 		dynamicObjects = std::move(dynamicObjectsSection);
-	}
-
-	void write_json(std::ostream& stream) {
-		auto objectToJson = [](const DynamicObject& obj) {
-			overloaded payloadVisitor{
-				[](const DynamicObject::BasePayload& payload) { return nlohmann::json{{"hp", payload.hp}}; },
-				[](const DynamicObject::AdvancedPayload& payload) {
-					return nlohmann::json{
-						{"hp", payload.hp},
-						//{"buildTime", payload.buildTime},
-						//{"army", payload.army},
-						payload.buildTime.transform([](std::uint8_t x) { return nlohmann::json{"buildTime", x}; }).value_or(nlohmann::json{}),
-						payload.army.transform([](std::uint8_t x) { return nlohmann::json{"army", x}; }).value_or(nlohmann::json{}),
-						{"buildTime", payload.buildTime.value_or(0)},
-						{"behave", payload.behave},
-						{"items", payload.items},
-					};
-				},
-				[](const std::monostate&) { return nlohmann::json{}; },
-			};
-
-			return nlohmann::json{
-				{"nvid", obj.nvid},
-				{"x", obj.x},
-				{"y", obj.y},
-				{"z", obj.z},
-				{"direction", obj.direction},
-				{"payload", std::visit(payloadVisitor, obj.payload)},
-			};
-		};
-
-
-		nlohmann::json document{
-			{"header",
-				nlohmann::json{
-					{"width", m_header.width},
-					{"height", m_header.height},
-					{"observerX", m_header.observerX},
-					{"observerY", m_header.observerY},
-					{"e", m_header.e},
-					{"f", m_header.f},
-					{"startTimer", m_header.startTimer},
-					{"mapVersion", m_header.mapVersion},
-				}},
-			{"objects", dynamicObjects | std::views::transform(objectToJson) | std::views::common | std::ranges::to<std::vector>() },
-		};
-
-		stream << document;
 	}
 
 	const MapHeaderRawData& header() const noexcept {

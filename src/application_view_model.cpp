@@ -6,6 +6,7 @@ export module application.view_model;
 
 import std;
 import imgui_utils;
+import Gromada.DataExporters;
 
 import application.model;
 import :map;
@@ -49,6 +50,13 @@ public:
 				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", m_model.map().filename().stem().u8string().c_str());
 			}
 
+			// TODO: reuse popup from previous item
+			if (ImGui::MenuItem("Export vids to CSV")) {
+				std::ofstream stream{"vids.csv", std::ios_base::out};
+				stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+				ExportVidsToCsv(m_model.vids(), stream);
+			}
+
 			if (ImGui::MenuItem("Exit")) {
 				sapp_request_quit();
 			}
@@ -71,7 +79,9 @@ public:
 			ImGui::InputText("Exporting map to", m_savePopupfilenameBuffer->data(), m_savePopupfilenameBuffer->size());
 			if (ImGui::Button("OK", ImVec2(120, 0))) {
 				ImGui::CloseCurrentPopup();
-				m_model.exportMap(std::filesystem::path{m_savePopupfilenameBuffer->data()});
+
+				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
+				ExportMapToJson(m_model.map(), stream);
 			}
 			ImGui::EndPopup();
 		}

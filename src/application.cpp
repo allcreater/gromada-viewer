@@ -25,7 +25,7 @@ import std;
 import application.model;
 import application.view_model;
 
-
+import Gromada.DataExporters;
 
 export class Application {
 public:
@@ -34,7 +34,9 @@ public:
 		, m_viewModel{ m_model }
     {
 		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
-            m_model.write_csv(*arg);
+			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
+			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+			ExportVidsToCsv(m_model.vids(), stream);
 		}
 
 		if (auto arg = arguments.present<std::filesystem::path>("--map")) {

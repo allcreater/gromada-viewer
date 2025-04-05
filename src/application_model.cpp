@@ -48,11 +48,6 @@ public:
 
 	const std::filesystem::path& gamePath() const { return m_gamePath; }
 
-	void exportMap(const std::filesystem::path& path) {
-		std::ofstream stream{path, std::ios_base::out};
-		m_map.write_json(stream);
-	}
-
 	void loadMap(const std::filesystem::path& path) {
 		GromadaResourceReader mapReader{path};
 		GromadaResourceNavigator mapNavigator{mapReader};
@@ -60,20 +55,6 @@ public:
 		m_map.filename() = std::move(path);
 	}
 
-	void write_csv(const std::filesystem::path& path) {
-		std::ofstream stream{path, std::ios_base::out /*|| std::ios_base::binary*/};
-		stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-		stream << "NVID,Name,UnitType,Behave,Flags,CollisionMask,AnotherWidth,AnotherHeight,Z_or_height,MaxHP,GridRadius,P6,Speed,Hz1,Hz2,Hz3,Army,"
-				  "SomeWeaponIndex,Hz4,DeathSizeMargin,SomethingAboutDeath,sX,sY,sZ,Hz5,Hz6,Direction,Z,InterestingNumber,VisualBehavior,Hz7,NumOfFrames,"
-				  "DataSize,ImgWidth,ImgHeight"
-			   << std::endl;
-		for (int index = 0; const auto& vid : vids()) {
-			stream << index << ',';
-			vid.write_csv_line(stream);
-			index++;
-		}
-	}
 
 private:
 	Resources m_resources;
