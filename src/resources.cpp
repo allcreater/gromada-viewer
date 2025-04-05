@@ -10,7 +10,7 @@ module;
 #endif
 
 #include <cassert>
-#include <json/json.h>
+//#include <json/json.h>
 
 export module Gromada.Resources;
 
@@ -107,7 +107,7 @@ export struct VidRawData {
 	void read(BinaryStreamReader reader);
 
 	std::ostream& write_csv_line(std::ostream& stream) const {
-		auto prettyName = std::string_view{ name.data(), strnlen(name.data(), name.size()) };
+		auto prettyName = std::string_view{ name.data(),  name.size() };
 
 		stream << prettyName << ',' << +std::to_underlying(unitType) << ',' << +behave << ',' << flags << ','
 			<< +collisionMask << ',' << anotherWidth << ',' << anotherHeight << ',' << z_or_height << ','
@@ -281,55 +281,56 @@ public:
 	}
 
 	void write_json(std::ostream& stream) {
-		Json::Value header;
-		header["width"] = m_header.width;
-		header["height"] = m_header.height;
-		header["observerX"] = m_header.observerX;
-		header["observerY"] = m_header.observerY;
-		header["e"] = m_header.e;
-		header["f"] = m_header.f;
-		header["startTimer"] = m_header.startTimer;
-		header["mapVersion"] = m_header.mapVersion;
+		//Json::Value header;
+		//header["width"] = m_header.width;
+		//header["height"] = m_header.height;
+		//header["observerX"] = m_header.observerX;
+		//header["observerY"] = m_header.observerY;
+		//header["e"] = m_header.e;
+		//header["f"] = m_header.f;
+		//header["startTimer"] = m_header.startTimer;
+		//header["mapVersion"] = m_header.mapVersion;
 
-		Json::Value objects;
-		for (const auto& obj : dynamicObjects) {
-			Json::Value object;
-			object["nvid"] = obj.nvid;
-			object["x"] = obj.x;
-			object["y"] = obj.y;
-			object["z"] = obj.z;
-			object["direction"] = obj.direction;
-			object["payload"] = std::visit(overloaded{
-											   [](const DynamicObject::BasePayload& payload) {
-												   Json::Value object;
-												   object["hp"] = payload.hp;
-												   return object;
-											   },
-											   [](const DynamicObject::AdvancedPayload& payload) {
-												   Json::Value object;
-												   object["hp"] = payload.hp;
-												   if (payload.buildTime)
-													   object["buildTime"] = *payload.buildTime;
-												   if (payload.army)
-													   object["army"] = *payload.army;
-												   object["behave"] = payload.behave;
-												   for (const auto item : payload.items) {
-													   object["items"].append(item);
-												   }
-												   return object;
-											   },
-											   [](const std::monostate&) { return Json::Value{}; },
-										   },
-				obj.payload);
 
-			objects.append(object);
-		}
+		//Json::Value objects;
+		//for (const auto& obj : dynamicObjects) {
+		//	Json::Value object;
+		//	object["nvid"] = obj.nvid;
+		//	object["x"] = obj.x;
+		//	object["y"] = obj.y;
+		//	object["z"] = obj.z;
+		//	object["direction"] = obj.direction;
+		//	object["payload"] = std::visit(overloaded{
+		//									   [](const DynamicObject::BasePayload& payload) {
+		//										   Json::Value object;
+		//										   object["hp"] = payload.hp;
+		//										   return object;
+		//									   },
+		//									   [](const DynamicObject::AdvancedPayload& payload) {
+		//										   Json::Value object;
+		//										   object["hp"] = payload.hp;
+		//										   if (payload.buildTime)
+		//											   object["buildTime"] = *payload.buildTime;
+		//										   if (payload.army)
+		//											   object["army"] = *payload.army;
+		//										   object["behave"] = payload.behave;
+		//										   for (const auto item : payload.items) {
+		//											   object["items"].append(item);
+		//										   }
+		//										   return object;
+		//									   },
+		//									   [](const std::monostate&) { return Json::Value{}; },
+		//								   },
+		//		obj.payload);
 
-		Json::Value root;
-		root["header"] = header;
-		root["objects"] = objects;
+		//	objects.append(object);
+		//}
 
-		stream << root;
+		//Json::Value root;
+		//root["header"] = header;
+		//root["objects"] = objects;
+
+		//stream << root;
 	}
 
 	const MapHeaderRawData& header() const noexcept {
