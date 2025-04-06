@@ -30,7 +30,8 @@ public:
 	SgUniqueResource(SgUniqueResource&& rhv) noexcept
 		: m_resource{std::exchange(rhv.m_resource, UniqueResourceTraits<T>::invalid())} {}
 	SgUniqueResource& operator=(SgUniqueResource&& rhv) noexcept {
-		std::swap(*this, rhv);
+		SgUniqueResource temp{std::move(rhv)};
+		std::swap(m_resource, temp.m_resource);
 		return *this;
 	}
 	~SgUniqueResource() {
