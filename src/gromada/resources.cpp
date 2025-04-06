@@ -49,7 +49,12 @@ export struct VidGraphics {
 
 	std::array<std::uint8_t, 0x300> palette;
 	std::vector<std::byte> data;
-	std::vector<std::span<std::byte>> frames;
+
+	struct Frame {
+		std::uint16_t referenceFrameNumber;
+		std::span<std::byte> data;
+	};
+	std::vector<Frame> frames;
 
 	// TODO: move out of there
 	RGBA8 getPaletteColor(std::uint8_t index) const {
@@ -57,6 +62,7 @@ export struct VidGraphics {
 		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
 	}
 
+	// TODO: add validation of the input data because it may cause out of range access 
 	void read(BinaryStreamReader& reader);
 
 	using DecodedData = std::vector<std::vector<RGBA8>>;
@@ -344,14 +350,22 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 
 	std::byte* frameBegin = data.data();
 	for (std::size_t i = 0; i < frames.size(); ++i) {
-		//auto offset = *std::start_lifetime_as<std::uint32_t>(frameBegin);
-		std::uint32_t offset;
-		std::memcpy(&offset, frameBegin, sizeof offset);
+		//auto payloadSize = *std::start_lifetime_as<std::uint32_t>(frameBegin);
+		std::uint32_t payloadSize;
+		std::memcpy(&payloadSize, frameBegin, sizeof payloadSize);
+		frameBegin += sizeof payloadSize;
 
-		frameBegin += sizeof offset;
-		frames[i] = { frameBegin, offset };
+		std::uint16_t referenceFrameNumber;
+		std::memcpy(&referenceFrameNumber, frameBegin, sizeof referenceFrameNumber);
+		frameBegin += sizeof referenceFrameNumber;
+		payloadSize -= 2;
 
-		frameBegin += offset;
+		frames[i] = {
+			.referenceFrameNumber = referenceFrameNumber,
+			.data = {frameBegin, payloadSize},
+		};
+
+		frameBegin += payloadSize;
 	}
 }
 
@@ -376,10 +390,10 @@ VidGraphics::DecodedData VidGraphics::decode() const {
 void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
 	assert(visualBehavior == 0);
 
-	for (const auto& srcData : frames) {
-		if (srcData.size() > 2) {
+	for (const auto& [referenceFrameNumber, srcData] : frames) {
+		if (srcData.size() > 0) {
 
-			std::vector<RGBA8> frame =  srcData.subspan(2) | std::views::transform([this](std::byte color_index) {
+			std::vector<RGBA8> frame =  srcData| std::views::transform([this](std::byte color_index) {
 				return getPaletteColor(std::to_underlying(color_index));
 			}) | std::ranges::to<std::vector<RGBA8>>();
 
@@ -387,36 +401,21 @@ void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
 			result.push_back(std::move(frame));
 		}
 		else {
-			std::uint16_t frameIndex;
-			std::memcpy(&frameIndex, srcData.data(), sizeof frameIndex);
-			result.push_back(result[frameIndex]);
+			result.push_back(result[referenceFrameNumber]);
 		}
 	}
 }
 
-struct SpanStreamReader {
-	SpanStreamReader(std::span<const std::byte> data)
-		: data{data} {}
-	template <typename T> T read() {
-		T result;
-		std::memcpy(&result, data.data(), sizeof result);
-		data = data.subspan(sizeof result);
-		return result;
-	}
-
-private:
-	std::span<const std::byte> data;
-};
 
 void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
 	assert(visualBehavior == 2);
 
-	for (auto srcData : frames) {
-		if (srcData.size() > 2) {
+	for (auto [referenceFrameNumber, srcData] : frames) {
+		if (srcData.size() > 0) {
 			std::vector<RGBA8> frameData(imgWidth * imgHeight);
 			std::mdspan frame{frameData.data(), imgHeight, imgWidth};
 
-			SpanStreamReader reader{srcData.subspan(2)};
+			SpanStreamReader reader{srcData};
 
 			const auto startY = reader.read<std::uint16_t>();
 			const auto height = reader.read<std::uint16_t>();
@@ -458,9 +457,7 @@ void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
 			result.push_back(std::move(frameData));
 		}
 		else {
-			std::uint16_t frameIndex;
-			std::memcpy(&frameIndex, srcData.data(), sizeof frameIndex);
-			result.push_back(result[frameIndex]);
+			result.push_back(result[referenceFrameNumber]);
 		}
 	}
 }

@@ -3,6 +3,7 @@ module;
 export module application.model;
 
 import std;
+import utils;
 
 export import Gromada.ResourceReader;
 export import Gromada.Resources;
@@ -55,6 +56,18 @@ public:
 		m_map.filename() = std::move(path);
 	}
 
+	const VidGraphics& getVidGraphics(std::uint16_t nvid) const {
+		return std::visit(overloaded{
+							  [this](std::int32_t referenceVidIndex) -> const VidGraphics& { return getVidGraphics(referenceVidIndex); },
+							  [](const VidRawData::Graphics& graphics) -> const VidGraphics& {
+								  if (!graphics) {
+									  throw std::runtime_error("vid graphics not loaded");
+								  }
+								  return *graphics;
+							  },
+						  },
+			m_resources.vids.at(nvid).graphicsData);
+	}
 
 private:
 	Resources m_resources;

@@ -12,6 +12,7 @@ add_executable (GromadaEditor
 		"gromada/data_exporters.cppm"
 		"gromada/resource_reader.cpp"
 		"gromada/resources.cpp"
+		"gromada/software_renderer.cppm"
 		"application.cpp"
 		"imgui_utils.cpp"
 		"view_models/vids.cpp"
