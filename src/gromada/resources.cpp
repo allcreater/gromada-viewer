@@ -34,6 +34,11 @@ export struct RGBA8 {
 	std::uint8_t b;
 	std::uint8_t a;
 };
+
+//export enum class ObjectFlags : std::uint16_t {
+//	Shadow = 0x80,
+//};
+
 export struct VidGraphics {
 	std::uint8_t visualBehavior;
 	std::uint16_t hz7;
@@ -116,7 +121,7 @@ export struct DynamicObject {
 
 	struct BasePayload {
 		std::uint8_t hp;
-};
+	};
 	struct AdvancedPayload : BasePayload {
 		std::optional<std::uint8_t> buildTime;
 		std::optional<std::uint8_t> army;
@@ -190,7 +195,7 @@ public:
 			DynamicObject::AdvancedPayload result;
 			readObject2(result);
 			return result;
-	}
+		}
 		else if (std::ranges::any_of(otherClasses, containsClassPredicate)) {
 			return std::monostate{};
 		}
@@ -238,8 +243,8 @@ public:
 					.y = rawData[1],
 					.z = rawData[2],
 					.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
-						.payload = readObjectPayload(nvid, reader),
-					});
+					.payload = readObjectPayload(nvid, reader),
+				});
 			}
 			return result;
 		};
@@ -317,9 +322,9 @@ void VidRawData::read(BinaryStreamReader reader)
 		graphicsData = std::int32_t{-dataSizeOrNvid};
 	}
 	else {
-	graphicsData = std::make_shared<VidGraphics>();
-	std::get<Graphics>(graphicsData)->read(reader);
-}
+		graphicsData = std::make_shared<VidGraphics>();
+		std::get<Graphics>(graphicsData)->read(reader);
+	}
 }
 
 

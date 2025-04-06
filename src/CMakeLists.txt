@@ -9,17 +9,17 @@ add_executable (GromadaEditor
 	FILE_SET modules
 	TYPE CXX_MODULES
 	FILES
-		"resource_reader.cpp"
+		"gromada/data_exporters.cppm"
+		"gromada/resource_reader.cpp"
+		"gromada/resources.cpp"
 		"application.cpp"
 		"imgui_utils.cpp"
-		"resources.cpp"
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"
 		"application_view_model.cpp"
 		"application_model.cpp"
 		"utils.cppm"
-		"data_exporters.cppm"
  )
 
 #find_package(SFML REQUIRED)
