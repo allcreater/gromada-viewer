@@ -28,38 +28,63 @@ private:
 
 public:
 	explicit MapViewModel(Model& model)
-		: m_model{model}, m_vids{getVids(model)}, m_camPos{model.map().header().observerX, model.map().header().observerY} {}
+		: m_model{model}, m_camPos{model.map().header().observerX, model.map().header().observerY} {}
 
-	static std::vector<VidView> getVids(const Model& model) {
-		return model.vids() | std::views::transform([](const VidRawData& vid) { return VidView{&vid}; }) | std::ranges::to<std::vector>();
-	}
 
 	void drawMap() {
 		ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
 
 		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size);
 		const auto camOffset = m_camPos - screenSize / 2;
+		
+		prepareFramebuffer(screenSize);
 
-		if (!m_framebuffer || m_framebuffer->dataDesc.extent(0) != screenSize.y || m_framebuffer->dataDesc.extent(1) != screenSize.x) {
-			m_framebuffer = Framebuffer{screenSize.x, screenSize.y};
-		}
-
-		std::ranges::fill(m_framebuffer->data, RGBA8{0, 0, 0, 0});
-
-		const auto& map = m_model.map();
-		for (const auto& obj : map.objects()) {
-			const auto& spritesPack = m_model.getVidGraphics(obj.nvid);
-
-			const glm::ivec2 pos = glm::ivec2{obj.x, obj.y} - camOffset;
-			DrawSprite(spritesPack, 0, pos.x - spritesPack.imgWidth / 2, pos.y - spritesPack.imgHeight / 2, m_framebuffer->dataDesc);
+		updateObjectsView(screenSize);
+		for (const auto& [spritesPack, obj, pos] : m_visibleObjects) {
+			DrawSprite(*spritesPack, 0, pos.x, pos.y, m_framebuffer->dataDesc);
 		}
 
 		m_framebuffer->commitToGpu();
+
+
 		draw_list->AddImage(simgui_imtextureid(m_framebuffer->image), ImVec2{0, 0}, ImVec2{static_cast<float>(screenSize.x), static_cast<float>(screenSize.y)},
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
 		updateCameraPos();
+	}
+
+	void prepareFramebuffer(glm::ivec2 screenSize) {
+		if (!m_framebuffer || m_framebuffer->dataDesc.extent(0) != screenSize.y || m_framebuffer->dataDesc.extent(1) != screenSize.x) {
+			m_framebuffer = Framebuffer{screenSize.x, screenSize.y};
+		}
+
+		std::ranges::fill(m_framebuffer->data, RGBA8{0, 0, 0, 0});
+	}
+
+	void updateObjectsView(glm::ivec2 screenSize) {
+		const auto makeObjectView = [this, camOffset = m_camPos - screenSize / 2](const DynamicObject& obj) -> ObjectView {
+			const auto& spritesPack = m_model.getVidGraphics(obj.nvid);
+			const glm::ivec2 pos = glm::ivec2{obj.x - spritesPack.imgWidth / 2, obj.y - spritesPack.imgHeight / 2} - camOffset;
+			return {
+				.pSpritesPack = &spritesPack,
+				.pObj = &obj,
+				.screenPos = pos,
+			};
+		};
+
+		const auto isVisible = [screenSize](const ObjectView& obj) {
+			const auto halfSize = glm::ivec2{obj.pSpritesPack->imgWidth, obj.pSpritesPack->imgHeight} / 2;
+			return obj.screenPos.x + halfSize.x >= 0 && obj.screenPos.x - halfSize.x < screenSize.x && obj.screenPos.y + halfSize.y >= 0 &&
+				   obj.screenPos.y - halfSize.y < screenSize.y;
+		};
+
+		auto objects = m_model.map().objects()
+			| std::views::transform(makeObjectView)
+			| std::views::filter(isVisible)
+			| std::views::common;
+		m_visibleObjects.assign(objects.begin(), objects.end());
+		std::ranges::sort(m_visibleObjects, {}, [](const ObjectView& obj) { return std::tuple{obj.pSpritesPack->visualBehavior, obj.screenPos.y}; });
 	}
 
 	void updateCameraPos() {
@@ -74,8 +99,14 @@ public:
 private:
 	Model& m_model;
 
-	std::vector<VidView> m_vids;
 	glm::ivec2 m_camPos;
+
+	struct ObjectView {
+		const VidGraphics* pSpritesPack;
+		const DynamicObject* pObj;
+		glm::ivec2 screenPos;
+	};
+	std::vector<ObjectView> m_visibleObjects;
 
 	struct Framebuffer {
 		Framebuffer(int width, int height)
