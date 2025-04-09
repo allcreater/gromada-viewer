@@ -30,11 +30,15 @@ public:
 	explicit MapViewModel(Model& model)
 		: m_model{model}, m_camPos{model.map().header().observerX, model.map().header().observerY} {}
 
+	// actual range is from 1 to 8
+	int magnificationFactor = 1;
 
 	void drawMap() {
 		ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
 
-		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size);
+		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
+
+		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 		const auto camOffset = m_camPos - screenSize / 2;
 		
 		prepareFramebuffer(screenSize);
@@ -47,7 +51,8 @@ public:
 		m_framebuffer->commitToGpu();
 
 
-		draw_list->AddImage(simgui_imtextureid(m_framebuffer->image), ImVec2{0, 0}, ImVec2{static_cast<float>(screenSize.x), static_cast<float>(screenSize.y)},
+		draw_list->AddImage(simgui_imtextureid(m_framebuffer->image), ImVec2{0, 0}, 
+			ImGui::GetMainViewport()->Size,
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
@@ -84,7 +89,8 @@ public:
 			| std::views::filter(isVisible)
 			| std::views::common;
 		m_visibleObjects.assign(objects.begin(), objects.end());
-		std::ranges::sort(m_visibleObjects, {}, [](const ObjectView& obj) { return std::tuple{obj.pSpritesPack->visualBehavior, obj.screenPos.y}; });
+		std::ranges::sort(m_visibleObjects, {},
+			[](const ObjectView& obj) { return std::tuple{obj.pSpritesPack->visualBehavior, obj.screenPos.y + obj.pSpritesPack->imgHeight / 2}; });
 	}
 
 	void updateCameraPos() {

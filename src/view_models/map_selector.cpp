@@ -20,7 +20,7 @@ public:
 		: m_model{model}, m_mapsBaseDirectory{model.gamePath() / "maps"} {}
 
 	void update() {
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(300, 500));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(200, 500));
 		ImGui::Begin("Maps");
 
 		auto pathToCStr = [this, currentStr = std::u8string{}](

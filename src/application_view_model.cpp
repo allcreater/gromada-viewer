@@ -70,6 +70,16 @@ public:
 			ImGui::EndMenu();
 		}
 
+		if (ImGui::BeginMenu("View")) {
+			if (ImGui::MenuItem("Zoom in", "CTRL+UP")) {
+				m_mapViewModel.magnificationFactor++;
+			}
+			if (ImGui::MenuItem("Zoom out", "CTRL+DOWN")) {
+				m_mapViewModel.magnificationFactor--;
+			}
+			ImGui::EndMenu();
+		}
+
 		if (openPopup != nullptr) {
 			ImGui::OpenPopup(openPopup);
 		}
