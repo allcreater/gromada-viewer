@@ -106,7 +106,7 @@ void ExportVidsToCsv(std::span<const VidRawData> vids, std::ostream& stream) {
 		{"sZ", MakePrintFunction<VidRawData, &VidRawData::sZ>()},
 		{"hz5", MakePrintFunction<VidRawData, &VidRawData::hz5>()},
 		{"hz6", MakePrintFunction<VidRawData, &VidRawData::hz6>()},
-		{"direction", MakePrintFunction<VidRawData, &VidRawData::direction>()},
+		{"Directions count", MakePrintFunction<VidRawData, &VidRawData::directionsCount>()},
 		{"z", MakePrintFunction<VidRawData, &VidRawData::z>()},
 		{"dataSizeOrNvid", MakePrintFunction<VidRawData, &VidRawData::dataSizeOrNvid>()},
 		//{"visualBehavior", MakePrintFunction<VidGraphics, &VidGraphics::visualBehavior>()},

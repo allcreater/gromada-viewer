@@ -102,9 +102,10 @@ export struct VidRawData {
 
 	std::uint16_t hz5;
 	std::uint16_t hz6;
-	std::uint8_t direction;
+	std::uint8_t directionsCount;
 	std::uint8_t z;
 
+	// TODO: std::array<std::uint8_t, 16> animationLengths; ?
 	std::array<std::uint8_t, 144> supportedActions;
 	std::array<std::uint16_t, 16> children;
 	std::array<std::uint8_t, 16> something;
@@ -315,7 +316,7 @@ void VidRawData::read(BinaryStreamReader reader)
 
 	reader.read_to(hz5);
 	reader.read_to(hz6);
-	reader.read_to(direction);
+	reader.read_to(directionsCount);
 	reader.read_to(z);
 
 	reader.read_to(supportedActions);

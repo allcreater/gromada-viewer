@@ -16,6 +16,7 @@ import imgui_utils;
 import application.model;
 
 import Gromada.SoftwareRenderer;
+import Gromada.VisualLogic;
 
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
@@ -44,8 +45,13 @@ public:
 		prepareFramebuffer(screenSize);
 
 		updateObjectsView(screenSize);
-		for (const auto& [spritesPack, obj, pos] : m_visibleObjects) {
-			DrawSprite(*spritesPack, 0, pos.x, pos.y, m_framebuffer->dataDesc);
+		for (const auto& [vid, spritesPack, obj, pos] : m_visibleObjects) {
+			auto [minIndex, maxIndex] = getAnimationFrameRange(*vid, Action::Stand, obj->direction);
+			assert(maxIndex < spritesPack->numOfFrames);
+
+			const auto animationOffset = m_frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj));
+			const auto frameNumber = animationOffset % (maxIndex - minIndex + 1) + minIndex;
+			DrawSprite(*spritesPack, frameNumber, pos.x, pos.y, m_framebuffer->dataDesc);
 		}
 
 		m_framebuffer->commitToGpu();
@@ -57,6 +63,7 @@ public:
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
 		updateCameraPos();
+		m_frameCounter++;
 	}
 
 	void prepareFramebuffer(glm::ivec2 screenSize) {
@@ -72,6 +79,7 @@ public:
 			const auto& spritesPack = m_model.getVidGraphics(obj.nvid);
 			const glm::ivec2 pos = glm::ivec2{obj.x - spritesPack.imgWidth / 2, obj.y - spritesPack.imgHeight / 2} - camOffset;
 			return {
+				.pVid = &m_model.vids()[obj.nvid],
 				.pSpritesPack = &spritesPack,
 				.pObj = &obj,
 				.screenPos = pos,
@@ -106,8 +114,10 @@ private:
 	Model& m_model;
 
 	glm::ivec2 m_camPos;
+	std::uint32_t m_frameCounter = 0;
 
 	struct ObjectView {
+		const VidRawData* pVid;
 		const VidGraphics* pSpritesPack;
 		const DynamicObject* pObj;
 		glm::ivec2 screenPos;

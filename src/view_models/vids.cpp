@@ -161,9 +161,7 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	ImGui::Text("Behave: %i ", self.behave);
 	ImGui::Text("Flags % i", self.flags);
 	ImGui::Text("Collision mask: %x", self.collisionMask);
-	ImGui::Text("W: %i", self.anotherWidth);
-	ImGui::Text("H: %i", self.anotherHeight);
-	ImGui::Text("Z: %i", self.z_or_height);
+	ImGui::Text("Sizes (W,H,Z): %i %i %i", self.anotherWidth, self.anotherHeight, self.z_or_height);
 	ImGui::Text("max HP: %i", self.maxHP);
 	ImGui::Text("grid radius: %i", self.gridRadius);
 	ImGui::Text("???: %i", self.p6);
@@ -183,8 +181,17 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 
 	ImGui::Text("???: %i", self.hz5);
 	ImGui::Text("???: %i", self.hz6);
-	ImGui::Text("direction? % i", self.direction);
+	ImGui::Text("Directions count: % i", self.directionsCount);
 	ImGui::Text("z2 : % i", self.z);
+
+
+	ImGui::Spacing();
+	ImGui::Text("Actions: ");
+    constexpr std::array<const char*, 16> actionNames = {"Stand", "Build", "Go", "Start move", "L Rotate", "R Rotate", "Open", "Close", "Fight", "Salut",
+		"Stand open", "Load", "Unload", "Wound", "Birth", "Death"};
+	for (std::size_t i = 0; i < 16; ++i) {
+		ImGui::Text("    %s: %i", actionNames[i], self.supportedActions[i]);
+	}
 
 	std::visit(overloaded{
 				   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
