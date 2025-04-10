@@ -34,36 +34,38 @@ public:
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;
 
-	void drawMap() {
-		ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+	int animationFps = 16;
 
+	void drawMap() {
 		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
+		animationFps = std::clamp(animationFps, 1, 60);
 
 		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 		const auto camOffset = m_camPos - screenSize / 2;
 		
 		prepareFramebuffer(screenSize);
 
+		const auto frameCounter = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(1000 / animationFps);
+
 		updateObjectsView(screenSize);
 		for (const auto& [vid, spritesPack, obj, pos] : m_visibleObjects) {
 			auto [minIndex, maxIndex] = getAnimationFrameRange(*vid, Action::Stand, obj->direction);
 			assert(maxIndex < spritesPack->numOfFrames);
 
-			const auto animationOffset = m_frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj));
+			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj));
 			const auto frameNumber = animationOffset % (maxIndex - minIndex + 1) + minIndex;
 			DrawSprite(*spritesPack, frameNumber, pos.x, pos.y, m_framebuffer->dataDesc);
 		}
 
 		m_framebuffer->commitToGpu();
 
-
+		ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
 		draw_list->AddImage(simgui_imtextureid(m_framebuffer->image), ImVec2{0, 0}, 
 			ImGui::GetMainViewport()->Size,
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
 		updateCameraPos();
-		m_frameCounter++;
 	}
 
 	void prepareFramebuffer(glm::ivec2 screenSize) {
@@ -114,7 +116,6 @@ private:
 	Model& m_model;
 
 	glm::ivec2 m_camPos;
-	std::uint32_t m_frameCounter = 0;
 
 	struct ObjectView {
 		const VidRawData* pVid;
