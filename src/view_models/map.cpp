@@ -89,9 +89,9 @@ public:
 		};
 
 		const auto isVisible = [screenSize](const ObjectView& obj) {
-			const auto halfSize = glm::ivec2{obj.pSpritesPack->imgWidth, obj.pSpritesPack->imgHeight} / 2;
-			return obj.screenPos.x + halfSize.x >= 0 && obj.screenPos.x - halfSize.x < screenSize.x && obj.screenPos.y + halfSize.y >= 0 &&
-				   obj.screenPos.y - halfSize.y < screenSize.y;
+			const auto size = glm::ivec2{obj.pSpritesPack->imgWidth, obj.pSpritesPack->imgHeight};
+			return obj.screenPos.x + size.x >= 0 && obj.screenPos.x < screenSize.x && obj.screenPos.y + size.y >= 0 &&
+				   obj.screenPos.y < screenSize.y;
 		};
 
 		auto objects = m_model.map().objects()
