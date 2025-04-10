@@ -33,6 +33,11 @@ struct BoundingBox {
 	int down;
 };
 
+constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) {
+	const int mult = 0x10000 * t / 255;
+	const int rem = 0x10000 - mult;
+	return static_cast<std::uint8_t>((a * rem + b * mult) / 0x10000);
+};
 
 void DrawSprite_Type0(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
 	std::mdspan indexedImage{
@@ -51,20 +56,17 @@ void DrawSprite_Type0(const VidGraphics& data, BoundingBox srcBounds, std::size_
 void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {
 	SpanStreamReader reader{data.frames[spriteIndex].data};
 
-	const auto startY = reader.read<std::uint16_t>();
-	const auto height = reader.read<std::uint16_t>();
+	const int startY = static_cast<int>(reader.read<std::uint16_t>());
+	const int height = reader.read<std::uint16_t>();
 
 	// Temporary
-	if (srcBounds.right - srcBounds.left < data.imgWidth || srcBounds.down - srcBounds.top < data.imgHeight) {
+	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
 		return;
 	}
 
-	for (std::size_t y = startY + y0; y < startY + height + y0; ++y) {
-		std::size_t x = x0;
-		while (true) {
-			const auto commandByte = reader.read<std::uint8_t>();
-			if (commandByte == 0)
-				break;
+	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
+		int x = x0;
+		for (std::uint8_t commandByte; commandByte = reader.read<std::uint8_t>(), commandByte != 0;) {
 
 			const auto count = commandByte & 0x3F;
 			switch (commandByte & 0xC0) {
@@ -100,6 +102,44 @@ void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_
 	}
 }
 
+void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {	
+
+	SpanStreamReader reader{data.frames[spriteIndex].data};
+
+	const int startY = static_cast<int>(reader.read<std::uint16_t>());
+	const int height = reader.read<std::uint16_t>();
+
+	// Temporary
+	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
+		return;
+	}
+
+	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
+		int x = x0;
+		for (std::uint8_t commandByte; commandByte = reader.read<std::uint8_t>(), commandByte != 0;) {
+			const auto count = commandByte & 0x1F;
+			
+			if ((commandByte & 0xE0) == 0) {
+				x += count;
+			} else if ((commandByte & 0xE0) == 0x20) {
+				for (auto i = 0; i < count; ++i) {
+					const auto index = reader.read<std::uint8_t>();
+					framebuffer[y, x++] = data.getPaletteColor(index);
+				}
+			} else {
+				const std::uint8_t opacity = 255 - (commandByte & 0xE0);
+				for (auto i = 0; i < count; ++i) {
+					const auto index = reader.read<std::uint8_t>();
+					const auto srcColor = data.getPaletteColor(index);
+					const auto dstColor = framebuffer[y, x];
+					framebuffer[y, x++] = {
+						lerp(srcColor.r, dstColor.r, opacity), lerp(srcColor.g, dstColor.g, opacity), lerp(srcColor.b, dstColor.b, opacity), 255}; // 
+				}
+			}
+		}
+	}
+}
+
 // TODO: source data must be somehow validated before using (after loading?), because it may cause out of range access
 void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
 	assert(x > std::numeric_limits<int>::min()/2 && y > std::numeric_limits<int>::min()/2);
@@ -131,6 +171,10 @@ void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, 
 		break;
 	case 2:
 		DrawSprite_Type2(data, srcBounds, spriteIndex, x, y, framebuffer);
+		break;
+
+	case 8:
+		DrawSprite_Type8(data, srcBounds, spriteIndex, x, y, framebuffer);
 		break;
 	default:
 		for (int j = srcBounds.top; j < srcBounds.down; ++j) {
