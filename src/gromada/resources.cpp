@@ -73,7 +73,7 @@ private:
 	void decodeFormat2(DecodedData& out) const;
 };
 
-export struct VidRawData {
+export struct Vid {
 	std::array<char, 34> name;
 	UnitType unitType;
 	std::uint8_t behave;
@@ -154,7 +154,7 @@ export class Map
 {
 public:
 	Map() = default;
-	explicit Map(std::span<const VidRawData> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator)
+	explicit Map(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator)
 		: vids{ vids } {
 
 		loadMapInfo(reader, resourceNavigator);
@@ -279,14 +279,14 @@ public:
 
 private:
 	std::filesystem::path m_filename;
-	std::span<const VidRawData> vids;
+	std::span<const Vid> vids;
 
 	MapHeaderRawData m_header;
 	std::vector<DynamicObject> dynamicObjects;
 };
 
 
-void VidRawData::read(BinaryStreamReader reader)
+void Vid::read(BinaryStreamReader reader)
 {
 	reader.read_to(name);
 	reader.read_to(unitType);

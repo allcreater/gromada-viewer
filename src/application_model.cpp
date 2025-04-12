@@ -14,7 +14,7 @@ struct Resources {
 		// clang-format off
         vids = navigator.getSections()
             | std::views::filter([](const Section& section) { return section.header().type == SectionType::Vid; })
-            | std::views::transform([this](const Section& section) { VidRawData result;  result.read(reader.beginRead(section)); return result; })
+            | std::views::transform([this](const Section& section) { Vid result;  result.read(reader.beginRead(section)); return result; })
             | std::ranges::to<std::vector>();
 		// clang-format on
 
@@ -35,7 +35,7 @@ struct Resources {
 	GromadaResourceReader reader;
 	GromadaResourceNavigator navigator;
 
-	std::vector<VidRawData> vids;
+	std::vector<Vid> vids;
 };
 
 export class Model {
@@ -43,7 +43,7 @@ public:
 	explicit Model(std::filesystem::path path)
 		: m_resources{path}, m_gamePath{path.parent_path()} {}
 
-	const std::span<const VidRawData> vids() const { return m_resources.vids; }
+	const std::span<const Vid> vids() const { return m_resources.vids; }
 
 	const Map& map() const { return m_map; }
 
@@ -59,7 +59,7 @@ public:
 	const VidGraphics& getVidGraphics(std::uint16_t nvid) const {
 		return std::visit(overloaded{
 							  [this](std::int32_t referenceVidIndex) -> const VidGraphics& { return getVidGraphics(referenceVidIndex); },
-							  [](const VidRawData::Graphics& graphics) -> const VidGraphics& {
+							  [](const Vid::Graphics& graphics) -> const VidGraphics& {
 								  if (!graphics) {
 									  throw std::runtime_error("vid graphics not loaded");
 								  }

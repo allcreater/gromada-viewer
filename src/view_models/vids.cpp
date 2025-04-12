@@ -72,7 +72,7 @@ public:
 
 				std::visit(overloaded{
 							   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
-							   [](const VidRawData::Graphics& arg) { ImGui::Text("%i", arg->visualBehavior); },
+							   [](const Vid::Graphics& arg) { ImGui::Text("%i", arg->visualBehavior); },
 						   },
 					vid.graphicsData);
 
@@ -88,7 +88,7 @@ public:
 				if (prevSelectedSection != m_selectedSection) {
 					m_decodedFrames.reset(); // To reduce sokol's pool size
 
-					if (const auto pFramesData = std::get_if<VidRawData::Graphics>(&vid.graphicsData); pFramesData && *pFramesData) {
+					if (const auto pFramesData = std::get_if<Vid::Graphics>(&vid.graphicsData); pFramesData && *pFramesData) {
 						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
 					}
 				}
@@ -101,7 +101,7 @@ public:
 	}
 
 private:
-	void VidUI(const VidRawData& self);
+	void VidUI(const Vid& self);
 	
 	struct DecodedFrames;
 	static DecodedFrames DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
@@ -155,7 +155,7 @@ namespace {
 }
 
 
-void VidsWindowViewModel::VidUI(const VidRawData& self) {
+void VidsWindowViewModel::VidUI(const Vid& self) {
 	ImGui::Text("%s", self.name.data());
 	ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
 	ImGui::Text("Behave: %i ", self.behave);
@@ -195,7 +195,7 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 
 	std::visit(overloaded{
 				   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
-				   [&self](const VidRawData::Graphics& arg) {
+				   [&self](const Vid::Graphics& arg) {
 					   ImGui::Text("frames size: %i", self.dataSizeOrNvid);
 					   ImGui::Text("Visual behavior: %x (%s)", arg->visualBehavior, classifyVisualBehavior(arg->visualBehavior));
 					   ImGui::Text("???: %i", arg->hz7);
@@ -210,7 +210,7 @@ void VidsWindowViewModel::VidUI(const VidRawData& self) {
 	if (!m_decodedFrames)
 		return;
 
-	const auto framesData = std::get_if<VidRawData::Graphics>(&self.graphicsData);
+	const auto framesData = std::get_if<Vid::Graphics>(&self.graphicsData);
 	static ImVec2 lastWindowSize = {100, 100};
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {

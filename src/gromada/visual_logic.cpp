@@ -26,19 +26,22 @@ export enum class Action {
 };
 
 // TODO: check is it works for different actions
-export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const VidRawData& vid, Action action, std::uint8_t direction) {
+export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid, Action action, std::uint8_t direction) {
 	assert(action == Action::Stand);
-	const auto actionIndex = std::to_underlying(action);
+	auto actionIndex = std::to_underlying(action);
 	assert(actionIndex >= 0 && actionIndex < 16);
 
+	if (vid.supportedActions[actionIndex] == 0) {
+		actionIndex = 0;
+	}
+
 	auto firstFrameIndex = std::accumulate(vid.supportedActions.begin(), vid.supportedActions.begin() + actionIndex, 0,
-		[&](int startIndex, std::uint8_t animationLength) { return startIndex + animationLength * vid.directionsCount;
-	});
+		[&](int startIndex, std::uint8_t animationLength) { return startIndex + animationLength * vid.directionsCount; });
 
 	const auto animationLength = vid.supportedActions[actionIndex];
 	const std::uint8_t roundAddition = (0xFF / vid.directionsCount) / 2;
 	firstFrameIndex += (((direction + roundAddition) & 0xFF) * vid.directionsCount / 256) * animationLength;
 
-	const auto lastFrameIndex = firstFrameIndex + animationLength-1;
+	const auto lastFrameIndex = firstFrameIndex + animationLength - 1;
 	return {firstFrameIndex, lastFrameIndex};
 }

@@ -24,7 +24,7 @@ constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cas
 export class MapViewModel {
 private:
 	struct VidView { // TODO: unused
-		const VidRawData* pVid;
+		const Vid* pVid;
 	};
 
 public:
@@ -118,7 +118,7 @@ private:
 	glm::ivec2 m_camPos;
 
 	struct ObjectView {
-		const VidRawData* pVid;
+		const Vid* pVid;
 		const VidGraphics* pSpritesPack;
 		const DynamicObject* pObj;
 		glm::ivec2 screenPos;
