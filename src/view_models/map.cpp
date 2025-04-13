@@ -22,11 +22,6 @@ constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
 
 export class MapViewModel {
-private:
-	struct VidView { // TODO: unused
-		const Vid* pVid;
-	};
-
 public:
 	explicit MapViewModel(Model& model)
 		: m_model{model}, m_camPos{model.map().header().observerX, model.map().header().observerY} {}

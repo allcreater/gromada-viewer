@@ -61,7 +61,8 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 	stream << document;
 }
 
-template <typename T, auto MemberPtr> std::function<void(std::ostream&, const T&)> MakePrintFunction() {
+template <auto MemberPtr> 
+auto MakePrintFunction() {
 	constexpr static auto Formatter = [](std::ostream& stream, const auto& value) {
 		using ValueType = std::decay_t<decltype(value)>;
 		if constexpr (std::ranges::contiguous_range<ValueType>) {
@@ -75,40 +76,42 @@ template <typename T, auto MemberPtr> std::function<void(std::ostream&, const T&
 		}
 	};
 
-	return [](std::ostream& stream, const T& obj) { Formatter(stream, std::invoke(MemberPtr, obj)); };
+	return std::function {
+		[](std::ostream& stream, std::add_const_t<type_from_member_t<decltype(MemberPtr)>> obj) { Formatter(stream, std::invoke(MemberPtr, obj)); }
+	};
 }
 
 
 void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream) {
 	static std::initializer_list<std::pair<std::string_view, std::function<void(std::ostream&, const Vid&)>>> printFunctions = {
-		{"name", MakePrintFunction<Vid, &Vid::name>()},
-		{"unitType", MakePrintFunction<Vid, &Vid::unitType>()},
-		{"behave", MakePrintFunction<Vid, &Vid::behave>()},
-		{"flags", MakePrintFunction<Vid, &Vid::flags>()},
-		{"collisionMask", MakePrintFunction<Vid, &Vid::collisionMask>()},
-		{"anotherWidth", MakePrintFunction<Vid, &Vid::anotherWidth>()},
-		{"anotherHeight", MakePrintFunction<Vid, &Vid::anotherHeight>()},
-		{"z_or_height", MakePrintFunction<Vid, &Vid::z_or_height>()},
-		{"maxHP", MakePrintFunction<Vid, &Vid::maxHP>()},
-		{"gridRadius", MakePrintFunction<Vid, &Vid::gridRadius>()},
-		{"p6", MakePrintFunction<Vid, &Vid::p6>()},
-		{"speed", MakePrintFunction<Vid, &Vid::speed>()},
-		{"hz1", MakePrintFunction<Vid, &Vid::hz1>()},
-		{"hz2", MakePrintFunction<Vid, &Vid::hz2>()},
-		{"hz3", MakePrintFunction<Vid, &Vid::hz3>()},
-		{"army", MakePrintFunction<Vid, &Vid::army>()},
-		{"someWeaponIndex", MakePrintFunction<Vid, &Vid::someWeaponIndex>()},
-		{"hz4", MakePrintFunction<Vid, &Vid::hz4>()},
-		{"deathSizeMargin", MakePrintFunction<Vid, &Vid::deathSizeMargin>()},
-		{"somethingAboutDeath", MakePrintFunction<Vid, &Vid::somethingAboutDeath>()},
-		{"sX", MakePrintFunction<Vid, &Vid::sX>()},
-		{"sY", MakePrintFunction<Vid, &Vid::sY>()},
-		{"sZ", MakePrintFunction<Vid, &Vid::sZ>()},
-		{"hz5", MakePrintFunction<Vid, &Vid::hz5>()},
-		{"hz6", MakePrintFunction<Vid, &Vid::hz6>()},
-		{"Directions count", MakePrintFunction<Vid, &Vid::directionsCount>()},
-		{"z", MakePrintFunction<Vid, &Vid::z>()},
-		{"dataSizeOrNvid", MakePrintFunction<Vid, &Vid::dataSizeOrNvid>()},
+		{"name", MakePrintFunction<&Vid::name>()},
+		{"unitType", MakePrintFunction<&Vid::unitType>()},
+		{"behave", MakePrintFunction<&Vid::behave>()},
+		{"flags", MakePrintFunction<&Vid::flags>()},
+		{"collisionMask", MakePrintFunction<&Vid::collisionMask>()},
+		{"anotherWidth", MakePrintFunction<&Vid::anotherWidth>()},
+		{"anotherHeight", MakePrintFunction<&Vid::anotherHeight>()},
+		{"z_or_height", MakePrintFunction<&Vid::z_or_height>()},
+		{"maxHP", MakePrintFunction<&Vid::maxHP>()},
+		{"gridRadius", MakePrintFunction<&Vid::gridRadius>()},
+		{"p6", MakePrintFunction<&Vid::p6>()},
+		{"speed", MakePrintFunction<&Vid::speed>()},
+		{"hz1", MakePrintFunction<&Vid::hz1>()},
+		{"hz2", MakePrintFunction<&Vid::hz2>()},
+		{"hz3", MakePrintFunction<&Vid::hz3>()},
+		{"army", MakePrintFunction<&Vid::army>()},
+		{"someWeaponIndex", MakePrintFunction<&Vid::someWeaponIndex>()},
+		{"hz4", MakePrintFunction<&Vid::hz4>()},
+		{"deathSizeMargin", MakePrintFunction<&Vid::deathSizeMargin>()},
+		{"somethingAboutDeath", MakePrintFunction<&Vid::somethingAboutDeath>()},
+		{"sX", MakePrintFunction<&Vid::sX>()},
+		{"sY", MakePrintFunction<&Vid::sY>()},
+		{"sZ", MakePrintFunction<&Vid::sZ>()},
+		{"hz5", MakePrintFunction<&Vid::hz5>()},
+		{"hz6", MakePrintFunction<&Vid::hz6>()},
+		{"Directions count", MakePrintFunction<&Vid::directionsCount>()},
+		{"z", MakePrintFunction<&Vid::z>()},
+		{"dataSizeOrNvid", MakePrintFunction<&Vid::dataSizeOrNvid>()},
 		//{"visualBehavior", MakePrintFunction<VidGraphics, &VidGraphics::visualBehavior>()},
 		//{"hz7", MakePrintFunction<VidGraphics, &VidGraphics::hz7>()},
 		//{"numOfFrames", MakePrintFunction<VidGraphics, &VidGraphics::numOfFrames>()},

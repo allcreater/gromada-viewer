@@ -23,4 +23,12 @@ export {
 	private:
 		std::span<const std::byte> data;
 	};
+
+
+	template <typename T> struct type_from_member;
+	template <typename M, typename T> struct type_from_member<M T::*> {
+		using type = T;
+	};
+	template <typename T> using type_from_member_t = type_from_member<T>::type;
+
 }

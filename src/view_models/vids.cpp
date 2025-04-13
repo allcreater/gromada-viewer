@@ -16,6 +16,27 @@ import application.model;
 
 import utils;
 
+auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
+	constexpr static auto extractGraphicsGormat = [](const Vid& vid) {
+		const auto* graphics = std::get_if<Vid::Graphics>(&(vid.graphicsData));
+		return graphics ? graphics->get()->visualBehavior : -1;
+	};
+
+	const std::array comparators{
+		+[](const Vid& a, const Vid& b) { return &a <=> &b; }, // we are sure they are in the same array, so that it's safe
+		+[](const Vid& a, const Vid& b) { return a.name <=> b.name; },
+		+[](const Vid& a, const Vid& b) { return a.behave <=> b.behave; },
+		+[](const Vid& a, const Vid& b) { return extractGraphicsGormat(a) <=> extractGraphicsGormat(b); },
+	};
+
+	return [sortSpecs, comparators](const Vid& a, const Vid& b) -> bool {
+		for (auto spec : std::span{sortSpecs.Specs, static_cast<size_t>(sortSpecs.SpecsCount)}) {
+			if (auto c = std::invoke(comparators[spec.ColumnIndex], a, b); c != 0)
+				return spec.SortDirection == ImGuiSortDirection_Ascending ? c == std::strong_ordering::less : c == std::strong_ordering::greater;
+		}
+		return false;
+	};
+}
 
 export class VidsWindowViewModel {
 public:
@@ -33,13 +54,14 @@ public:
 		const auto prevSelectedSection = m_selectedSection;
 
 		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
-				m_selectedSection = std::max(m_selectedSection - 1, 0);
-			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
-				m_selectedSection = std::min(m_selectedSection + 1, static_cast<int>(m_model.vids().size()));
+			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_selectedSection != m_sortedVids.begin())
+				m_selectedSection--;
+			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && m_selectedSection + 1 != m_sortedVids.end())
+				m_selectedSection++;
 		}
 
-		if (ImGui::BeginTable("vids_list_table", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
+		if (ImGui::BeginTable(
+				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
 			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
 			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 50.0f);
@@ -47,16 +69,21 @@ public:
 
 			ImGui::TableHeadersRow();
 
+			if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty) {
+				const Vid* selectedVid = &(m_selectedSection->get());
+				std::ranges::sort(m_sortedVids, makeComparator(*specs));
+				m_selectedSection = std::ranges::find(m_sortedVids, selectedVid, [](auto reference) { return &(reference.get()); });
+				specs->SpecsDirty = false;
+			}
 
-			// ImGui::TableGetSortSpecs()
-			// TODO: add sorting
+			for (auto it = m_sortedVids.begin(); it != m_sortedVids.end(); ++it) {
+				const Vid& vid = *it;
 
-			for (int index = 0; const auto& vid : m_model.vids()) {
 				ImGui::TableNextColumn();
-
-				bool isElementSelected = m_selectedSection == index;
-				if (ImGui::Selectable(std::to_string(index).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
-					m_selectedSection = index;
+				bool isElementSelected = m_selectedSection == it;
+				const int nvid = std::distance(m_model.vids().data(), &vid);
+				if (ImGui::Selectable(std::to_string(nvid).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
+					m_selectedSection = it;
 				}
 				if (isElementSelected) {
 					ImGui::SetItemDefaultFocus();
@@ -77,24 +104,20 @@ public:
 					vid.graphicsData);
 
 				ImGui::TableNextRow();
-				index++;
 			}
 
 			ImGui::EndTable();
 
 			ImGui::Begin("Vid details");
-			if (m_selectedSection >= 0 && m_selectedSection < m_model.vids().size()) {
-				const auto& vid = m_model.vids()[m_selectedSection];
-				if (prevSelectedSection != m_selectedSection) {
-					m_decodedFrames.reset(); // To reduce sokol's pool size
+			if (prevSelectedSection != m_selectedSection) {
+				m_decodedFrames.clear(); // To reduce sokol's pool size
 
-					if (const auto pFramesData = std::get_if<Vid::Graphics>(&vid.graphicsData); pFramesData && *pFramesData) {
-						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
-					}
+				if (const auto pFramesData = std::get_if<Vid::Graphics>(&(m_selectedSection->get().graphicsData)); pFramesData && *pFramesData) {
+					m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
 				}
-
-				VidUI(vid);
 			}
+
+			VidUI(*m_selectedSection);
 			ImGui::End();
 		}
 		ImGui::End();
@@ -103,13 +126,13 @@ public:
 private:
 	void VidUI(const Vid& self);
 	
-	struct DecodedFrames;
-	static DecodedFrames DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
+	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
 private:
 	Model& m_model;
 
-	int m_selectedSection = 0;
+	std::vector<std::reference_wrapper<const Vid>> m_sortedVids{m_model.vids().begin(), m_model.vids().end()};
+	decltype(m_sortedVids)::iterator m_selectedSection = m_sortedVids.begin();
 
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
 		.min_filter = SG_FILTER_LINEAR,
@@ -118,10 +141,8 @@ private:
 		.wrap_v = SG_WRAP_REPEAT,
 		.wrap_w = SG_WRAP_REPEAT,
 	}};
-	struct DecodedFrames {
-		std::vector<SgUniqueImage> images;
-	};
-	std::optional<DecodedFrames> m_decodedFrames;
+
+	std::vector<SgUniqueImage> m_decodedFrames;
 };
 
 namespace {
@@ -207,7 +228,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 			   },
 		self.graphicsData);
 
-	if (!m_decodedFrames)
+	if (m_decodedFrames.empty())
 		return;
 
 	const auto framesData = std::get_if<Vid::Graphics>(&self.graphicsData);
@@ -215,7 +236,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
 		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->imgWidth + 2.0f)));
-		for (int index = 0; const auto& image : m_decodedFrames->images) {
+		for (int index = 0; const auto& image : m_decodedFrames) {
 			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->imgWidth), static_cast<float>((*framesData)->imgHeight)});
 
 			if ((index+1) % imagesPerLine != 0)
@@ -230,9 +251,8 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 }
 
-VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
-
-	auto images = vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
+std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
+	return vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
 		return sg_image_desc{.type = SG_IMAGETYPE_2D,
 			.width = static_cast<int>(vid.imgWidth),
 			.height = static_cast<int>(vid.imgHeight),
@@ -241,7 +261,4 @@ VidsWindowViewModel::DecodedFrames VidsWindowViewModel::DecodeVidFrames(const Vi
 			.data = {{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}};
 	}) | std::ranges::to<std::vector>();
 
-	return {
-		.images = std::move(images),
-	};
 }
