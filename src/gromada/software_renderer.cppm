@@ -102,6 +102,38 @@ void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_
 	}
 }
 
+void DrawSprite_Type4(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {
+	SpanStreamReader reader{data.frames[spriteIndex].data};
+
+	const int startY = static_cast<int>(reader.read<std::uint16_t>());
+	const int height = reader.read<std::uint16_t>();
+
+	// Temporary
+	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
+		return;
+	}
+
+	struct ControlWord {
+		std::uint16_t count : 7;
+		std::uint16_t command : 3;
+		std::uint16_t factor : 6;
+	};
+
+	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
+		int x = x0;
+		for (ControlWord commandWord; commandWord = reader.read<ControlWord>(), commandWord.count > 0;) {
+			if (commandWord.factor == 0 && commandWord.command == 0) {
+				x += commandWord.count;
+			}
+			else {
+				for (int i = 0; i < commandWord.count; ++i) {
+					framebuffer[y, x++] = {static_cast<std::uint8_t>(commandWord.factor * 4), 0, static_cast<std::uint8_t>(1 << commandWord.command), 255};
+				}
+			}
+		}
+	}
+}
+
 void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {	
 
 	SpanStreamReader reader{data.frames[spriteIndex].data};
@@ -172,7 +204,9 @@ void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, 
 	case 2:
 		DrawSprite_Type2(data, srcBounds, spriteIndex, x, y, framebuffer);
 		break;
-
+	case 4:
+		DrawSprite_Type4(data, srcBounds, spriteIndex, x, y, framebuffer);
+		break;
 	case 8:
 		DrawSprite_Type8(data, srcBounds, spriteIndex, x, y, framebuffer);
 		break;
