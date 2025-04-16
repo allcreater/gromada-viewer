@@ -38,10 +38,10 @@ export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid
 	auto firstFrameIndex = std::accumulate(vid.supportedActions.begin(), vid.supportedActions.begin() + actionIndex, 0,
 		[&](int startIndex, std::uint8_t animationLength) { return startIndex + animationLength * vid.directionsCount; });
 
-	const auto animationLength = vid.supportedActions[actionIndex];
+	const int animationLength = vid.supportedActions[actionIndex];
 	const std::uint8_t roundAddition = (0xFF / vid.directionsCount) / 2;
 	firstFrameIndex += (((direction + roundAddition) & 0xFF) * vid.directionsCount / 256) * animationLength;
 
-	const auto lastFrameIndex = firstFrameIndex + animationLength - 1;
+	const auto lastFrameIndex = firstFrameIndex + std::max(animationLength - 1, 0);
 	return {firstFrameIndex, lastFrameIndex};
 }
