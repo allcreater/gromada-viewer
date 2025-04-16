@@ -14,10 +14,10 @@ export {
 
 
 void ExportMapToJson(const Map& map, std::ostream& stream) {
-	auto objectToJson = [](const DynamicObject& obj) {
+	auto objectToJson = [](const GameObject& obj) {
 		overloaded payloadVisitor{
-			[](const DynamicObject::BasePayload& payload) { return nlohmann::json{{"hp", payload.hp}}; },
-			[](const DynamicObject::AdvancedPayload& payload) {
+			[](const GameObject::BasePayload& payload) { return nlohmann::json{{"hp", payload.hp}}; },
+			[](const GameObject::AdvancedPayload& payload) {
 				return nlohmann::json{
 					{"hp", payload.hp},
 					//{"buildTime", payload.buildTime},
@@ -42,7 +42,7 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 		};
 	};
 
-	const auto& header = map.header();
+	const auto& header = map.header;
 	nlohmann::json document{
 		{"header",
 			nlohmann::json{
@@ -55,7 +55,7 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 				{"startTimer", header.startTimer},
 				{"mapVersion", header.mapVersion},
 			}},
-		{"objects", map.objects() | std::views::transform(objectToJson) | std::views::common | std::ranges::to<std::vector>()},
+		{"objects", map.objects | std::views::transform(objectToJson) | std::views::common | std::ranges::to<std::vector>()},
 	};
 
 	stream << document;

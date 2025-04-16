@@ -44,16 +44,20 @@ public:
 		: m_resources{path}, m_gamePath{path.parent_path()} {}
 
 	const std::span<const Vid> vids() const { return m_resources.vids; }
-
-	const Map& map() const { return m_map; }
+	
+	// NOTE: Map is just a DTO type, for game logic a new class will be needed
+	Map& map() { return m_activeMap; }
+	const Map& map() const { return m_activeMap; }
+	const std::filesystem::path& activeMapPath() const { return m_activeMapPath; }
 
 	const std::filesystem::path& gamePath() const { return m_gamePath; }
 
 	void loadMap(const std::filesystem::path& path) {
 		GromadaResourceReader mapReader{path};
 		GromadaResourceNavigator mapNavigator{mapReader};
-		m_map = Map{m_resources.vids, mapReader, mapNavigator};
-		m_map.filename() = std::move(path);
+
+		m_activeMap = Map::load(m_resources.vids, mapReader, mapNavigator);
+		m_activeMapPath = std::move(path);
 	}
 
 	const VidGraphics& getVidGraphics(std::uint16_t nvid) const {
@@ -71,6 +75,7 @@ public:
 
 private:
 	Resources m_resources;
-	Map m_map;
+	Map m_activeMap;
+	std::filesystem::path m_activeMapPath;
 	std::filesystem::path m_gamePath;
 };

@@ -28,7 +28,7 @@ public:
 
 		if (ListBox("Maps", &m_selectedMap, std::span{m_maps}, std::move(pathToCStr))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
-			if (selectedMap.path != m_model.map().filename()) {
+			if (selectedMap.path != m_model.activeMapPath()) {
 				m_model.loadMap(selectedMap.path);
 			}
 		}

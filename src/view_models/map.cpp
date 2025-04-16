@@ -24,7 +24,7 @@ constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cas
 export class MapViewModel {
 public:
 	explicit MapViewModel(Model& model)
-		: m_model{model}, m_camPos{model.map().header().observerX, model.map().header().observerY} {}
+		: m_model{model}, m_camPos{model.map().header.observerX, model.map().header.observerY} {}
 
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;
@@ -72,7 +72,7 @@ public:
 	}
 
 	void updateObjectsView(glm::ivec2 screenSize) {
-		const auto makeObjectView = [this, camOffset = m_camPos - screenSize / 2](const DynamicObject& obj) -> ObjectView {
+		const auto makeObjectView = [this, camOffset = m_camPos - screenSize / 2](const GameObject& obj) -> ObjectView {
 			const auto& spritesPack = m_model.getVidGraphics(obj.nvid);
 			const glm::ivec2 pos = glm::ivec2{obj.x - spritesPack.imgWidth / 2, obj.y - spritesPack.imgHeight / 2} - camOffset;
 			return {
@@ -89,7 +89,7 @@ public:
 				   obj.screenPos.y < screenSize.y;
 		};
 
-		auto objects = m_model.map().objects()
+		auto objects = m_model.map().objects
 			| std::views::transform(makeObjectView)
 			| std::views::filter(isVisible)
 			| std::views::common;
@@ -104,7 +104,7 @@ public:
 		}
 
 		const auto& map = m_model.map();
-		m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{map.header().width, map.header().height});
+		m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{map.header.width, map.header.height});
 	}
 
 private:
@@ -115,7 +115,7 @@ private:
 	struct ObjectView {
 		const Vid* pVid;
 		const VidGraphics* pSpritesPack;
-		const DynamicObject* pObj;
+		const GameObject* pObj;
 		glm::ivec2 screenPos;
 	};
 	std::vector<ObjectView> m_visibleObjects;

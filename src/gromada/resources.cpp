@@ -119,7 +119,7 @@ export struct Vid {
 	void read(BinaryStreamReader reader);
 };
 
-export struct DynamicObject {
+export struct GameObject {
 	unsigned int nvid;
 	int x;
 	int y;
@@ -139,150 +139,31 @@ export struct DynamicObject {
 	Payload payload;
 };
 
+export enum /*class*/ MapVersion : std::uint32_t {
+	V0 = 0,
+	V1 = 1,
+	V2 = 2,
+	V3 = 3,
+};
+
 export struct MapHeaderRawData {
 	std::uint32_t width;
 	std::uint32_t height;
-	std::uint16_t observerX;
-	std::uint16_t observerY;
+	std::int16_t observerX;
+	std::int16_t observerY;
 	std::uint32_t e;
 	std::uint32_t f;
 	std::uint32_t startTimer;
-	std::uint32_t mapVersion;
+	MapVersion mapVersion;
 };
 
-export class Map
+
+export struct Map
 {
-public:
-	Map() = default;
-	explicit Map(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator)
-		: vids{ vids } {
+	static Map load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator);
 
-		loadMapInfo(reader, resourceNavigator);
-		loadDynamicObjects(reader, resourceNavigator);
-	}
-
-	DynamicObject::Payload readObjectPayload(std::int16_t nvid, BinaryStreamReader& reader) const {
-		const auto readStaticObj = [&](DynamicObject::BasePayload& result) {
-			result.hp = reader.read<std::uint8_t>();
-		};
-
-		const auto readObject2 = [&](DynamicObject::AdvancedPayload& result) {
-			readStaticObj(result);
-
-			if (m_header.mapVersion > 2) {
-				result.buildTime = reader.read<std::uint8_t>();
-			}
-
-			if (m_header.mapVersion > 1) {
-				result.army = reader.read<std::uint8_t>();
-			}
-
-			result.behave = reader.read<std::uint8_t>();
-
-			if (m_header.mapVersion == 0)
-				return;
-
-			for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0; ) {
-				result.items.push_back(itemId);
-			}
-		};
-
-		static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
-		static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
-		static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
-
-
-		const auto containsClassPredicate = [id = vids[nvid].behave](std::uint8_t x) { return x == id; };
-		if (std::ranges::any_of(staticClasses, containsClassPredicate)) {
-			DynamicObject::BasePayload result;
-			readStaticObj(result);
-			return result;
-		}
-		else if (std::ranges::any_of(dynamicClasses, containsClassPredicate)) {
-			DynamicObject::AdvancedPayload result;
-			readObject2(result);
-			return result;
-		}
-		else if (std::ranges::any_of(otherClasses, containsClassPredicate)) {
-			return std::monostate{};
-		}
-
-		throw std::runtime_error("Unknown object class");
-	}
-
-	void loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-		auto readMapHeader = [&](BinaryStreamReader reader) {
-			MapHeaderRawData result;
-			reader.read_to(result.width);
-			reader.read_to(result.height);
-			reader.read_to(result.observerX);
-			reader.read_to(result.observerY);
-			reader.read_to(result.e);
-			reader.read_to(result.f);
-			reader.read_to(result.startTimer);
-			if (reader.size() < 28) {
-				result.mapVersion = 0;
-				return result;
-			}
-			reader.read_to(result.mapVersion);
-
-			return result;
-			};
-
-		auto it = std::ranges::find(resourceNavigator.getSections(), SectionType::MapInfo, [](const Section& section) {return section.header().type; });
-		if (it == resourceNavigator.getSections().end()) {
-			return;
-		}
-
-		m_header = readMapHeader(reader.beginRead(*it));
-	}
-
-	void loadDynamicObjects(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-		auto readDynamicObjects = [&](BinaryStreamReader reader) {
-			std::vector<DynamicObject> result;
-			for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0; ) {
-				std::array<std::uint16_t, 4> rawData;
-				reader.read_to(rawData);
-
-				result.push_back({
-					.nvid = static_cast<unsigned int>(nvid),
-					.x = rawData[0],
-					.y = rawData[1],
-					.z = rawData[2],
-					.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
-					.payload = readObjectPayload(nvid, reader),
-				});
-			}
-			return result;
-		};
-
-
-		auto dynamicObjectsSection = resourceNavigator.getSections()
-			| std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; })
-			| std::views::transform([&](const Section& section) { return readDynamicObjects(reader.beginRead(section)); })
-			| std::views::join
-			| std::ranges::to<std::vector>();
-
-		dynamicObjects = std::move(dynamicObjectsSection);
-	}
-
-	const MapHeaderRawData& header() const noexcept {
-		return m_header;
-	}
-
-	std::span<const DynamicObject> objects() const noexcept {
-		return dynamicObjects;
-	}
-
-	std::filesystem::path& filename() noexcept { return m_filename; }
-	const std::filesystem::path& filename() const noexcept { return m_filename; }
-
-private:
-	std::filesystem::path m_filename;
-	std::span<const Vid> vids;
-
-	MapHeaderRawData m_header;
-	std::vector<DynamicObject> dynamicObjects;
+	MapHeaderRawData header;
+	std::vector<GameObject> objects;
 };
 
 
@@ -480,4 +361,117 @@ export std::vector<StreamSpan> getSounds(GromadaResourceReader& reader, const Se
 	}
 
 	return result;
+}
+
+
+// Map loading
+
+GameObject::Payload readObjectPayload(MapVersion mapVersion, std::uint8_t behavior, BinaryStreamReader& reader) {
+	const auto readStaticObj = [&](GameObject::BasePayload& result) { result.hp = reader.read<std::uint8_t>(); };
+
+	const auto readObject2 = [&](GameObject::AdvancedPayload& result) {
+		readStaticObj(result);
+
+		if (std::to_underlying(mapVersion) > 2) {
+			result.buildTime = reader.read<std::uint8_t>();
+		}
+
+		if (std::to_underlying(mapVersion) > 1) {
+			result.army = reader.read<std::uint8_t>();
+		}
+
+		result.behave = reader.read<std::uint8_t>();
+
+		if (std::to_underlying(mapVersion) == 0)
+			return;
+
+		for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0;) {
+			result.items.push_back(itemId);
+		}
+	};
+
+	static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
+	static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
+	static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
+
+
+	const auto containsClassPredicate = [behavior](std::uint8_t x) { return x == behavior; };
+	if (std::ranges::any_of(staticClasses, containsClassPredicate)) {
+		GameObject::BasePayload result;
+		readStaticObj(result);
+		return result;
+	}
+	else if (std::ranges::any_of(dynamicClasses, containsClassPredicate)) {
+		GameObject::AdvancedPayload result;
+		readObject2(result);
+		return result;
+	}
+	else if (std::ranges::any_of(otherClasses, containsClassPredicate)) {
+		return std::monostate{};
+	}
+
+	throw std::runtime_error("Unknown object class");
+}
+
+MapHeaderRawData loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
+	auto readMapHeader = [&](BinaryStreamReader reader) {
+		MapHeaderRawData result;
+		reader.read_to(result.width);
+		reader.read_to(result.height);
+		reader.read_to(result.observerX);
+		reader.read_to(result.observerY);
+		reader.read_to(result.e);
+		reader.read_to(result.f);
+		reader.read_to(result.startTimer);
+		if (reader.size() < 28) {
+			result.mapVersion = MapVersion::V0;
+			return result;
+		}
+		reader.read_to(result.mapVersion);
+
+		return result;
+	};
+
+	auto it = std::ranges::find(resourceNavigator.getSections(), SectionType::MapInfo, [](const Section& section) { return section.header().type; });
+	if (it == resourceNavigator.getSections().end()) {
+		throw std::runtime_error("Invalid map: no header section");
+	}
+
+	return readMapHeader(reader.beginRead(*it));
+}
+
+std::vector<GameObject> loadDynamicObjects(
+	MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
+	auto readDynamicObjects = [&](BinaryStreamReader reader) {
+		std::vector<GameObject> result;
+		for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0;) {
+			std::array<std::uint16_t, 4> rawData;
+			reader.read_to(rawData);
+
+			result.push_back({
+				.nvid = static_cast<unsigned int>(nvid),
+				.x = rawData[0],
+				.y = rawData[1],
+				.z = rawData[2],
+				.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
+				.payload = readObjectPayload(mapVersion, vids[nvid].behave, reader),
+			});
+		}
+		return result;
+	};
+
+
+	return resourceNavigator.getSections() | std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; }) |
+		   std::views::transform([&](const Section& section) { return readDynamicObjects(reader.beginRead(section)); }) | std::views::join |
+		   std::ranges::to<std::vector>();
+
+}
+
+Map Map::load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
+	auto header = loadMapInfo(reader, resourceNavigator);
+
+	return Map{
+		.header = header,
+		.objects = loadDynamicObjects(header.mapVersion, vids, reader, resourceNavigator),
+	};
 }

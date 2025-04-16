@@ -108,7 +108,7 @@ public:
 
 			ImGui::EndTable();
 
-			ImGui::Begin("Vid details");
+			if (ImGui::Begin("Vid details")) {
 			if (prevSelectedSection != m_selectedSection) {
 				m_decodedFrames.clear(); // To reduce sokol's pool size
 
@@ -118,6 +118,7 @@ public:
 			}
 
 			VidUI(*m_selectedSection);
+			}
 			ImGui::End();
 		}
 		ImGui::End();
