@@ -11,7 +11,7 @@ export module application.view_model:vids_window;
 import std;
 import sokol.helpers;
 import imgui_utils;
-
+import framebuffer;
 import application.model;
 
 import utils;
@@ -60,10 +60,10 @@ public:
 
 		if (ImGui::BeginTable(
 				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
-			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 30.0f);
 			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-			ImGui::TableSetupColumn("Graphics format", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 30.0f);
+			ImGui::TableSetupColumn("Graphics format", ImGuiTableColumnFlags_WidthFixed, 30.0f);
 
 			ImGui::TableHeadersRow();
 
@@ -94,10 +94,18 @@ public:
 																			  // treenodes/tabs while dragging
 					// src_flags |= ImGuiDragDropFlags_SourceNoPreviewTooltip; // Hide the tooltip
 					if (ImGui::BeginDragDropSource(src_flags)) {
+						static std::uint8_t s_CurrentDirection = 0;
 						MyImUtils::SetDragDropPayload(ObjectToPlaceMessage{
 							.nvid = nvid,
+							.direction = s_CurrentDirection,
 						});
-						ImGui::Text("Vid");
+
+						if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
+							const auto step = 255 / static_cast<float>(vid.directionsCount);
+							s_CurrentDirection += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
+						}
+
+						ImGui::Text("dir = %i", s_CurrentDirection);
 						ImGui::EndDragDropSource();
 					}
 				}

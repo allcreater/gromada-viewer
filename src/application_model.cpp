@@ -41,6 +41,7 @@ struct Resources {
 //TODO: move
 export struct ObjectToPlaceMessage {
 	unsigned int nvid;
+	std::uint8_t direction;
 };
 
 export class Model {

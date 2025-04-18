@@ -43,14 +43,13 @@ public:
 		animationFps = std::clamp(animationFps, 1, 60);
 
 		m_viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
-		drawMap();
 
-		//if (ImGui::BeginDragDropTarget()) {
+		const size_t numberOfObjectsBeforeModification = m_model.map().objects.size();
 
 		const auto* vp = ImGui::GetMainViewport();
 		if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
 			ImGuiDragDropFlags target_flags = 0;
-			//target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;	// Don't wait until the delivery (release mouse button on a target) to do something
+			target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
 			//target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
 			if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
 				const auto pos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
@@ -59,11 +58,19 @@ public:
 					.x = pos.x,
 					.y = pos.y,
 					.z = 0,
-					.direction = 0,
+					.direction = payload->first.direction,
 				});
 			}
 			ImGui::EndDragDropTarget();
 		}
+
+		drawMap();
+
+		// Roll back objects on map if object is not dropped yet
+		if (ImGui::IsDragDropActive() && (m_model.map().objects.size() > numberOfObjectsBeforeModification)) {
+			m_model.map().objects.resize(numberOfObjectsBeforeModification);
+		}
+
 		updateCameraPos();
 	}
 
