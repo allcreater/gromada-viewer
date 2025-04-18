@@ -28,6 +28,7 @@ export enum class UnitType : std::uint8_t {
 	Item = 0x40,
 };
 
+//TODO: move to software_renderer
 export struct RGBA8 {
 	std::uint8_t r;
 	std::uint8_t g;

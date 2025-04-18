@@ -11,40 +11,16 @@ module;
 export module application.view_model : map;
 
 import std;
+import framebuffer;
 import imgui_utils;
 
 import application.model;
 import level_renderer;
 
 import Gromada.SoftwareRenderer;
-import sokol.helpers;
 
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
-
-struct Framebuffer {
-	Framebuffer(int width, int height)
-		: image{sg_image_desc{
-			  .type = SG_IMAGETYPE_2D,
-			  .width = width,
-			  .height = height,
-			  .usage = SG_USAGE_STREAM,
-			  .pixel_format = SG_PIXELFORMAT_RGBA8,
-		  }},
-		  data{static_cast<size_t>(width * height), RGBA8{0, 0, 0, 0}},
-		  dataDesc{data.data(), std::dextents<int, 2>{height, width}}
-	{}
-
-	void commitToGpu() { sg_update_image(image, sg_image_data{{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}); }
-
-	operator FramebufferRef(){
-		return dataDesc;
-	}
-
-	SgUniqueImage image;
-	std::vector<RGBA8> data;
-	FramebufferRef dataDesc;
-};
 
 
 export class MapViewModel {
@@ -93,29 +69,21 @@ public:
 
 private:
 	void drawMap() {
-		prepareFramebuffer(m_viewportSize);
-		assert(m_levelFramebuffer);
+		m_levelFramebuffer.resize(m_viewportSize);
+		m_levelFramebuffer.clear({0, 0, 0, 0});
 
 		const auto frameCounter = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(1000 / animationFps);
-		m_levelRenderer.drawMap(*m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize, frameCounter);
+		m_levelRenderer.drawMap(m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize, frameCounter);
 		
-		m_levelFramebuffer->commitToGpu();
+		m_levelFramebuffer.commitToGpu();
 		ImDrawList* draw_list = ImGui::GetWindowDrawList();
 		draw_list->AddImage(
-			simgui_imtextureid(m_levelFramebuffer->image), ImVec2{0, 0}, 
+			simgui_imtextureid(m_levelFramebuffer.getImage()), ImVec2{0, 0}, 
 			ImGui::GetMainViewport()->Size,
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
-		//ImGui::Image(simgui_imtextureid(m_levelFramebuffer->image), ImGui::GetMainViewport()->Size);
-	}
-
-	void prepareFramebuffer(glm::ivec2 viewportSize) {
-		if (!m_levelFramebuffer || m_levelFramebuffer->dataDesc.extent(0) != viewportSize.y || m_levelFramebuffer->dataDesc.extent(1) != viewportSize.x) {
-			m_levelFramebuffer = Framebuffer{viewportSize.x, viewportSize.y};
-		}
-
-		std::ranges::fill(m_levelFramebuffer->data, RGBA8{0, 0, 0, 0});
+		//ImGui::Image(simgui_imtextureid(m_levelFramebuffer.getImage()), ImGui::GetMainViewport()->Size);
 	}
 
 	void updateCameraPos() {
@@ -134,5 +102,5 @@ private:
 	glm::ivec2 m_viewportSize;
 
 	LevelRenderer m_levelRenderer;
-	std::optional<Framebuffer> m_levelFramebuffer;
+	Framebuffer m_levelFramebuffer;
 };

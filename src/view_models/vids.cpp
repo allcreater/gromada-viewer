@@ -95,8 +95,9 @@ public:
 					// src_flags |= ImGuiDragDropFlags_SourceNoPreviewTooltip; // Hide the tooltip
 					if (ImGui::BeginDragDropSource(src_flags)) {
 						MyImUtils::SetDragDropPayload(ObjectToPlaceMessage{
-							.nvid = nvid,	
+							.nvid = nvid,
 						});
+						ImGui::Text("Vid");
 						ImGui::EndDragDropSource();
 					}
 				}

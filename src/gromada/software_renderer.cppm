@@ -19,6 +19,7 @@ import Gromada.Resources;
 
 
 //using Rgb565 = std::uint16_t;
+//export struct RGBA8;
 export using FramebufferRef = std::mdspan<RGBA8, std::dextents<int, 2>>;
 export void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer);
 
