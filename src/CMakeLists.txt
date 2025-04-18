@@ -21,6 +21,7 @@ add_executable (GromadaEditor
 		"view_models/map_selector.cpp"
 		"application_view_model.cpp"
 		"application_model.cpp"
+		"level_renderer.cppm"
 		"utils.cppm"
  )
 

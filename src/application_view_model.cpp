@@ -26,10 +26,11 @@ public:
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::Begin("Root window", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
-
+		
 		m_mapViewModel.updateUI();
 
-		ImGui::SetNextWindowSize(ImVec2{200, 500}, ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos({10, 50}, ImGuiCond_Appearing);
+		ImGui::SetNextWindowSize(ImVec2{300, 500}, ImGuiCond_Appearing);
 		ImGui::Begin("Panel");
 		if (ImGui::BeginTabBar("Tabs")) {
 			if (ImGui::BeginTabItem("Vids")) {
