@@ -31,12 +31,15 @@ public:
 
 	int animationFps = 16;
 
+	void updateUI() {
+		drawMap();
+	}
+
 	void drawMap() {
 		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
 		animationFps = std::clamp(animationFps, 1, 60);
 
 		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
-		const auto camOffset = m_camPos - screenSize / 2;
 		
 		prepareFramebuffer(screenSize);
 
@@ -54,7 +57,8 @@ public:
 
 		m_framebuffer->commitToGpu();
 
-		ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+		
+		ImDrawList* draw_list = ImGui::GetWindowDrawList();
 		draw_list->AddImage(simgui_imtextureid(m_framebuffer->image), ImVec2{0, 0}, 
 			ImGui::GetMainViewport()->Size,
 			ImVec2{0, 0},

@@ -49,8 +49,6 @@ public:
 		static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
 									   ImGuiTableFlags_ContextMenuInBody;
 
-		ImGui::Begin("Vids");
-
 		const auto prevSelectedSection = m_selectedSection;
 
 		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
@@ -81,7 +79,7 @@ public:
 
 				ImGui::TableNextColumn();
 				bool isElementSelected = m_selectedSection == it;
-				const int nvid = std::distance(m_model.vids().data(), &vid);
+				const unsigned int nvid = std::distance(m_model.vids().data(), &vid);
 				if (ImGui::Selectable(std::to_string(nvid).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
 					m_selectedSection = it;
 				}
@@ -121,7 +119,6 @@ public:
 			}
 			ImGui::End();
 		}
-		ImGui::End();
 	}
 
 private:

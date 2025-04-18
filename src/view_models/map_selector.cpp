@@ -19,10 +19,7 @@ public:
 	explicit MapsSelectorViewModel(Model& model)
 		: m_model{model}, m_mapsBaseDirectory{model.gamePath() / "maps"} {}
 
-	void update() {
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(200, 500));
-		ImGui::Begin("Maps");
-
+	void updateUI() {
 		auto pathToCStr = [this, currentStr = std::u8string{}](
 							  const MapEntry& mapEntry) mutable { return reinterpret_cast<const char*>(mapEntry.name.c_str()); };
 
@@ -32,8 +29,6 @@ public:
 				m_model.loadMap(selectedMap.path);
 			}
 		}
-		ImGui::End();
-		ImGui::PopStyleVar();
 	}
 
 private:

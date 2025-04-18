@@ -16,25 +16,39 @@ import :vids_window;
 export class ViewModel {
 public:
 	explicit ViewModel(Model& model)
-		: m_model{model} {}
+		: m_model{model}, m_vidsViewModel{m_model} {
+	}
 
 	void updateUI() {
-		m_mapViewModel.drawMap();
 		drawMenu();
+		const auto* viewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(viewport->WorkPos);
+		ImGui::SetNextWindowSize(viewport->WorkSize);
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::Begin("Root window", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-		if (m_showVidsWindow) {
-			if (!m_vidsViewModel) {
-				m_vidsViewModel.emplace(m_model);
+		m_mapViewModel.updateUI();
+
+		ImGui::SetNextWindowSize(ImVec2{200, 500}, ImGuiCond_Appearing);
+		ImGui::Begin("Panel");
+		if (ImGui::BeginTabBar("Tabs")) {
+			if (ImGui::BeginTabItem("Vids")) {
+				m_vidsViewModel.updateUI();
+				ImGui::EndTabItem();
 			}
 
-			if (m_vidsViewModel) {
-				m_vidsViewModel->updateUI();
+			if (ImGui::BeginTabItem("Maps")) {
+				m_mapsSelectorViewModel.updateUI();
+				ImGui::EndTabItem();
 			}
-		}
 
-		if (m_showMapsSelector) {
-			m_mapsSelectorViewModel.update();
+			ImGui::EndTabBar();
 		}
+		ImGui::End();
+
+		ImGui::End();
+
+		ImGui::ShowDemoWindow();
 	}
 
 
@@ -60,13 +74,6 @@ public:
 			if (ImGui::MenuItem("Exit")) {
 				sapp_request_quit();
 			}
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Windows")) {
-			ImGui::MenuItem("Vids", "ALT+V", &m_showVidsWindow);
-			ImGui::MenuItem("Maps", "ALT+M", &m_showMapsSelector);
-
 			ImGui::EndMenu();
 		}
 
@@ -102,11 +109,9 @@ public:
 private:
 	Model& m_model;
 
-	bool m_showVidsWindow = false;
-	bool m_showMapsSelector = true;
 	std::optional<std::array<char, 256>> m_savePopupfilenameBuffer;
 
-	std::optional<VidsWindowViewModel> m_vidsViewModel;
+	VidsWindowViewModel m_vidsViewModel;
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
 };
