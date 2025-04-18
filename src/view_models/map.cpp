@@ -1,6 +1,7 @@
 module;
 #include <glm/glm.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <sokol_gfx.h>
 #include <sokol_app.h>
 #include <sokol_log.h>
@@ -31,26 +32,51 @@ public:
 
 	int animationFps = 16;
 
+	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
+		const auto* vp = ImGui::GetMainViewport();
+		return (m_camPos - m_viewportSize / 2) + (screenPos / magnificationFactor);
+	}
+
 	void updateUI() {
 		drawMap();
+
+		//if (ImGui::BeginDragDropTarget()) {
+
+		const auto* vp = ImGui::GetMainViewport();
+		if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
+			ImGuiDragDropFlags target_flags = 0;
+			//target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;	// Don't wait until the delivery (release mouse button on a target) to do something
+			//target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
+			if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
+				const auto pos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+				m_model.map().objects.push_back({
+					.nvid = payload->first.nvid,
+					.x = pos.x,
+					.y = pos.y,
+					.z = 0,
+					.direction = 0,
+				});
+			}
+			ImGui::EndDragDropTarget();
+		}
 	}
 
 	void drawMap() {
 		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
 		animationFps = std::clamp(animationFps, 1, 60);
 
-		const auto screenSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
+		m_viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 		
-		prepareFramebuffer(screenSize);
+		prepareFramebuffer(m_viewportSize);
 
 		const auto frameCounter = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(1000 / animationFps);
 
-		updateObjectsView(screenSize);
+		updateObjectsView(m_viewportSize);
 		for (const auto& [vid, spritesPack, obj, pos] : m_visibleObjects) {
 			auto [minIndex, maxIndex] = getAnimationFrameRange(*vid, Action::Stand, obj->direction);
 			assert(maxIndex < spritesPack->numOfFrames);
-
-			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj));
+			
+			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj) / alignof (std::uintptr_t));
 			const auto frameNumber = animationOffset % (maxIndex - minIndex + 1) + minIndex;
 			DrawSprite(*spritesPack, frameNumber, pos.x, pos.y, m_framebuffer->dataDesc);
 		}
@@ -64,19 +90,21 @@ public:
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
+		//ImGui::Image(simgui_imtextureid(m_framebuffer->image), ImGui::GetMainViewport()->Size);
+
 		updateCameraPos();
 	}
 
-	void prepareFramebuffer(glm::ivec2 screenSize) {
-		if (!m_framebuffer || m_framebuffer->dataDesc.extent(0) != screenSize.y || m_framebuffer->dataDesc.extent(1) != screenSize.x) {
-			m_framebuffer = Framebuffer{screenSize.x, screenSize.y};
+	void prepareFramebuffer(glm::ivec2 viewportSize) {
+		if (!m_framebuffer || m_framebuffer->dataDesc.extent(0) != viewportSize.y || m_framebuffer->dataDesc.extent(1) != viewportSize.x) {
+			m_framebuffer = Framebuffer{viewportSize.x, viewportSize.y};
 		}
 
 		std::ranges::fill(m_framebuffer->data, RGBA8{0, 0, 0, 0});
 	}
 
-	void updateObjectsView(glm::ivec2 screenSize) {
-		const auto makeObjectView = [this, camOffset = m_camPos - screenSize / 2](const GameObject& obj) -> ObjectView {
+	void updateObjectsView(glm::ivec2 viewportSize) {
+		const auto makeObjectView = [this, camOffset = m_camPos - viewportSize / 2](const GameObject& obj) -> ObjectView {
 			const auto& spritesPack = m_model.getVidGraphics(obj.nvid);
 			const glm::ivec2 pos = glm::ivec2{obj.x - spritesPack.imgWidth / 2, obj.y - spritesPack.imgHeight / 2} - camOffset;
 			return {
@@ -87,10 +115,10 @@ public:
 			};
 		};
 
-		const auto isVisible = [screenSize](const ObjectView& obj) {
+		const auto isVisible = [viewportSize](const ObjectView& obj) {
 			const auto size = glm::ivec2{obj.pSpritesPack->imgWidth, obj.pSpritesPack->imgHeight};
-			return obj.screenPos.x + size.x >= 0 && obj.screenPos.x < screenSize.x && obj.screenPos.y + size.y >= 0 &&
-				   obj.screenPos.y < screenSize.y;
+			return obj.screenPos.x + size.x >= 0 && obj.screenPos.x < viewportSize.x && obj.screenPos.y + size.y >= 0 &&
+				   obj.screenPos.y < viewportSize.y;
 		};
 
 		auto objects = m_model.map().objects
@@ -115,6 +143,7 @@ private:
 	Model& m_model;
 
 	glm::ivec2 m_camPos;
+	glm::ivec2 m_viewportSize;
 
 	struct ObjectView {
 		const Vid* pVid;

@@ -38,6 +38,11 @@ struct Resources {
 	std::vector<Vid> vids;
 };
 
+//TODO: move
+export struct ObjectToPlaceMessage {
+	unsigned int nvid;
+};
+
 export class Model {
 public:
 	explicit Model(std::filesystem::path path)

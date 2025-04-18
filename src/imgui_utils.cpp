@@ -6,6 +6,8 @@ module;
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
+#include <cassert>
+
 #if __INTELLISENSE__
 #include <span>
 #endif
@@ -14,6 +16,7 @@ export module imgui_utils;
 
 import std;
 
+namespace MyImUtils {
 
 export template<typename T, typename Fn = std::identity>
 bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
@@ -60,4 +63,25 @@ bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textTo
     //    MarkItemEdited(g.LastItemData.ID);
 
     return value_changed;
+}
+
+export template<typename T> 
+    requires std::is_trivially_copyable_v<T>
+bool SetDragDropPayload(const T& object) {
+	return ImGui::SetDragDropPayload(typeid(T).name(), &object, sizeof(T));
+}
+
+export template <typename T>
+	requires std::is_trivially_copyable_v<T>
+std::optional<std::pair<T, const ImGuiPayload&>> AcceptDragDropPayload(ImGuiDragDropFlags flags = {}) {
+	const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(typeid(T).name(), flags);
+	if (!payload)
+		return std::nullopt;
+
+    T object;
+	assert(sizeof (T) == payload->DataSize);
+	std::memcpy(&object, payload->Data, sizeof (T));
+	return std::pair{std::move(object), *payload};
+}
+
 }

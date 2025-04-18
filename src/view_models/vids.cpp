@@ -87,6 +87,20 @@ public:
 					ImGui::SetItemDefaultFocus();
 				}
 
+				{
+					ImGuiDragDropFlags src_flags = 0;
+					src_flags |= ImGuiDragDropFlags_SourceNoDisableHover;	  // Keep the source displayed as hovered
+					src_flags |= ImGuiDragDropFlags_SourceNoHoldToOpenOthers; // Because our dragging is local, we disable the feature of opening foreign
+																			  // treenodes/tabs while dragging
+					// src_flags |= ImGuiDragDropFlags_SourceNoPreviewTooltip; // Hide the tooltip
+					if (ImGui::BeginDragDropSource(src_flags)) {
+						MyImUtils::SetDragDropPayload(ObjectToPlaceMessage{
+							.nvid = nvid,	
+						});
+						ImGui::EndDragDropSource();
+					}
+				}
+
 				ImGui::TableNextColumn();
 				ImGui::Text("%s", vid.name.data());
 
@@ -107,15 +121,15 @@ public:
 			ImGui::EndTable();
 
 			if (ImGui::Begin("Vid details")) {
-			if (prevSelectedSection != m_selectedSection) {
-				m_decodedFrames.clear(); // To reduce sokol's pool size
+				if (prevSelectedSection != m_selectedSection) {
+					m_decodedFrames.clear(); // To reduce sokol's pool size
 
-				if (const auto pFramesData = std::get_if<Vid::Graphics>(&(m_selectedSection->get().graphicsData)); pFramesData && *pFramesData) {
-					m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
+					if (const auto pFramesData = std::get_if<Vid::Graphics>(&(m_selectedSection->get().graphicsData)); pFramesData && *pFramesData) {
+						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
+					}
 				}
-			}
 
-			VidUI(*m_selectedSection);
+				VidUI(*m_selectedSection);
 			}
 			ImGui::End();
 		}
