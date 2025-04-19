@@ -207,21 +207,21 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	ImGui::Text("max HP: %i", self.maxHP);
 	ImGui::Text("grid radius: %i", self.gridRadius);
 	ImGui::Text("???: %i", self.p6);
-	ImGui::Text("Speed % i", self.speed);
 
-	ImGui::Text("???: %i", self.hz1);
-	ImGui::Text("???: %i", self.hz2);
-	ImGui::Text("???: %i", self.hz3);
+	ImGui::Text("Speed %i %i", self.speedX, self.speedY);
+	ImGui::Text("Acceleration: %i", self.acceleration);
+	ImGui::Text("Rotation period: %i", self.rotationPeriod);
+
 	ImGui::Text("Army: %i", self.army);
 	ImGui::Text("Weapon?: %i", self.someWeaponIndex);
 	ImGui::Text("???: %i", self.hz4);
-	ImGui::Text("Death size margin: % i", self.deathSizeMargin);
-	ImGui::Text("Death ??: %i", self.somethingAboutDeath);
-	ImGui::Text("some X: %i", self.sX);
-	ImGui::Text("some Y: %i", self.sY);
-	ImGui::Text("some Z: %i", self.sZ);
+	ImGui::Text("Damage radius: % i", self.deathDamageRadius);
+	ImGui::Text("Damage: %i", self.deathDamage);
+	ImGui::Text("some X: %i", self.linkX);
+	ImGui::Text("some Y: %i", self.linkY);
+	ImGui::Text("some Z: %i", self.linkZ);
 
-	ImGui::Text("???: %i", self.hz5);
+	ImGui::Text("Linked nVid: %i", self.linkedObjectVid);
 	ImGui::Text("???: %i", self.hz6);
 	ImGui::Text("Directions count: % i", self.directionsCount);
 	ImGui::Text("z2 : % i", self.z);

@@ -87,21 +87,21 @@ export struct Vid {
 	std::uint8_t maxHP;
 	std::uint16_t gridRadius;
 	std::uint8_t p6;
-	std::uint16_t speed;
+	std::uint16_t speedX;
 
-	std::uint16_t hz1;
-	std::uint16_t hz2;
-	std::uint8_t hz3;
+	std::uint16_t speedY;
+	std::uint16_t acceleration;
+	std::uint8_t rotationPeriod;
 	std::uint8_t army;
 	std::uint8_t someWeaponIndex;
 	std::uint8_t hz4;
-	std::uint16_t deathSizeMargin;
-	std::uint8_t somethingAboutDeath;
-	std::uint8_t sX;
-	std::uint8_t sY;
-	std::uint8_t sZ;
+	std::uint16_t deathDamageRadius;
+	std::uint8_t deathDamage;
+	std::uint8_t linkX;
+	std::uint8_t linkY;
+	std::uint8_t linkZ;
 
-	std::uint16_t hz5;
+	std::uint16_t linkedObjectVid;
 	std::uint16_t hz6;
 	std::uint8_t directionsCount;
 	std::uint8_t z;
@@ -182,21 +182,21 @@ void Vid::read(BinaryStreamReader reader)
 	reader.read_to(maxHP);
 	reader.read_to(gridRadius);
 	reader.read_to(p6);
-	reader.read_to(speed);
+	reader.read_to(speedX);
 
-	reader.read_to(hz1);
-	reader.read_to(hz2);
-	reader.read_to(hz3);
+	reader.read_to(speedY);
+	reader.read_to(acceleration);
+	reader.read_to(rotationPeriod);
 	reader.read_to(army);
 	reader.read_to(someWeaponIndex);
 	reader.read_to(hz4);
-	reader.read_to(deathSizeMargin);
-	reader.read_to(somethingAboutDeath);
-	reader.read_to(sX);
-	reader.read_to(sY);
-	reader.read_to(sZ);
+	reader.read_to(deathDamageRadius);
+	reader.read_to(deathDamage);
+	reader.read_to(linkX);
+	reader.read_to(linkY);
+	reader.read_to(linkZ);
 
-	reader.read_to(hz5);
+	reader.read_to(linkedObjectVid);
 	reader.read_to(hz6);
 	reader.read_to(directionsCount);
 	reader.read_to(z);
