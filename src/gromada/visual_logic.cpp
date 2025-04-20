@@ -4,6 +4,7 @@ module;
 export module Gromada.VisualLogic;
 
 import std;
+import utils;
 import Gromada.Resources;
 
 export enum class Action {
@@ -44,4 +45,18 @@ export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid
 
 	const auto lastFrameIndex = firstFrameIndex + std::max(animationLength - 1, 0);
 	return {firstFrameIndex, lastFrameIndex};
+}
+
+export const VidGraphics& getVidGraphics(std::span<const Vid> vids, std::uint16_t nvid) {
+	assert(nvid < vids.size());
+	return std::visit(overloaded{
+						  [vids](std::int32_t referenceVidIndex) -> const VidGraphics& { return getVidGraphics(vids, referenceVidIndex); },
+						  [](const Vid::Graphics& graphics) -> const VidGraphics& {
+							  if (!graphics) {
+								  throw std::runtime_error("vid graphics not loaded");
+							  }
+							  return *graphics;
+						  },
+					  },
+		vids[nvid].graphicsData);
 }

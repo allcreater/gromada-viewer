@@ -46,6 +46,7 @@ public:
     }
 
 	void on_frame() {
+		m_model.update();
 		m_viewModel.updateUI();
 
         //ImGui::ShowDemoWindow();

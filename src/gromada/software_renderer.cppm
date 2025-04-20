@@ -26,14 +26,6 @@ export void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, 
 
 // Implementation
 
-// TODO: use full-featured 2D AABB's instead
-struct BoundingBox {
-	int left;
-	int right;
-	int top;
-	int down;
-};
-
 constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) {
 	const int mult = 0x10000 * t / 255;
 	const int rem = 0x10000 - mult;

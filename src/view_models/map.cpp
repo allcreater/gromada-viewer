@@ -15,7 +15,7 @@ import framebuffer;
 import imgui_utils;
 
 import application.model;
-import level_renderer;
+import engine.level_renderer;
 
 import Gromada.SoftwareRenderer;
 
@@ -26,7 +26,7 @@ constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cas
 export class MapViewModel {
 public:
 	explicit MapViewModel(Model& model)
-		: m_model{model}, m_camPos{model.map().header.observerX, model.map().header.observerY}, m_levelRenderer{model} {}
+		: m_model{model}, m_camPos{model.map().header.observerX, model.map().header.observerY}, m_levelRenderer{model.objectsView()} {}
 
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;

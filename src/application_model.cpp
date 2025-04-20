@@ -8,6 +8,9 @@ import utils;
 export import Gromada.ResourceReader;
 export import Gromada.Resources;
 
+export import engine.objects_view;
+
+
 struct Resources {
 	explicit Resources(std::filesystem::path path)
 		: reader{path}, navigator{reader} {
@@ -47,7 +50,7 @@ export struct ObjectToPlaceMessage {
 export class Model {
 public:
 	explicit Model(std::filesystem::path path)
-		: m_resources{path}, m_gamePath{path.parent_path()} {}
+		: m_resources{path}, m_gamePath{path.parent_path()}, m_objectsView{m_resources.vids, m_activeMap} {}
 
 	const std::span<const Vid> vids() const { return m_resources.vids; }
 	
@@ -56,7 +59,11 @@ public:
 	const Map& map() const { return m_activeMap; }
 	const std::filesystem::path& activeMapPath() const { return m_activeMapPath; }
 
+	const ObjectsView& objectsView() const { return m_objectsView; }
+
 	const std::filesystem::path& gamePath() const { return m_gamePath; }
+
+	void update() { m_objectsView.update(); }
 
 	void loadMap(const std::filesystem::path& path) {
 		GromadaResourceReader mapReader{path};
@@ -66,22 +73,11 @@ public:
 		m_activeMapPath = std::move(path);
 	}
 
-	const VidGraphics& getVidGraphics(std::uint16_t nvid) const {
-		return std::visit(overloaded{
-							  [this](std::int32_t referenceVidIndex) -> const VidGraphics& { return getVidGraphics(referenceVidIndex); },
-							  [](const Vid::Graphics& graphics) -> const VidGraphics& {
-								  if (!graphics) {
-									  throw std::runtime_error("vid graphics not loaded");
-								  }
-								  return *graphics;
-							  },
-						  },
-			m_resources.vids.at(nvid).graphicsData);
-	}
-
 private:
 	Resources m_resources;
 	Map m_activeMap;
+	ObjectsView m_objectsView;
+
 	std::filesystem::path m_activeMapPath;
 	std::filesystem::path m_gamePath;
 };
