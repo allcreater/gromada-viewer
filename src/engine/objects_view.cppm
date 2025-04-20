@@ -6,6 +6,8 @@ export module engine.objects_view;
 import std;
 import utils;
 
+import engine.bounding_box;
+
 import Gromada.Resources;
 import Gromada.VisualLogic;
 

@@ -5,6 +5,7 @@ export module engine.level_renderer;
 
 import std;
 
+import engine.bounding_box;
 import engine.objects_view;
 
 import Gromada.SoftwareRenderer;

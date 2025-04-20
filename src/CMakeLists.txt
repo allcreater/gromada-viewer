@@ -9,6 +9,7 @@ add_executable (GromadaEditor
 	FILE_SET modules
 	TYPE CXX_MODULES
 	FILES
+		"engine/bounding_box.cppm"
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"gromada/data_exporters.cppm"
@@ -25,7 +26,6 @@ add_executable (GromadaEditor
 		"framebuffer.cppm"
 		"imgui_utils.cpp"
 		"utils.cppm"
-
  )
 
 #find_package(SFML REQUIRED)

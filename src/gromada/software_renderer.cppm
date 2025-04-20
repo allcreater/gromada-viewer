@@ -15,6 +15,7 @@ export module Gromada.SoftwareRenderer;
 
 import std;
 import utils;
+import engine.bounding_box;
 import Gromada.Resources;
 
 
