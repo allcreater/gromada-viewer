@@ -80,7 +80,10 @@ private:
 		m_levelFramebuffer.clear({0, 0, 0, 0});
 
 		const auto frameCounter = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(1000 / animationFps);
+
+		const auto time = std::chrono::high_resolution_clock::now();
 		m_levelRenderer.drawMap(m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize, frameCounter);
+		const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
 		
 		m_levelFramebuffer.commitToGpu();
 		ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -90,6 +93,8 @@ private:
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
+		std::array<char, 128> stringBuffer;
+		draw_list->AddText({10, 30}, 0xFFFFFFFF, stringBuffer.data(), std::format_to(stringBuffer.data(), "map render time: {}", duration_cast<std::chrono::milliseconds>(renderDuration)));
 		//ImGui::Image(simgui_imtextureid(m_levelFramebuffer.getImage()), ImGui::GetMainViewport()->Size);
 	}
 
