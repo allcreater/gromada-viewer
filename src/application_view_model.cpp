@@ -39,6 +39,10 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("Maps")) {
+				//auto onMapReloaded = [this] { 
+				//	m_mapViewModel.cameraPos() = {m_model.map().header.observerX, m_model.map().header.observerY};
+				//};
+
 				m_mapsSelectorViewModel.updateUI();
 				ImGui::EndTabItem();
 			}

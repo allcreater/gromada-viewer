@@ -11,15 +11,43 @@ import engine.bounding_box;
 import Gromada.Resources;
 import Gromada.VisualLogic;
 
+// Workaround: we can't use template fromPositionAndSize here because it will require to include glm across all dependent modules 
+BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
+	const auto min = pos - size/2, max = pos + size/2;
+	return BoundingBox{
+		.left = min.x,
+		.right = max.x,
+		.top = min.y,
+		.down = max.y,
+	};
+}
+
+export {
+
+struct ObjectView {
+	std::reference_wrapper<const Vid> vid;
+	std::reference_wrapper<const VidGraphics> graphics;
+	std::reference_wrapper<const GameObject> obj;
+	size_t objectIndex;
+};
+
+struct VisualBounds {
+	BoundingBox operator()(const ObjectView& view) const {
+		return getCenteredBB({view.obj.get().x, view.obj.get().y}, {view.graphics.get().imgWidth, view.graphics.get().imgHeight});
+	}
+};
+constexpr inline VisualBounds visualBounds{};
+
+struct PhysicalBounds {
+	BoundingBox operator()(const ObjectView& view) const {
+		return getCenteredBB({view.obj.get().x, view.obj.get().y}, {view.vid.get().anotherWidth, view.vid.get().anotherHeight});
+	}
+};
+constexpr inline PhysicalBounds physicalBounds{};
 
 // "A poor's man World" or something like that :) Will be supplemented as needed
-export class ObjectsView {
-public:
-	struct ObjectView {
-		std::reference_wrapper<const Vid> vid;
-		std::reference_wrapper<const VidGraphics> graphics;
-		std::reference_wrapper<const GameObject> obj;
-	};
+class ObjectsView {
+
 
 public:
 	ObjectsView(std::span<const Vid> vids, const Map& map)
@@ -31,25 +59,20 @@ public:
 				.vid = m_vids[obj.nvid],
 				.graphics = getVidGraphics(m_vids, obj.nvid),
 				.obj = obj,
+				.objectIndex = static_cast<size_t>(std::distance(m_map.objects.data(), &obj)),
 			};
 		};
 
 		m_objects.assign_range(m_map.objects | std::views::transform(makeObjectView));
 	}
 
-	std::ranges::bidirectional_range auto queryObjectsInRegion(BoundingBox bounds) const {
-		constexpr auto visualBounds = [](const ObjectView& view) -> BoundingBox {
-			const auto halfSize = glm::ivec2{view.graphics.get().imgWidth / 2, view.graphics.get().imgHeight / 2};
-			return BoundingBox{
-				.left = view.obj.get().x - halfSize.x,
-				.right = view.obj.get().x + halfSize.x,
-				.top = view.obj.get().y - halfSize.y,
-				.down = view.obj.get().y + halfSize.y,
-			};
-		};
-
-		return m_objects | std::views::filter([visualBounds, bounds](const ObjectView& object) { return visualBounds(object).isIntersects(bounds); });
+	template <typename BoundsFn = decltype(visualBounds)>
+	std::ranges::bidirectional_range auto queryObjectsInRegion(BoundingBox region, BoundsFn&& boundsFn = BoundsFn{}) const {
+		return m_objects | std::views::filter([region, boundsFn = std::forward<BoundsFn>(boundsFn)](
+												  const ObjectView& object) { return boundsFn(object).isIntersects(region); });
 	}
+
+	std::span<const ObjectView> objects() const { return m_objects; }
 
 private:
 	std::span<const Vid> m_vids;
@@ -57,3 +80,5 @@ private:
 
 	std::vector<ObjectView> m_objects;
 };
+
+}

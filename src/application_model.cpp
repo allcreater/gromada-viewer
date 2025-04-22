@@ -63,6 +63,8 @@ public:
 
 	const std::filesystem::path& gamePath() const { return m_gamePath; }
 
+	std::vector<std::size_t>& selectedMapObjects() { return m_selectedObjects;  }
+
 	void update() { m_objectsView.update(); }
 
 	void loadMap(const std::filesystem::path& path) {
@@ -77,6 +79,7 @@ private:
 	Resources m_resources;
 	Map m_activeMap;
 	ObjectsView m_objectsView;
+	std::vector<std::size_t> m_selectedObjects;
 
 	std::filesystem::path m_activeMapPath;
 	std::filesystem::path m_gamePath;

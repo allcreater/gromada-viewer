@@ -15,6 +15,7 @@ import framebuffer;
 import imgui_utils;
 
 import application.model;
+import engine.bounding_box;
 import engine.level_renderer;
 
 import Gromada.SoftwareRenderer;
@@ -34,8 +35,10 @@ public:
 	int animationFps = 16;
 
 	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
-		const auto* vp = ImGui::GetMainViewport();
 		return (m_camPos - m_viewportSize / 2) + (screenPos / magnificationFactor);
+	}
+	glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const {
+		return  (worldPos - m_camPos + m_viewportSize / 2) * magnificationFactor;
 	}
 
 	void updateUI() {
@@ -44,6 +47,7 @@ public:
 
 		m_viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 
+		const auto mouseWorldPos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
 		const size_t numberOfObjectsBeforeModification = m_model.map().objects.size();
 
 		const auto* vp = ImGui::GetMainViewport();
@@ -52,11 +56,10 @@ public:
 			target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
 			//target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
 			if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
-				const auto pos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
 				m_model.map().objects.push_back({
 					.nvid = payload->first.nvid,
-					.x = pos.x,
-					.y = pos.y,
+					.x = mouseWorldPos.x,
+					.y = mouseWorldPos.y,
 					.z = 0,
 					.direction = payload->first.direction,
 				});
@@ -70,6 +73,25 @@ public:
 		if (ImGui::IsDragDropActive() && (m_model.map().objects.size() > numberOfObjectsBeforeModification)) {
 			m_model.map().objects.resize(numberOfObjectsBeforeModification);
 		}
+		
+		// handling selection
+		if (!ImGui::IsDragDropActive()) {
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+				if (!m_selection) {
+					m_selection = std::pair{mouseWorldPos, mouseWorldPos};
+				}
+				else {
+					m_selection->second = mouseWorldPos;
+				}
+			}
+			else if (m_selection) {
+				m_model.selectedMapObjects().assign_range(
+					m_model.objectsView().queryObjectsInRegion(BoundingBox::fromPositions(m_selection->first, m_selection->second), physicalBounds) |
+					std::views::transform(std::mem_fn(&ObjectView::objectIndex)));
+				m_selection.reset();
+			}
+		}
+
 
 		updateCameraPos();
 	}
@@ -93,9 +115,38 @@ private:
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
+
+		// selection visualization
+		for (const auto& [vid, spritesPack, obj, _] :
+			m_model.selectedMapObjects() | std::views::transform([this](size_t index) { return m_model.objectsView().objects()[index]; })) {
+			const glm::ivec2 halfSize {vid.get().anotherWidth / 2, vid.get().anotherHeight / 2};
+			const glm::ivec2 pos {obj.get().x, obj.get().y};
+
+			const auto color = [unitType = vid.get().unitType] {
+				using enum UnitType;
+				constexpr auto alpha = 70;
+				switch (unitType) {
+					case Terrain: return IM_COL32(50, 200, 50, alpha);
+					case Object: return IM_COL32(200, 200, 200, alpha);
+					case Monster: return IM_COL32(255, 100, 100, alpha);
+					case Avia: return IM_COL32(50, 100, 200, alpha);
+					case Cannon: return IM_COL32(128, 80, 50, alpha);
+					case Sprite: return IM_COL32(100, 100, 100, alpha);
+					case Item: return IM_COL32(200, 200, 50, alpha);
+					default:
+						return IM_COL32_BLACK;
+				}
+			}();
+			const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
+			draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
+		}
+
+		if (m_selection) {
+			draw_list->AddRect(to_imvec(worldToScreenPos(m_selection->first)), to_imvec(worldToScreenPos(m_selection->second)), 0x7F7F7F7F);
+		}
+
 		std::array<char, 128> stringBuffer;
 		draw_list->AddText({10, 30}, 0xFFFFFFFF, stringBuffer.data(), std::format_to(stringBuffer.data(), "map render time: {}", duration_cast<std::chrono::milliseconds>(renderDuration)));
-		//ImGui::Image(simgui_imtextureid(m_levelFramebuffer.getImage()), ImGui::GetMainViewport()->Size);
 	}
 
 	void updateCameraPos() {
@@ -112,6 +163,8 @@ private:
 
 	glm::ivec2 m_camPos;
 	glm::ivec2 m_viewportSize;
+
+	std::optional<std::pair<glm::ivec2, glm::ivec2>> m_selection;
 
 	LevelRenderer m_levelRenderer;
 	Framebuffer m_levelFramebuffer;

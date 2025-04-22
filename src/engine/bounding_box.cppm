@@ -27,7 +27,7 @@ export struct BoundingBox {
 	}
 
 	template <vector2<int> Vector> 
-	[[nodiscard]] static constexpr BoundingBox fromPositionAndSize(const Vector& topLeft, const Vector& size) { 
+	[[nodiscard]] static constexpr BoundingBox fromPositionAndSize(const Vector& topLeft, const Vector& size) noexcept { 
 		return fromPositions(topLeft, topLeft + size);
 	}
 

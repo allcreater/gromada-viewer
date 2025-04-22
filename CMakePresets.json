@@ -24,7 +24,7 @@
         "CMAKE_CXX_COMPILER": "cl.exe"
       },
       "environment": {
-        "CXXFLAGS": "/W4 /Wall /extern:W2 /external:anglebrackets"
+        "CXXFLAGS": "/W4 /Wall /external:W2 /external:anglebrackets"
       },
       "condition": {
         "type": "equals",
@@ -76,6 +76,9 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      },
+      "environment": {
+        "CXXFLAGS": "$penv{CXXFLAGS}"
       }
     },
     {
