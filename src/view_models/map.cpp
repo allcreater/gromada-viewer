@@ -86,7 +86,7 @@ public:
 			}
 			else if (m_selection) {
 				m_model.selectedMapObjects().assign_range(
-					m_model.objectsView().queryObjectsInRegion(BoundingBox::fromPositions(m_selection->first, m_selection->second), physicalBounds) |
+					m_model.objectsView().queryObjectsInRegion(BoundingBox::fromPositions(m_selection->first.x, m_selection->first.y, m_selection->second.x, m_selection->second.y), physicalBounds) |
 					std::views::transform(std::mem_fn(&ObjectView::objectIndex)));
 				m_selection.reset();
 			}

@@ -2,13 +2,6 @@ export module engine.bounding_box;
 
 import std;
 
-template <typename T, typename ComponentType>
-concept vector2 = requires(T vector) {
-	{ vector.x } -> std::convertible_to<ComponentType>;
-	{ vector.y } -> std::convertible_to<ComponentType>;
-	{ vector + vector } -> std::same_as<T>;
-};
-
 // TODO: use full-featured 2D AABB's instead
 export struct BoundingBox {
 	int left;
@@ -16,19 +9,17 @@ export struct BoundingBox {
 	int top;
 	int down;
 
-	template <vector2<int> Vector>
-	[[nodiscard]] static constexpr BoundingBox fromPositions(const Vector& a, const Vector& b) noexcept { 
+	[[nodiscard]] static constexpr BoundingBox fromPositions(int x1, int y1, int x2, int y2) noexcept { 
 		return {
-			.left = std::min(a.x, b.x),
-			.right = std::max(a.x, b.x),
-			.top = std::min(a.y, b.y),
-			.down = std::max(a.y, b.y),
+			.left = std::min(x1, x2),
+			.right = std::max(x1, x2),
+			.top = std::min(y1, y2),
+			.down = std::max(y1, y2),
 		};
 	}
 
-	template <vector2<int> Vector> 
-	[[nodiscard]] static constexpr BoundingBox fromPositionAndSize(const Vector& topLeft, const Vector& size) noexcept { 
-		return fromPositions(topLeft, topLeft + size);
+	[[nodiscard]] static constexpr BoundingBox fromPositionAndSize(int x, int y, int sizeX, int sizeY) noexcept { 
+		return fromPositions(x, y, x + sizeX, y + sizeY);
 	}
 
 	constexpr bool empty() const noexcept { return (right - left <= 0) || (down - top <= 0); }

@@ -11,7 +11,6 @@ import engine.bounding_box;
 import Gromada.Resources;
 import Gromada.VisualLogic;
 
-// Workaround: we can't use template fromPositionAndSize here because it will require to include glm across all dependent modules 
 BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
 	const auto min = pos - size/2, max = pos + size/2;
 	return BoundingBox{
@@ -67,7 +66,7 @@ public:
 	}
 
 	template <typename BoundsFn = decltype(visualBounds)>
-	std::ranges::bidirectional_range auto queryObjectsInRegion(BoundingBox region, BoundsFn&& boundsFn = BoundsFn{}) const {
+	inline std::ranges::bidirectional_range auto queryObjectsInRegion(BoundingBox region, BoundsFn&& boundsFn = BoundsFn{}) const {
 		return m_objects | std::views::filter([region, boundsFn = std::forward<BoundsFn>(boundsFn)](
 												  const ObjectView& object) { return boundsFn(object).isIntersects(region); });
 	}
