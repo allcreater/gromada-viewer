@@ -33,7 +33,7 @@ public:
 
 private:
 	void updateObjectsView(glm::ivec2 min, glm::ivec2 max) {
-		m_visibleObjects.assign_range(m_objectsView.queryObjectsInRegion(BoundingBox{min.x, max.x, min.y, max.y}));
+		m_visibleObjects.assign_range(m_objectsView.queryObjectsInRegion(ObjectsView::visualBounds, BoundingBox{min.x, max.x, min.y, max.y}));
 		std::ranges::sort(m_visibleObjects, {},
 			[](const ObjectView& obj) { return std::tuple{obj.graphics.get().visualBehavior, obj.obj.get().y + obj.graphics.get().imgHeight}; });
 	}
