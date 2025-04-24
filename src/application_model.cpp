@@ -73,6 +73,7 @@ public:
 
 		m_activeMap = Map::load(m_resources.vids, mapReader, mapNavigator);
 		m_activeMapPath = std::move(path);
+		m_selectedObjects.clear();
 	}
 
 private:
