@@ -112,7 +112,7 @@ void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream) {
 		{"Directions count", MakePrintFunction<&Vid::directionsCount>()},
 		{"z", MakePrintFunction<&Vid::z>()},
 		{"dataSizeOrNvid", MakePrintFunction<&Vid::dataSizeOrNvid>()},
-		//{"visualBehavior", MakePrintFunction<VidGraphics, &VidGraphics::visualBehavior>()},
+		//{"dataFormat", MakePrintFunction<VidGraphics, &VidGraphics::dataFormat>()},
 		//{"hz7", MakePrintFunction<VidGraphics, &VidGraphics::hz7>()},
 		//{"numOfFrames", MakePrintFunction<VidGraphics, &VidGraphics::numOfFrames>()},
 		//{"dataSize", MakePrintFunction<VidGraphics, &VidGraphics::dataSize>()},

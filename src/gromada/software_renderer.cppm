@@ -191,7 +191,7 @@ void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, 
 	};
 
 	SpanStreamReader reader{data.frames[spriteIndex].data};
-	switch (data.visualBehavior) {
+	switch (data.dataFormat) {
 	case 0:
 		DrawSprite_Type0(data, srcBounds, spriteIndex, x, y, framebuffer);
 		break;

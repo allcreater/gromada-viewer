@@ -41,7 +41,7 @@ export struct RGBA8 {
 //};
 
 export struct VidGraphics {
-	std::uint8_t visualBehavior;
+	std::uint8_t dataFormat;
 	std::uint16_t hz7;
 	std::uint16_t numOfFrames;
 	std::uint32_t dataSize;
@@ -87,21 +87,23 @@ export struct Vid {
 	std::uint8_t maxHP;
 	std::uint16_t gridRadius;
 	std::uint8_t p6;
-	std::uint16_t speedX;
 
+	std::uint16_t speedX;
 	std::uint16_t speedY;
 	std::uint16_t acceleration;
 	std::uint8_t rotationPeriod;
+
 	std::uint8_t army;
 	std::uint8_t someWeaponIndex;
 	std::uint8_t hz4;
 	std::uint16_t deathDamageRadius;
 	std::uint8_t deathDamage;
+
 	std::uint8_t linkX;
 	std::uint8_t linkY;
 	std::uint8_t linkZ;
-
 	std::uint16_t linkedObjectVid;
+
 	std::uint16_t hz6;
 	std::uint8_t directionsCount;
 	std::uint8_t z;
@@ -182,21 +184,23 @@ void Vid::read(BinaryStreamReader reader)
 	reader.read_to(maxHP);
 	reader.read_to(gridRadius);
 	reader.read_to(p6);
-	reader.read_to(speedX);
 
+	reader.read_to(speedX);
 	reader.read_to(speedY);
 	reader.read_to(acceleration);
 	reader.read_to(rotationPeriod);
+
 	reader.read_to(army);
 	reader.read_to(someWeaponIndex);
 	reader.read_to(hz4);
 	reader.read_to(deathDamageRadius);
 	reader.read_to(deathDamage);
+
 	reader.read_to(linkX);
 	reader.read_to(linkY);
 	reader.read_to(linkZ);
-
 	reader.read_to(linkedObjectVid);
+
 	reader.read_to(hz6);
 	reader.read_to(directionsCount);
 	reader.read_to(z);
@@ -218,7 +222,7 @@ void Vid::read(BinaryStreamReader reader)
 
 
 void VidGraphics::read(BinaryStreamReader& reader) {
-	reader.read_to(visualBehavior);
+	reader.read_to(dataFormat);
 	reader.read_to(hz7);
 	reader.read_to(numOfFrames);
 	reader.read_to(dataSize);
@@ -256,7 +260,7 @@ VidGraphics::DecodedData VidGraphics::decode() const {
 	std::vector<std::vector<RGBA8>> result;
 	result.reserve(frames.size());
 
-	switch (visualBehavior) {
+	switch (dataFormat) {
 	case 0:
 		decodeFormat0(result);
 		break;
@@ -271,7 +275,7 @@ VidGraphics::DecodedData VidGraphics::decode() const {
 }
 
 void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
-	assert(visualBehavior == 0);
+	assert(dataFormat == 0);
 
 	for (const auto& [referenceFrameNumber, srcData] : frames) {
 		if (srcData.size() > 0) {
@@ -291,7 +295,7 @@ void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
 
 
 void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
-	assert(visualBehavior == 2);
+	assert(dataFormat == 2);
 
 	for (auto [referenceFrameNumber, srcData] : frames) {
 		if (srcData.size() > 0) {

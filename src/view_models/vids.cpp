@@ -19,7 +19,7 @@ import utils;
 auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
 	constexpr static auto extractGraphicsGormat = [](const Vid& vid) {
 		const auto* graphics = std::get_if<Vid::Graphics>(&(vid.graphicsData));
-		return graphics ? graphics->get()->visualBehavior : -1;
+		return graphics ? graphics->get()->dataFormat : -1;
 	};
 
 	const std::array comparators{
@@ -120,7 +120,7 @@ public:
 
 				std::visit(overloaded{
 							   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
-							   [](const Vid::Graphics& arg) { ImGui::Text("%i", arg->visualBehavior); },
+							   [](const Vid::Graphics& arg) { ImGui::Text("%i", arg->dataFormat); },
 						   },
 					vid.graphicsData);
 
@@ -167,7 +167,7 @@ private:
 };
 
 namespace {
-	constexpr auto classifyVisualBehavior (std::uint8_t behavior) -> const char* {
+	constexpr auto classifyDataFormat (std::uint8_t behavior) -> const char* {
 		switch (behavior & 0x3F) {
 		case 0:
 			return "unpack mode 1";
@@ -239,7 +239,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 				   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
 				   [&self](const Vid::Graphics& arg) {
 					   ImGui::Text("frames size: %i", self.dataSizeOrNvid);
-					   ImGui::Text("Visual behavior: %x (%s)", arg->visualBehavior, classifyVisualBehavior(arg->visualBehavior));
+					   ImGui::Text("data format: %x (%s)", arg->dataFormat, classifyDataFormat(arg->dataFormat));
 					   ImGui::Text("???: %i", arg->hz7);
 					   ImGui::Text("numOfFrames: %i", arg->numOfFrames);
 					   ImGui::Text("dataSize: %i", arg->dataSize);
