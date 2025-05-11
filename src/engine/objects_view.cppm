@@ -8,7 +8,7 @@ import utils;
 
 import engine.bounding_box;
 
-import Gromada.Resources;
+import Gromada.GameResources;
 import Gromada.VisualLogic;
 
 BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
@@ -49,14 +49,15 @@ public:
 	constexpr static inline VisualBounds visualBounds {}; 
 	constexpr static inline PhysicalBounds physicalBounds{}; 
 
-	ObjectsView(std::span<const Vid> vids, const Map& map)
-		: m_vids{vids}, m_map{map} {}
+	ObjectsView(const GameResources& resources, const Map& map)
+		: m_resources{resources}, m_map{map} {}
 
 	void update() {
 		const auto makeObjectView = [this](const GameObject& obj) -> ObjectView {
+		    const auto& [vid, graphics] = m_resources.getVid(obj.nvid);
 			return {
-				.vid = m_vids[obj.nvid],
-				.graphics = getVidGraphics(m_vids, obj.nvid),
+				.vid = vid,
+				.graphics = graphics,
 				.obj = obj,
 				.objectIndex = static_cast<size_t>(std::distance(m_map.objects.data(), &obj)),
 			};
@@ -78,7 +79,7 @@ public:
 	std::span<const ObjectView> objects() const noexcept { return m_objects; }
 
 private:
-	std::span<const Vid> m_vids;
+    const GameResources& m_resources;
 	const Map& m_map;
 
 	std::vector<ObjectView> m_objects;

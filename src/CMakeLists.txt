@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.30)
 
 add_executable (GromadaEditor
 	"main.cpp"
- )
+)
 
 
  target_sources(GromadaEditor PRIVATE 
@@ -13,6 +13,7 @@ add_executable (GromadaEditor
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"gromada/data_exporters.cppm"
+		"gromada/game_resources.cppm"
 		"gromada/resource_reader.cpp"
 		"gromada/resources.cpp"
 		"gromada/software_renderer.cppm"
