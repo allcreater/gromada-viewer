@@ -65,23 +65,41 @@ bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textTo
     return value_changed;
 }
 
+template <typename T> const char* payloadTypeName() noexcept { 
+	static std::array<char, sizeof ImGuiPayload::DataType> typeName = [] {
+		const char* stdName = typeid(T).name();
+
+		std::array<char, sizeof ImGuiPayload::DataType> nameBuffer;
+		if (std::string_view(stdName).size() > nameBuffer.size()) {
+			std::format_to_n(nameBuffer.data(), nameBuffer.size(), "hash_{}", typeid(T).hash_code());
+		}
+		else {
+			std::strncpy(nameBuffer.data(), stdName, nameBuffer.size() - 1);
+        }
+
+		return nameBuffer;
+	}();
+
+	return typeName.data();
+}
+
 export template<typename T> 
     requires std::is_trivially_copyable_v<T>
 bool SetDragDropPayload(const T& object) {
-	return ImGui::SetDragDropPayload(typeid(T).name(), &object, sizeof(T));
+	return ImGui::SetDragDropPayload(payloadTypeName<T>(), &object, sizeof(T));
 }
 
 export template <typename T>
 	requires std::is_trivially_copyable_v<T>
-std::optional<std::pair<T, const ImGuiPayload&>> AcceptDragDropPayload(ImGuiDragDropFlags flags = {}) {
-	const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(typeid(T).name(), flags);
+std::optional<std::pair<T, const ImGuiPayload*>> AcceptDragDropPayload(ImGuiDragDropFlags flags = {}) {
+	const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadTypeName<T>(), flags);
 	if (!payload)
 		return std::nullopt;
 
     T object;
 	assert(sizeof (T) == payload->DataSize);
 	std::memcpy(&object, payload->Data, sizeof (T));
-	return std::pair{std::move(object), *payload};
+	return std::pair{std::move(object), payload};
 }
 
 }
