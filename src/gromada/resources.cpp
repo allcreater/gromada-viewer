@@ -106,7 +106,7 @@ export struct Vid {
 
 	std::uint16_t hz6;
 	std::uint8_t directionsCount;
-	std::uint8_t z;
+	std::uint8_t z; // z_priority?
 
 	// TODO: std::array<std::uint8_t, 16> animationLengths; ?
 	std::array<std::uint8_t, 144> supportedActions;
@@ -445,31 +445,34 @@ MapHeaderRawData loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavig
 	return readMapHeader(reader.beginRead(*it));
 }
 
+//TODO: use output iterator
+void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVersion, std::span<const Vid> vids, BinaryStreamReader reader) {
+	for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0;) {
+		std::array<std::uint16_t, 4> rawData;
+		reader.read_to(rawData);
+
+		result.push_back({
+			.nvid = static_cast<unsigned int>(nvid),
+			.x = rawData[0],
+			.y = rawData[1],
+			.z = rawData[2],
+			.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
+			.payload = readObjectPayload(mapVersion, vids[nvid].behave, reader),
+		});
+	}
+}
+
 std::vector<GameObject> loadDynamicObjects(
 	MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-	auto readDynamicObjects = [&](BinaryStreamReader reader) {
-		std::vector<GameObject> result;
-		for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0;) {
-			std::array<std::uint16_t, 4> rawData;
-			reader.read_to(rawData);
+	std::vector<GameObject> result;
+	
+	std::ranges::for_each(
+		resourceNavigator.getSections() | std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; }),
+		[&](const Section& section) { return readDynamicObjectsSection(result, mapVersion, vids, reader.beginRead(section)); }
 
-			result.push_back({
-				.nvid = static_cast<unsigned int>(nvid),
-				.x = rawData[0],
-				.y = rawData[1],
-				.z = rawData[2],
-				.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
-				.payload = readObjectPayload(mapVersion, vids[nvid].behave, reader),
-			});
-		}
-		return result;
-	};
+	);
 
-
-	return resourceNavigator.getSections() | std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; }) |
-		   std::views::transform([&](const Section& section) { return readDynamicObjects(reader.beginRead(section)); }) | std::views::join |
-		   std::ranges::to<std::vector>();
-
+	return result;
 }
 
 Map Map::load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
@@ -479,4 +482,16 @@ Map Map::load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaR
 		.header = header,
 		.objects = loadDynamicObjects(header.mapVersion, vids, reader, resourceNavigator),
 	};
+}
+
+export std::vector<GameObject> loadMenu(std::span<const Vid> vids, std::istream&& stream) {
+	std::vector<GameObject> result;
+	stream.seekg(4, std::ios::beg);
+	BinaryStreamReader reader{stream};
+
+	for (int i = 0; i < 16; ++i) {
+		readDynamicObjectsSection(result, MapVersion::V0, vids, reader);
+	}
+
+	return result;
 }

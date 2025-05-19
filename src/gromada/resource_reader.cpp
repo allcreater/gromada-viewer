@@ -18,6 +18,7 @@ export {
 	class BinaryStreamReader {
 	public:
 		explicit BinaryStreamReader(std::istream& stream, std::size_t length) : m_stream{ stream }, m_dataLength{ length } {}
+		explicit BinaryStreamReader(std::istream& stream) : m_stream{ stream }, m_dataLength{ std::numeric_limits<std::size_t>::max() } {}
 
 		void read_to(std::span<std::byte> out) {
 			if (m_count + out.size() > m_dataLength)
@@ -71,12 +72,12 @@ export {
 		MapInfo = 1,
 		Objects = 2,
 		Command = 4,
-		Boo = 5,
+		ObjectsIds = 5,
 		Army = 6,
 		Vid = '!',
 		Sound = '\"',
 		Weapon = '#',
-		Foo = '%',
+		TilesTable = '%',
 	};
 
 	struct SectionHeader {
