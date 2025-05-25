@@ -43,7 +43,7 @@ private:
 	static std::vector<MapEntry> getMaps(const Model& model, const std::filesystem::path& mapsDirectory) {
 		return std::filesystem::recursive_directory_iterator{mapsDirectory} | std::views::transform([&mapsDirectory](const auto& entry) {
 			return MapEntry{std::filesystem::relative(entry.path(), mapsDirectory).u8string(), entry.path()};
-		}) | std::views::filter([](const auto& entry) { return entry.path.extension() == ".map"; }) |
+		}) | std::views::filter([](const auto& entry) { return entry.path.extension() == ".map" || entry.path.extension() == ".men"; }) |
 			   std::ranges::to<std::vector>();
 	}
 

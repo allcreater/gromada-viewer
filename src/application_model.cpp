@@ -37,10 +37,22 @@ public:
 	void update() { m_objectsView.update(); }
 
 	void loadMap(const std::filesystem::path& path) {
-		GromadaResourceReader mapReader{path};
-		GromadaResourceNavigator mapNavigator{mapReader};
+		if (path.extension() == ".map") {
+			GromadaResourceReader mapReader{path};
+			GromadaResourceNavigator mapNavigator{mapReader};
 
-		m_activeMap = Map::load(vids(), mapReader, mapNavigator);
+			m_activeMap = Map::load(vids(), mapReader, mapNavigator);
+		}
+		else {
+			m_activeMap = Map{
+				.header = {
+					.width = 800,
+					.height = 600,
+				},
+				.objects = loadMenu(vids(), std::ifstream{path, std::ios_base::in | std::ios_base::binary}),
+			};
+		}
+
 		m_activeMapPath = std::move(path);
 		m_selectedObjects.clear();
 	}
