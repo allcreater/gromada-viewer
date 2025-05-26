@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -17,6 +18,7 @@ import imgui_utils;
 import application.model;
 import engine.bounding_box;
 import engine.level_renderer;
+import engine.objects_view;
 
 import Gromada.SoftwareRenderer;
 
@@ -27,7 +29,10 @@ constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cas
 export class MapViewModel {
 public:
 	explicit MapViewModel(Model& model)
-		: m_model{model}, m_levelRenderer{model.objectsView()} {}
+		: m_model{model}, m_levelRenderer{model} {
+
+	    m_selectionQuery = m_model.query_builder<const GameObject, const VidComponent>().with<Selected>().cached().build();
+	}
 
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;
@@ -48,7 +53,6 @@ public:
 		updateViewport();
 
 		const auto mouseWorldPos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-		const size_t numberOfObjectsBeforeModification = m_model.map().objects.size();
 
 		const auto* vp = ImGui::GetMainViewport();
 		if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
@@ -56,24 +60,22 @@ public:
 			target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
 			//target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
 			if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
-				m_model.map().objects.push_back({
+				auto _ = m_model.entity()
+			    .set<GameObject>({
 					.nvid = payload->first.nvid,
 					.x = mouseWorldPos.x,
 					.y = mouseWorldPos.y,
 					.z = 0,
 					.direction = payload->first.direction,
-				});
+				})
+			    .add_if<DestroyAfterUpdate>(!(payload->second->IsDelivery()));
+
 			}
 			ImGui::EndDragDropTarget();
 		}
 
 		drawMap();
 
-		// Roll back objects on map if object is not dropped yet
-		if (ImGui::IsDragDropActive() && (m_model.map().objects.size() > numberOfObjectsBeforeModification)) {
-			m_model.map().objects.resize(numberOfObjectsBeforeModification);
-		}
-		
 		if (!ImGui::IsDragDropActive()) {
 			updateSelection(mouseWorldPos);
 		}
@@ -98,17 +100,16 @@ private:
 			ImVec2{0, 0},
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
+	    // selection visualization
+	    m_selectionQuery.each([&](const GameObject& obj, const VidComponent& vid) {
+	        const glm::ivec2 halfSize {vid.vid().anotherWidth / 2, vid.vid().anotherHeight / 2};
+            const glm::ivec2 pos {obj.x, obj.y};
 
-		// selection visualization
-		for (const auto& [vid, spritesPack, obj, _] :
-			m_model.selectedMapObjects() | std::views::transform([this](size_t index) { return m_model.objectsView().objects()[index]; })) {
-			const glm::ivec2 halfSize {vid.get().anotherWidth / 2, vid.get().anotherHeight / 2};
-			const glm::ivec2 pos {obj.get().x, obj.get().y};
+            const auto color = objectSelectionColor(vid.vid().unitType);
+            const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
+            draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
+	    });
 
-			const auto color = objectSelectionColor(vid.get().unitType);
-			const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
-			draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
-		}
 
 		if (m_selectionFrame) {
 			draw_list->AddRect(to_imvec(worldToScreenPos(m_selectionFrame->first)), to_imvec(worldToScreenPos(m_selectionFrame->second)), IM_COL32(0, 255, 0, 200));
@@ -125,8 +126,10 @@ private:
 			m_camPos -= from_imvec(ImGui::GetIO().MouseDelta);
 		}
 
-		const auto& map = m_model.map();
-		m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{map.header.width, map.header.height});
+	    const auto activeLevel = m_model.component<ActiveLevel>();
+		if (const auto* mapHeader = activeLevel.get<MapHeaderRawData>()) {
+			m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader->width, mapHeader->height});
+		}
 	}
 
 	void updateSelection(glm::ivec2 mouseWorldPos) {
@@ -136,11 +139,12 @@ private:
 			}
 			else {
 				m_selectionFrame->second = mouseWorldPos;
-
-				m_model.selectedMapObjects().assign_range(
-						m_model.objectsView().queryObjectsInRegion(ObjectsView::physicalBounds,
-							BoundingBox::fromPositions(m_selectionFrame->first.x, m_selectionFrame->first.y, m_selectionFrame->second.x, m_selectionFrame->second.y)) |
-						std::views::transform(std::mem_fn(&ObjectView::objectIndex)));
+			    m_model.remove_all<Selected>();
+                m_model.defer([&] {
+                    m_model.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->first.x, m_selectionFrame->first.y, m_selectionFrame->second.x, m_selectionFrame->second.y), [](flecs::entity entity) {
+                        entity.add<Selected>();
+                    });
+                });
 			}
 		}
 		else if (m_selectionFrame) {
@@ -172,7 +176,7 @@ private:
 	glm::ivec2 m_viewportSize;
 
 	std::optional<std::pair<glm::ivec2, glm::ivec2>> m_selectionFrame;
-
+    flecs::query<const GameObject, const VidComponent> m_selectionQuery;
 	LevelRenderer m_levelRenderer;
 	Framebuffer m_levelFramebuffer;
 };

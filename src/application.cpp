@@ -36,7 +36,9 @@ public:
 		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
 			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-			ExportVidsToCsv(m_model.vids(), stream);
+
+			const auto vids = m_model.get<const GameResources>()->vids();
+			ExportVidsToCsv(vids, stream);
 		}
 
 		if (auto arg = arguments.present<std::filesystem::path>("--map")) {
@@ -46,7 +48,7 @@ public:
     }
 
 	void on_frame() {
-		m_model.update();
+		m_model.progress();
 		m_viewModel.updateUI();
 
         //ImGui::ShowDemoWindow();

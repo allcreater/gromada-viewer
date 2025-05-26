@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 
 export module application.model;
 
@@ -8,7 +9,7 @@ import utils;
 import Gromada.ResourceReader;
 export import Gromada.GameResources;
 
-export import engine.objects_view;
+export import engine.world_components;
 
 //TODO: move
 export struct ObjectToPlaceMessage {
@@ -16,41 +17,54 @@ export struct ObjectToPlaceMessage {
 	std::uint8_t direction;
 };
 
-export class Model {
+
+export struct Selected {};
+export struct Selectable {};
+export using Path = std::filesystem::path;
+
+export struct EditorComponents {
+    EditorComponents(flecs::world& world) {
+        world.component<Selected>();
+        world.component<Selectable>();
+        world.component<Path>();
+    }
+};
+
+export class Model : public flecs::world {
 public:
 	explicit Model(std::filesystem::path path)
-		: m_resources{path}, m_gamePath{path.parent_path()}, m_objectsView{m_resources, m_activeMap} {}
-
-	const std::span<const Vid> vids() const { return m_resources.vids(); }
-	
-	// NOTE: Map is just a DTO type, for game logic a new class will be needed
-	Map& map() { return m_activeMap; }
-	const Map& map() const { return m_activeMap; }
-	const std::filesystem::path& activeMapPath() const { return m_activeMapPath; }
-
-	const ObjectsView& objectsView() const { return m_objectsView; }
-
-	const std::filesystem::path& gamePath() const { return m_gamePath; }
-
-	std::vector<std::size_t>& selectedMapObjects() { return m_selectedObjects;  }
-
-	void update() { m_objectsView.update(); }
+		: flecs::world{create_world(GameResources{path})} {}
 
 	void loadMap(const std::filesystem::path& path) {
 		GromadaResourceReader mapReader{path};
 		GromadaResourceNavigator mapNavigator{mapReader};
 
-		m_activeMap = Map::load(vids(), mapReader, mapNavigator);
-		m_activeMapPath = std::move(path);
-		m_selectedObjects.clear();
+        auto& m_world = *this;
+
+		const auto& vids = m_world.get<const GameResources>()->vids();
+		const auto map = Map::load(vids, mapReader, mapNavigator);
+	    const auto activeLevel = m_world.component<ActiveLevel>();
+	    m_world.delete_with(flecs::ChildOf, activeLevel);
+
+	    for (const auto& obj : map.objects) {
+	        m_world.entity()
+                .set<GameObject>(obj)
+                .child_of(activeLevel);
+	    }
+
+	    activeLevel.set<MapHeaderRawData>(map.header);
+        activeLevel.set<Path>(std::move(path));
 	}
 
 private:
-	GameResources m_resources;
-	Map m_activeMap;
-	ObjectsView m_objectsView;
-	std::vector<std::size_t> m_selectedObjects;
+	flecs::world create_world(GameResources&& resources) {
+		flecs::world world{};
+        world.import<World>();
+        world.import<EditorComponents>();
 
-	std::filesystem::path m_activeMapPath;
-	std::filesystem::path m_gamePath;
+        world.emplace<GameResources>(std::move(resources));
+
+        return world;
+    }
+
 };

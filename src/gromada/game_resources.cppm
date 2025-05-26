@@ -8,7 +8,7 @@ export import Gromada.Resources;
 export class GameResources {
 public:
     explicit GameResources(std::filesystem::path path)
-        : m_reader{path}, m_navigator{m_reader} {
+        : m_gamePath(path.parent_path()), m_reader{path}, m_navigator{m_reader} {
         // clang-format off
         m_vids = m_navigator.getSections()
             | std::views::filter([](const Section& section) { return section.header().type == SectionType::Vid; })
@@ -40,10 +40,14 @@ public:
 
     const std::span<const Vid> vids() const { return m_vids; }
 
+    const std::filesystem::path& gamePath() const { return m_gamePath; }
+    std::filesystem::path mapsPath() const { return m_gamePath / "maps"; }
+
     std::tuple<const Vid&, const VidGraphics&> getVid(std::size_t index) const {
         return {m_vids[index], *std::get<Vid::Graphics>(m_vids[index].graphicsData)};
     }
 private:
+    std::filesystem::path m_gamePath;
     GromadaResourceReader m_reader;
     GromadaResourceNavigator m_navigator;
 

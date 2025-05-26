@@ -63,7 +63,7 @@
         "CMAKE_BUILD_TYPE": "Debug"
       },
       "environment": {
-        "CXXFLAGS": "$penv{CXXFLAGS} /fsanitize=address"
+        "CXXFLAGS": "$penv{CXXFLAGS}"
       }
     },
     {

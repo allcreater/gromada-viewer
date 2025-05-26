@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 #include <glm/glm.hpp>
 
 export module engine.level_renderer;
@@ -8,6 +9,7 @@ import std;
 import engine.bounding_box;
 import engine.objects_view;
 
+import Gromada.Resources;
 import Gromada.SoftwareRenderer;
 import Gromada.VisualLogic;
 
@@ -15,30 +17,40 @@ import Gromada.VisualLogic;
 
 export class LevelRenderer {
 public:
-	LevelRenderer(const ObjectsView& objectsView)
-		: m_objectsView{objectsView} {}
+	LevelRenderer(const flecs::world& world)
+		: m_world{world} {}
 
 	void drawMap(FramebufferRef framebuffer, glm::ivec2 viewportOffset, glm::ivec2 viewportSize, std::uint32_t frameCounter) {
 		updateObjectsView(viewportOffset, viewportOffset + viewportSize);
-		for (const auto& [vid, spritesPack, obj, _] : m_visibleObjects) {
-			const glm::ivec2 pos = glm::ivec2{obj.get().x - spritesPack.get().imgWidth / 2, obj.get().y - spritesPack.get().imgHeight / 2} - viewportOffset;
-			auto [minIndex, maxIndex] = getAnimationFrameRange(vid, Action::Stand, obj.get().direction);
-			assert(maxIndex < spritesPack.get().numOfFrames);
+		for (flecs::entity entity : m_visibleObjects) {
+		    auto obj = entity.get_ref<const GameObject>();
+		    auto vid = entity.get_ref<const VidComponent>();
 
-			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(&(obj.get())) / 57);
+			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().imgWidth / 2, obj->y - vid->graphics().imgHeight / 2} - viewportOffset;
+			auto [minIndex, maxIndex] = getAnimationFrameRange(vid->vid(), Action::Stand, obj->direction);
+			assert(maxIndex < vid->graphics().numOfFrames);
+
+			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj.get()) / 57);
 			const auto frameNumber = animationOffset % (maxIndex - minIndex + 1) + minIndex;
-			DrawSprite(spritesPack, frameNumber, pos.x, pos.y, framebuffer);
+			DrawSprite(vid->graphics(), frameNumber, pos.x, pos.y, framebuffer);
 		}
 	}
 
 private:
 	void updateObjectsView(glm::ivec2 min, glm::ivec2 max) {
-		m_visibleObjects.assign_range(m_objectsView.queryObjectsInRegion(ObjectsView::visualBounds, BoundingBox{min.x, max.x, min.y, max.y}));
+	    m_visibleObjects.clear();
+	    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::visualBounds, BoundingBox{min.x, max.x, min.y, max.y}, [&](flecs::entity entity){ m_visibleObjects.push_back(entity); });
+
 		std::ranges::sort(m_visibleObjects, {},
-			[](const ObjectView& obj) { return std::tuple{obj.graphics.get().dataFormat, obj.obj.get().y + obj.graphics.get().imgHeight}; });
+			[](flecs::entity entity) {
+			    auto obj = entity.get_ref<const GameObject>();
+			    const auto& graphics = entity.get_ref<VidComponent>()->graphics();
+			    const auto& vid = entity.get_ref<VidComponent>()->vid();
+			    return std::tuple{vid.z, obj->y + graphics.imgHeight / 2};
+			});
 	}
 
 private:
-	const ObjectsView& m_objectsView;
-	std::vector<ObjectView> m_visibleObjects;
+	const flecs::world& m_world;
+	std::vector<flecs::entity> m_visibleObjects;
 };

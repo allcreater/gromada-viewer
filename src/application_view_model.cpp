@@ -66,14 +66,17 @@ public:
 			if (ImGui::MenuItem("Export map JSON")) {
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
-				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", m_model.activeMapPath().stem().u8string().c_str());
+			    const auto* activeMapPath = m_model.component<ActiveLevel>().get<Path>();
+				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
 			}
 
 			// TODO: reuse popup from previous item
 			if (ImGui::MenuItem("Export vids to CSV")) {
 				std::ofstream stream{"vids.csv", std::ios_base::out};
 				stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-				ExportVidsToCsv(m_model.vids(), stream);
+
+				const auto vids = m_model.get<const GameResources>()->vids();
+				ExportVidsToCsv(vids, stream);
 			}
 
 			if (ImGui::MenuItem("Exit")) {
@@ -103,7 +106,7 @@ public:
 				ImGui::CloseCurrentPopup();
 
 				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
-				ExportMapToJson(m_model.map(), stream);
+				//ExportMapToJson(m_model.map(), stream);
 			}
 			ImGui::EndPopup();
 		}

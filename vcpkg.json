@@ -2,9 +2,10 @@
   "name": "gromada-editor",
   "version-string": "0.0.1",
   "dependencies": [
-    "imgui",
     "argparse",
-    "nlohmann-json",
-    "glm"
+    "flecs",
+    "glm",
+    "imgui",
+    "nlohmann-json"
   ]
 }

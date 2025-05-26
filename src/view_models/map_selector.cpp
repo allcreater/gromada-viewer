@@ -17,15 +17,17 @@ import application.model;
 export class MapsSelectorViewModel {
 public:
 	explicit MapsSelectorViewModel(Model& model)
-		: m_model{model}, m_mapsBaseDirectory{model.gamePath() / "maps"} {}
+		: m_model{model}, m_mapsBaseDirectory{model.get<const GameResources>()->mapsPath()} {}
 
 	void updateUI() {
 		auto pathToCStr = [this, currentStr = std::u8string{}](
 							  const MapEntry& mapEntry) mutable { return reinterpret_cast<const char*>(mapEntry.name.c_str()); };
 
+	    const auto activeLevel = m_model.component<ActiveLevel>();
+
 		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span{m_maps}, std::move(pathToCStr))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
-			if (selectedMap.path != m_model.activeMapPath()) {
+			if (auto* currentPath = activeLevel.get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
 				m_model.loadMap(selectedMap.path);
 			}
 		}
