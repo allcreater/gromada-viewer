@@ -16,7 +16,7 @@ class World {
 public:
 	World(flecs::world& world) {
 		world.component<GameObject>();
-		world.component<VidComponent>();
+		world.component<Vid>();
 		world.component<MapHeaderRawData>();
 		world.component<ObjectsView>();
 		world.component<GameResources>();
@@ -32,7 +32,7 @@ public:
 			.each([](flecs::entity entity, const GameObject& object) { // TODO: try param GameResources
 			    const auto& res = *entity.world().get<const GameResources>();
 	            const auto& vid = std::get<0>(res.getVid(object.nvid));
-	            entity.emplace<VidComponent>(vid);
+	            entity.emplace<Vid>(vid);
 	        });
 
 	    world.system<DestroyAfterUpdate>().kind(flecs::OnStore).each([](flecs::entity entity, DestroyAfterUpdate) {

@@ -24,10 +24,10 @@ public:
 		updateObjectsView(viewportOffset, viewportOffset + viewportSize);
 		for (flecs::entity entity : m_visibleObjects) {
 		    auto obj = entity.get_ref<const GameObject>();
-		    auto vid = entity.get_ref<const VidComponent>();
+		    auto vid = entity.get_ref<const Vid>();
 
 			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().imgWidth / 2, obj->y - vid->graphics().imgHeight / 2} - viewportOffset;
-			auto [minIndex, maxIndex] = getAnimationFrameRange(vid->vid(), Action::Stand, obj->direction);
+			auto [minIndex, maxIndex] = getAnimationFrameRange(*vid.get(), Action::Stand, obj->direction);
 			assert(maxIndex < vid->graphics().numOfFrames);
 
 			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj.get()) / 57);
@@ -44,9 +44,8 @@ private:
 		std::ranges::sort(m_visibleObjects, {},
 			[](flecs::entity entity) {
 			    auto obj = entity.get_ref<const GameObject>();
-			    const auto& graphics = entity.get_ref<VidComponent>()->graphics();
-			    const auto& vid = entity.get_ref<VidComponent>()->vid();
-			    return std::tuple{vid.z, obj->y + graphics.imgHeight / 2};
+			    auto vid = entity.get_ref<const Vid>();
+			    return std::tuple{vid->z, obj->y + vid->graphics().imgHeight / 2};
 			});
 	}
 

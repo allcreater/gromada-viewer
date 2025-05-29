@@ -119,6 +119,13 @@ export struct Vid {
 	std::variant<std::int32_t, Graphics> graphicsData;
 
 	//
+    const VidGraphics& graphics() const {
+        const auto* graphics = std::get_if<Vid::Graphics>(&graphicsData);
+        if (!graphics || !graphics->get())
+            throw std::logic_error("Missing graphics");
+
+        return **graphics;
+    }
 	void read(BinaryStreamReader reader);
 };
 

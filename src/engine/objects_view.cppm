@@ -24,32 +24,14 @@ BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
 
 export {
 
-class VidComponent {
-public:
-    VidComponent(const Vid& vid) : m_vid(&vid) {
-        assert(m_vid != nullptr);
-    }
-
-    const Vid& vid() const noexcept { return *m_vid; }
-    const VidGraphics& graphics() const noexcept {
-        assert(std::holds_alternative<Vid::Graphics>(m_vid->graphicsData));
-        return *std::get<Vid::Graphics>(m_vid->graphicsData);
-    }
-
-    VidComponent(const VidComponent& other) = default;
-    VidComponent(VidComponent&& other) = default;
-private:
-    const Vid* m_vid;
-};
-
 struct VisualBoundsFn {
-	BoundingBox operator()(const VidComponent& vid, const GameObject& obj) const {
+	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
 		return getCenteredBB({obj.x, obj.y}, {vid.graphics().imgWidth, vid.graphics().imgHeight});
 	}
 };
 struct PhysicalBoundsFn {
-	BoundingBox operator()(const VidComponent& vid, const GameObject& obj) const {
-		return getCenteredBB({obj.x, obj.y}, {vid.vid().anotherWidth, vid.vid().anotherHeight});
+	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
+		return getCenteredBB({obj.x, obj.y}, {vid.anotherWidth, vid.anotherHeight});
 	}
 };
 
@@ -60,7 +42,7 @@ public:
 	constexpr static inline VisualBounds visualBounds{};
 	constexpr static inline PhysicalBounds physicalBounds{};
 
-	ObjectsView(flecs::world& world) { m_query = world.query_builder<const VidComponent, const GameObject>().cached().build(); }
+	ObjectsView(flecs::world& world) { m_query = world.query_builder<const Vid, const GameObject>().cached().build(); }
 
     inline void queryObjectsInRegion([[maybe_unused]] VisualBounds, BoundingBox region, const auto& callback) const {
 	    queryObjectsInRegionImpl(VisualBoundsFn{}, region, callback);
@@ -71,7 +53,7 @@ public:
 	 }
 private:
     void queryObjectsInRegionImpl(auto&& boundsFn, BoundingBox region, const auto& callback) const {
-        m_query.each([region, boundsFn, &callback](flecs::entity entity, const VidComponent& vid, const GameObject& obj) {
+        m_query.each([region, boundsFn, &callback](flecs::entity entity, const Vid& vid, const GameObject& obj) {
             if (boundsFn(vid, obj).isIntersects(region)) {
                 std::invoke(callback,entity/*, vid, obj*/);
             }
@@ -80,7 +62,7 @@ private:
     }
 
 private:
-	flecs::query<const VidComponent, const GameObject> m_query;
+	flecs::query<const Vid, const GameObject> m_query;
 };
 
 }

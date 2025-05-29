@@ -31,7 +31,7 @@ public:
 	explicit MapViewModel(Model& model)
 		: m_model{model}, m_levelRenderer{model} {
 
-	    m_selectionQuery = m_model.query_builder<const GameObject, const VidComponent>().with<Selected>().cached().build();
+	    m_selectionQuery = m_model.query_builder<const GameObject, const Vid>().with<Selected>().cached().build();
 	}
 
 	// actual range is from 1 to 8
@@ -101,11 +101,11 @@ private:
 			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
 	    // selection visualization
-	    m_selectionQuery.each([&](const GameObject& obj, const VidComponent& vid) {
-	        const glm::ivec2 halfSize {vid.vid().anotherWidth / 2, vid.vid().anotherHeight / 2};
+	    m_selectionQuery.each([&](const GameObject& obj, const Vid& vid) {
+	        const glm::ivec2 halfSize {vid.anotherWidth / 2, vid.anotherHeight / 2};
             const glm::ivec2 pos {obj.x, obj.y};
 
-            const auto color = objectSelectionColor(vid.vid().unitType);
+            const auto color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
             draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
 	    });
@@ -176,7 +176,7 @@ private:
 	glm::ivec2 m_viewportSize;
 
 	std::optional<std::pair<glm::ivec2, glm::ivec2>> m_selectionFrame;
-    flecs::query<const GameObject, const VidComponent> m_selectionQuery;
+    flecs::query<const GameObject, const Vid> m_selectionQuery;
 	LevelRenderer m_levelRenderer;
 	Framebuffer m_levelFramebuffer;
 };
