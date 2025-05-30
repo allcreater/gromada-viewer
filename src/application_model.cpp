@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 
 export module application.model;
 
@@ -8,7 +9,7 @@ import utils;
 import Gromada.ResourceReader;
 export import Gromada.GameResources;
 
-export import engine.objects_view;
+export import engine.world_components;
 
 //TODO: move
 export struct ObjectToPlaceMessage {
@@ -16,41 +17,63 @@ export struct ObjectToPlaceMessage {
 	std::uint8_t direction;
 };
 
-export class Model {
+
+export struct Selected {};
+export struct Selectable {};
+export using Path = std::filesystem::path;
+
+export struct EditorComponents {
+    EditorComponents(flecs::world& world) {
+        world.component<Selected>();
+        world.component<Selectable>();
+        world.component<Path>();
+    }
+};
+
+export class Model : public flecs::world {
 public:
 	explicit Model(std::filesystem::path path)
-		: m_resources{path}, m_gamePath{path.parent_path()}, m_objectsView{m_resources, m_activeMap} {}
+		: flecs::world{create_world(GameResources{path})} {}
 
-	const std::span<const Vid> vids() const { return m_resources.vids(); }
-	
-	// NOTE: Map is just a DTO type, for game logic a new class will be needed
-	Map& map() { return m_activeMap; }
-	const Map& map() const { return m_activeMap; }
-	const std::filesystem::path& activeMapPath() const { return m_activeMapPath; }
+    // TODO: "this->" leaved to remember that it will be a free function soon
+	void loadMap(std::filesystem::path path) {
+		const auto& vids = this->get<const GameResources>()->vids();
+		const auto map = Map::load(vids, path);
+	    const auto activeLevel = this->component<ActiveLevel>();
+	    this->delete_with(flecs::ChildOf, activeLevel);
 
-	const ObjectsView& objectsView() const { return m_objectsView; }
+	    for (const auto& obj : map.objects) {
+	        this->entity()
+                .set<GameObject>(obj)
+                .child_of(activeLevel);
+	    }
 
-	const std::filesystem::path& gamePath() const { return m_gamePath; }
+	    activeLevel.set<MapHeaderRawData>(map.header);
+        activeLevel.set<Path>(std::move(path));
+	}
 
-	std::vector<std::size_t>& selectedMapObjects() { return m_selectedObjects;  }
+	Map saveMap() const {
+		const auto activeLevel = this->component<ActiveLevel>();
+	    auto query = this->query_builder<const GameObject>().with(flecs::ChildOf).second<ActiveLevel>().build();
 
-	void update() { m_objectsView.update(); }
-
-	void loadMap(const std::filesystem::path& path) {
-		GromadaResourceReader mapReader{path};
-		GromadaResourceNavigator mapNavigator{mapReader};
-
-		m_activeMap = Map::load(vids(), mapReader, mapNavigator);
-		m_activeMapPath = std::move(path);
-		m_selectedObjects.clear();
+		Map map{};
+		map.header = *activeLevel.get<MapHeaderRawData>();
+		map.objects.reserve(query.count());
+	    query.each([&map](const GameObject& obj) {
+			map.objects.push_back(obj);
+		});
+		return map;
 	}
 
 private:
-	GameResources m_resources;
-	Map m_activeMap;
-	ObjectsView m_objectsView;
-	std::vector<std::size_t> m_selectedObjects;
+	flecs::world create_world(GameResources&& resources) {
+		flecs::world world{};
+        world.import<World>();
+        world.import<EditorComponents>();
 
-	std::filesystem::path m_activeMapPath;
-	std::filesystem::path m_gamePath;
+        world.emplace<GameResources>(std::move(resources));
+
+        return world;
+    }
+
 };

@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 #include <imgui.h>
 #include <sokol_app.h>
 
@@ -16,7 +17,7 @@ import :vids_window;
 export class ViewModel {
 public:
 	explicit ViewModel(Model& model)
-		: m_model{model}, m_vidsViewModel{m_model} {
+		: m_model{model} {
 	}
 
 	void updateUI() {
@@ -66,14 +67,17 @@ public:
 			if (ImGui::MenuItem("Export map JSON")) {
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
-				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", m_model.activeMapPath().stem().u8string().c_str());
+			    const auto* activeMapPath = m_model.component<ActiveLevel>().get<Path>();
+				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
 			}
 
 			// TODO: reuse popup from previous item
 			if (ImGui::MenuItem("Export vids to CSV")) {
 				std::ofstream stream{"vids.csv", std::ios_base::out};
 				stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-				ExportVidsToCsv(m_model.vids(), stream);
+
+				const auto vids = m_model.get<const GameResources>()->vids();
+				ExportVidsToCsv(vids, stream);
 			}
 
 			if (ImGui::MenuItem("Exit")) {
@@ -103,7 +107,7 @@ public:
 				ImGui::CloseCurrentPopup();
 
 				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
-				ExportMapToJson(m_model.map(), stream);
+				ExportMapToJson(m_model.saveMap(), stream);
 			}
 			ImGui::EndPopup();
 		}
@@ -116,7 +120,7 @@ private:
 
 	std::optional<std::array<char, 256>> m_savePopupfilenameBuffer;
 
-	VidsWindowViewModel m_vidsViewModel;
+	VidsWindowViewModel m_vidsViewModel{m_model};
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
 };

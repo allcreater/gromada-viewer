@@ -79,7 +79,9 @@ public:
 
 				ImGui::TableNextColumn();
 				bool isElementSelected = m_selectedSection == it;
-				const unsigned int nvid = std::distance(m_model.vids().data(), &vid);
+
+				const auto vids = m_model.get<const GameResources>()->vids();
+				const unsigned int nvid = std::distance(vids.data(), &vid);
 				if (ImGui::Selectable(std::to_string(nvid).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
 					m_selectedSection = it;
 				}
@@ -132,10 +134,7 @@ public:
 			if (ImGui::Begin("Vid details")) {
 				if (prevSelectedSection != m_selectedSection) {
 					m_decodedFrames.clear(); // To reduce sokol's pool size
-
-					if (const auto pFramesData = std::get_if<Vid::Graphics>(&(m_selectedSection->get().graphicsData)); pFramesData && *pFramesData) {
-						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
-					}
+					m_decodedFrames = DecodeVidFrames(m_selectedSection->get().graphics(), m_guiImagesSampler);
 				}
 
 				VidUI(*m_selectedSection);
@@ -152,7 +151,7 @@ private:
 private:
 	Model& m_model;
 
-	std::vector<std::reference_wrapper<const Vid>> m_sortedVids{m_model.vids().begin(), m_model.vids().end()};
+	std::vector<std::reference_wrapper<const Vid>> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vids()};
 	decltype(m_sortedVids)::iterator m_selectedSection = m_sortedVids.begin();
 
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{

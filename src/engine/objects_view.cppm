@@ -1,5 +1,6 @@
 module;
 #include <glm/glm.hpp>
+#include <flecs.h>
 
 export module engine.objects_view;
 
@@ -23,66 +24,45 @@ BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
 
 export {
 
-struct ObjectView {
-	std::reference_wrapper<const Vid> vid;
-	std::reference_wrapper<const VidGraphics> graphics;
-	std::reference_wrapper<const GameObject> obj;
-	size_t objectIndex;
-};
-
 struct VisualBoundsFn {
-	BoundingBox operator()(const ObjectView& view) const {
-		return getCenteredBB({view.obj.get().x, view.obj.get().y}, {view.graphics.get().imgWidth, view.graphics.get().imgHeight});
+	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
+		return getCenteredBB({obj.x, obj.y}, {vid.graphics().imgWidth, vid.graphics().imgHeight});
 	}
 };
 struct PhysicalBoundsFn {
-	BoundingBox operator()(const ObjectView& view) const {
-		return getCenteredBB({view.obj.get().x, view.obj.get().y}, {view.vid.get().anotherWidth, view.vid.get().anotherHeight});
+	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
+		return getCenteredBB({obj.x, obj.y}, {vid.anotherWidth, vid.anotherHeight});
 	}
 };
 
-// "A poor's man World" or something like that :) Will be supplemented as needed
 class ObjectsView {
 public:
 	struct VisualBounds {};
 	struct PhysicalBounds {};
-	constexpr static inline VisualBounds visualBounds {}; 
-	constexpr static inline PhysicalBounds physicalBounds{}; 
+	constexpr static inline VisualBounds visualBounds{};
+	constexpr static inline PhysicalBounds physicalBounds{};
 
-	ObjectsView(const GameResources& resources, const Map& map)
-		: m_resources{resources}, m_map{map} {}
+	ObjectsView(flecs::world& world) { m_query = world.query_builder<const Vid, const GameObject>().cached().build(); }
 
-	void update() {
-		const auto makeObjectView = [this](const GameObject& obj) -> ObjectView {
-		    const auto& [vid, graphics] = m_resources.getVid(obj.nvid);
-			return {
-				.vid = vid,
-				.graphics = graphics,
-				.obj = obj,
-				.objectIndex = static_cast<size_t>(std::distance(m_map.objects.data(), &obj)),
-			};
-		};
-
-		m_objects.assign_range(m_map.objects | std::views::transform(makeObjectView));
+    inline void queryObjectsInRegion([[maybe_unused]] VisualBounds, BoundingBox region, const auto& callback) const {
+	    queryObjectsInRegionImpl(VisualBoundsFn{}, region, callback);
 	}
 
-	inline std::ranges::bidirectional_range auto queryObjectsInRegion([[maybe_unused]] VisualBounds, BoundingBox region) const {
-		return m_objects | std::views::filter([region, boundsFn = VisualBoundsFn{}](
-												  const ObjectView& object) { return boundsFn(object).isIntersects(region); });
-	}
+	 inline void queryObjectsInRegion([[maybe_unused]] PhysicalBounds, BoundingBox region, const auto& callback) const {
+	    queryObjectsInRegionImpl(PhysicalBoundsFn{}, region, callback);
+	 }
+private:
+    void queryObjectsInRegionImpl(auto&& boundsFn, BoundingBox region, const auto& callback) const {
+        m_query.each([region, boundsFn, &callback](flecs::entity entity, const Vid& vid, const GameObject& obj) {
+            if (boundsFn(vid, obj).isIntersects(region)) {
+                std::invoke(callback,entity/*, vid, obj*/);
+            }
+        });
 
-	inline std::ranges::bidirectional_range auto queryObjectsInRegion([[maybe_unused]] PhysicalBounds, BoundingBox region) const {
-		return m_objects | std::views::filter([region, boundsFn = PhysicalBoundsFn{}](
-												  const ObjectView& object) { return boundsFn(object).isIntersects(region); });
-	}
-
-	std::span<const ObjectView> objects() const noexcept { return m_objects; }
+    }
 
 private:
-    const GameResources& m_resources;
-	const Map& m_map;
-
-	std::vector<ObjectView> m_objects;
+	flecs::query<const Vid, const GameObject> m_query;
 };
 
 }

@@ -12,6 +12,7 @@ add_executable (GromadaEditor
 		"engine/bounding_box.cppm"
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
+		"engine/world_components.cppm"
 		"gromada/data_exporters.cppm"
 		"gromada/game_resources.cppm"
 		"gromada/resource_reader.cpp"
@@ -31,16 +32,20 @@ add_executable (GromadaEditor
 
 #find_package(SFML REQUIRED)
 find_package(argparse CONFIG REQUIRED)
+find_package(flecs CONFIG REQUIRED)
 
 target_link_libraries(GromadaEditor
 	PRIVATE
 		third_party_libs
 		argparse::argparse
+		$<IF:$<TARGET_EXISTS:flecs::flecs>,flecs::flecs,flecs::flecs_static>
 		nlohmann_json_adapter
 )
 
 
 #add_subdirectory("data/shaders")
 #add_dependencies(VulkanViewer app_shaders)
+
+target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
 
 target_compile_features(GromadaEditor PRIVATE cxx_std_23 )
