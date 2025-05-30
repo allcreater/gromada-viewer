@@ -170,7 +170,7 @@ export struct MapHeaderRawData {
 
 export struct Map
 {
-	static Map load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator);
+	static Map load(std::span<const Vid> vids, const std::filesystem::path& path);
 
 	MapHeaderRawData header;
 	std::vector<GameObject> objects;
@@ -482,7 +482,10 @@ std::vector<GameObject> loadDynamicObjects(
 	return result;
 }
 
-Map Map::load(std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
+Map Map::load(std::span<const Vid> vids, const std::filesystem::path& path) {
+	GromadaResourceReader reader{path};
+	GromadaResourceNavigator resourceNavigator{reader};
+
 	auto header = loadMapInfo(reader, resourceNavigator);
 
 	return Map{

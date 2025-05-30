@@ -107,7 +107,7 @@ public:
 				ImGui::CloseCurrentPopup();
 
 				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
-				//ExportMapToJson(m_model.map(), stream);
+				ExportMapToJson(m_model.saveMap(), stream);
 			}
 			ImGui::EndPopup();
 		}

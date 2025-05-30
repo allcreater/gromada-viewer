@@ -35,25 +35,35 @@ public:
 	explicit Model(std::filesystem::path path)
 		: flecs::world{create_world(GameResources{path})} {}
 
-	void loadMap(const std::filesystem::path& path) {
-		GromadaResourceReader mapReader{path};
-		GromadaResourceNavigator mapNavigator{mapReader};
-
-        auto& m_world = *this;
-
-		const auto& vids = m_world.get<const GameResources>()->vids();
-		const auto map = Map::load(vids, mapReader, mapNavigator);
-	    const auto activeLevel = m_world.component<ActiveLevel>();
-	    m_world.delete_with(flecs::ChildOf, activeLevel);
+    // TODO: "this->" leaved to remember that it will be a free function soon
+	void loadMap(std::filesystem::path path) {
+		const auto& vids = this->get<const GameResources>()->vids();
+		const auto map = Map::load(vids, path);
+	    const auto activeLevel = this->component<ActiveLevel>();
+	    this->delete_with(flecs::ChildOf, activeLevel);
 
 	    for (const auto& obj : map.objects) {
-	        m_world.entity()
+	        this->entity()
                 .set<GameObject>(obj)
                 .child_of(activeLevel);
 	    }
 
 	    activeLevel.set<MapHeaderRawData>(map.header);
         activeLevel.set<Path>(std::move(path));
+	}
+
+	Map saveMap() const {
+		const auto activeLevel = this->component<ActiveLevel>();
+
+		Map map{};
+		map.header = *activeLevel.get<MapHeaderRawData>();
+		map.objects.reserve(this->count(flecs::ChildOf, activeLevel));
+		this->each<GameObject>([&map, &activeLevel](flecs::entity e, const GameObject& obj) {
+			if (e.has(flecs::ChildOf, activeLevel)) {
+				map.objects.push_back(obj);
+			}
+		});
+		return map;
 	}
 
 private:

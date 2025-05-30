@@ -134,10 +134,7 @@ public:
 			if (ImGui::Begin("Vid details")) {
 				if (prevSelectedSection != m_selectedSection) {
 					m_decodedFrames.clear(); // To reduce sokol's pool size
-
-					if (const auto pFramesData = std::get_if<Vid::Graphics>(&(m_selectedSection->get().graphicsData)); pFramesData && *pFramesData) {
-						m_decodedFrames = DecodeVidFrames(**pFramesData, m_guiImagesSampler);
-					}
+					m_decodedFrames = DecodeVidFrames(m_selectedSection->get().graphics(), m_guiImagesSampler);
 				}
 
 				VidUI(*m_selectedSection);
