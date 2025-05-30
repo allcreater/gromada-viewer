@@ -140,26 +140,31 @@ void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_
 		return;
 	}
 
+	struct ControlWord {
+		std::uint8_t count : 5;
+		std::uint8_t opacity : 3;
+	};
+
 	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
 		int x = x0;
-		for (std::uint8_t commandByte; commandByte = reader.read<std::uint8_t>(), commandByte != 0;) {
-			const auto count = commandByte & 0x1F;
+		for (ControlWord command; command = reader.read<ControlWord>(), command.count != 0;) {
 			
-			if ((commandByte & 0xE0) == 0) {
-				x += count;
-			} else if ((commandByte & 0xE0) == 0x20) {
-				for (auto i = 0; i < count; ++i) {
+			if (command.opacity == 0) {
+				x += command.count;
+			}
+			else if (command.opacity == 7) {
+				for (auto i = 0; i < command.count; ++i) {
 					const auto index = reader.read<std::uint8_t>();
 					framebuffer[y, x++] = data.getPaletteColor(index);
 				}
 			} else {
-				const std::uint8_t opacity = 255 - (commandByte & 0xE0);
-				for (auto i = 0; i < count; ++i) {
+				const std::uint8_t t = 255 - command.opacity * 42;
+				for (auto i = 0; i < command.count; ++i) {
 					const auto index = reader.read<std::uint8_t>();
 					const auto srcColor = data.getPaletteColor(index);
 					const auto dstColor = framebuffer[y, x];
 					framebuffer[y, x++] = {
-						lerp(srcColor.r, dstColor.r, opacity), lerp(srcColor.g, dstColor.g, opacity), lerp(srcColor.b, dstColor.b, opacity), 255}; // 
+						lerp(srcColor.r, dstColor.r, t), lerp(srcColor.g, dstColor.g, t), lerp(srcColor.b, dstColor.b, t), 255};
 				}
 			}
 		}
