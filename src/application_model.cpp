@@ -54,14 +54,13 @@ public:
 
 	Map saveMap() const {
 		const auto activeLevel = this->component<ActiveLevel>();
+	    auto query = this->query_builder<const GameObject>().with(flecs::ChildOf).second<ActiveLevel>().build();
 
 		Map map{};
 		map.header = *activeLevel.get<MapHeaderRawData>();
-		map.objects.reserve(this->count(flecs::ChildOf, activeLevel));
-		this->each<GameObject>([&map, &activeLevel](flecs::entity e, const GameObject& obj) {
-			if (e.has(flecs::ChildOf, activeLevel)) {
-				map.objects.push_back(obj);
-			}
+		map.objects.reserve(query.count());
+	    query.each([&map](const GameObject& obj) {
+			map.objects.push_back(obj);
 		});
 		return map;
 	}
