@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 #include <imgui.h>
 #include <sokol_app.h>
 
@@ -16,7 +17,7 @@ import :vids_window;
 export class ViewModel {
 public:
 	explicit ViewModel(Model& model)
-		: m_model{model}, m_vidsViewModel{m_model} {
+		: m_model{model} {
 	}
 
 	void updateUI() {
@@ -119,7 +120,7 @@ private:
 
 	std::optional<std::array<char, 256>> m_savePopupfilenameBuffer;
 
-	VidsWindowViewModel m_vidsViewModel;
+	VidsWindowViewModel m_vidsViewModel{m_model};
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
 };
