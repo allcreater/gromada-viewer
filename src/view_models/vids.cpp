@@ -58,6 +58,7 @@ public:
 				m_selectedSection++;
 		}
 
+	    ImGui::Checkbox("Show details", &m_showDetails);
 		if (ImGui::BeginTable(
 				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
 			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 30.0f);
@@ -131,15 +132,18 @@ public:
 
 			ImGui::EndTable();
 
-			if (ImGui::Begin("Vid details")) {
-				if (prevSelectedSection != m_selectedSection) {
-					m_decodedFrames.clear(); // To reduce sokol's pool size
-					m_decodedFrames = DecodeVidFrames(m_selectedSection->get().graphics(), m_guiImagesSampler);
-				}
+		    if (m_showDetails) {
+		        ImGui::SetNextWindowPos({300, 20}, ImGuiCond_FirstUseEver);
+		        if (ImGui::Begin("Vid details", &m_showDetails)) {
+		            if (prevSelectedSection != m_selectedSection) {
+		                m_decodedFrames.clear(); // To reduce sokol's pool size
+		                m_decodedFrames = DecodeVidFrames(m_selectedSection->get().graphics(), m_guiImagesSampler);
+		            }
 
-				VidUI(*m_selectedSection);
-			}
-			ImGui::End();
+		            VidUI(*m_selectedSection);
+		        }
+		        ImGui::End();
+		    }
 		}
 	}
 
@@ -150,7 +154,7 @@ private:
 
 private:
 	Model& m_model;
-
+    bool m_showDetails = false;
 	std::vector<std::reference_wrapper<const Vid>> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vids()};
 	decltype(m_sortedVids)::iterator m_selectedSection = m_sortedVids.begin();
 
@@ -166,19 +170,6 @@ private:
 };
 
 namespace {
-	constexpr auto classifyDataFormat (std::uint8_t behavior) -> const char* {
-		switch (behavior & 0x3F) {
-		case 0:
-			return "unpack mode 1";
-		case 6:
-			return "unpack mode 2";
-		case 8:
-			return "unpack mode 3";
-		default:
-			return "not packed";
-		}
-	};
-
 	constexpr auto classifyUnitType(UnitType unitType) -> const char* {
 		using enum UnitType;
 		switch (unitType) {
@@ -234,12 +225,12 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 				   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
 				   [&self](const Vid::Graphics& arg) {
 					   ImGui::Text("frames size: %i", self.dataSizeOrNvid);
-					   ImGui::Text("data format: %x (%s)", arg->dataFormat, classifyDataFormat(arg->dataFormat));
-					   ImGui::Text("frame duration: %i (%i fps)", arg->frameDuration, 1000 / arg->frameDuration);
+					   ImGui::Text("data format: %x", arg->dataFormat);
+					   ImGui::Text("frame duration: %ims (%i FPS)", arg->frameDuration, 1000 / arg->frameDuration);
 					   ImGui::Text("numOfFrames: %i", arg->numOfFrames);
 					   ImGui::Text("dataSize: %i", arg->dataSize);
-					   ImGui::Text("imgWidth: %i", arg->imgWidth);
-					   ImGui::Text("imgHeight: %i", arg->imgHeight);
+					   ImGui::Text("width: %i", arg->width);
+					   ImGui::Text("height: %i", arg->height);
 				   },
 			   },
 		self.graphicsData);
@@ -251,9 +242,9 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	static ImVec2 lastWindowSize = {100, 100};
 	ImGui::SetNextWindowSize(lastWindowSize, ImGuiCond_Appearing);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
-		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->imgWidth + 2.0f)));
+		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->width + 2.0f)));
 		for (int index = 0; const auto& image : m_decodedFrames) {
-			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->imgWidth), static_cast<float>((*framesData)->imgHeight)});
+			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
 
 			if ((index+1) % imagesPerLine != 0)
 				ImGui::SameLine();
@@ -270,8 +261,8 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
 	return vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
 		return sg_image_desc{.type = SG_IMAGETYPE_2D,
-			.width = static_cast<int>(vid.imgWidth),
-			.height = static_cast<int>(vid.imgHeight),
+			.width = static_cast<int>(vid.width),
+			.height = static_cast<int>(vid.height),
 			.num_slices = 1,
 			.pixel_format = SG_PIXELFORMAT_RGBA8,
 			.data = {{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}};

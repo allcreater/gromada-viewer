@@ -38,10 +38,10 @@ public:
 	int magnificationFactor = 1;
 
 	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
-		return (m_camPos - m_viewportSize / 2) + (screenPos / magnificationFactor);
+		return m_screenToWorldMat * glm::vec3{screenPos, 1.0f};
 	}
 	glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const {
-		return  (worldPos - m_camPos + m_viewportSize / 2) * magnificationFactor;
+	    return m_screenToWorldMat * glm::vec3{worldPos, 1.0f};
 	}
 
 	void updateUI() {
@@ -75,6 +75,10 @@ public:
 
 		if (!ImGui::IsDragDropActive()) {
 			updateSelection(mouseWorldPos);
+
+		    if (ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel != 0.0f) {
+		        magnificationFactor += glm::sign(ImGui::GetIO().MouseWheel);
+		    }
 		}
 	}
 
@@ -125,6 +129,15 @@ private:
 		if (const auto* mapHeader = activeLevel.get<MapHeaderRawData>()) {
 			m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader->width, mapHeader->height});
 		}
+
+	    auto translation = m_camPos - m_viewportSize / 2;
+        m_screenToWorldMat = glm::mat3x3{
+            1.0f / magnificationFactor, 0.0f, 0.0f,
+            0.0f, 1.0f / magnificationFactor, 0.0f,
+            translation.x, translation.y, 1.0f,
+        };
+	    m_worldToScreenMat = glm::inverse(m_screenToWorldMat);
+
 	}
 
 	void updateSelection(glm::ivec2 mouseWorldPos) {
@@ -167,8 +180,10 @@ private:
 private:
 	Model& m_model;
 
-	glm::ivec2 m_camPos;
+	glm::ivec2 m_camPos{0.0f, 0.0f};
 	glm::ivec2 m_viewportSize;
+
+    glm::mat3x3 m_screenToWorldMat, m_worldToScreenMat;
 
 	std::optional<std::pair<glm::ivec2, glm::ivec2>> m_selectionFrame;
     flecs::query<const GameObject, const Vid> m_selectionQuery;

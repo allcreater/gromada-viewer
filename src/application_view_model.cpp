@@ -87,10 +87,10 @@ public:
 		}
 
 		if (ImGui::BeginMenu("View")) {
-			if (ImGui::MenuItem("Zoom in", "CTRL+UP")) {
+			if (ImGui::MenuItem("Zoom in", "Ctrl + Wheel up")) {
 				m_mapViewModel.magnificationFactor++;
 			}
-			if (ImGui::MenuItem("Zoom out", "CTRL+DOWN")) {
+			if (ImGui::MenuItem("Zoom out", "Ctrl + Wheel down")) {
 				m_mapViewModel.magnificationFactor--;
 			}
 			ImGui::EndMenu();
