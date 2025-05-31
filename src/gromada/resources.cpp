@@ -45,8 +45,8 @@ export struct VidGraphics {
 	std::uint16_t frameDuration;
 	std::uint16_t numOfFrames;
 	std::uint32_t dataSize;
-	std::uint16_t imgWidth;
-	std::uint16_t imgHeight;
+	std::uint16_t width;
+	std::uint16_t height;
 
 	std::array<std::uint8_t, 0x300> palette;
 	std::vector<std::byte> data;
@@ -233,8 +233,8 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 	reader.read_to(frameDuration);
 	reader.read_to(numOfFrames);
 	reader.read_to(dataSize);
-	reader.read_to(imgWidth);
-	reader.read_to(imgHeight);
+	reader.read_to(width);
+	reader.read_to(height);
 
 	data.resize(dataSize - sizeof(palette));
 	reader.read_to(palette);
@@ -291,7 +291,7 @@ void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
 				return getPaletteColor(std::to_underlying(color_index));
 			}) | std::ranges::to<std::vector<RGBA8>>();
 
-			assert(frame.size() == imgWidth * imgHeight);
+			assert(frame.size() == width * height);
 			result.push_back(std::move(frame));
 		}
 		else {
@@ -306,8 +306,8 @@ void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
 
 	for (auto [referenceFrameNumber, srcData] : frames) {
 		if (srcData.size() > 0) {
-			std::vector<RGBA8> frameData(imgWidth * imgHeight);
-			std::mdspan frame{frameData.data(), imgHeight, imgWidth};
+			std::vector<RGBA8> frameData(width * height);
+			std::mdspan frame{frameData.data(), height, width};
 
 			SpanStreamReader reader{srcData};
 

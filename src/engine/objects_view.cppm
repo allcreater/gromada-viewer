@@ -26,7 +26,7 @@ export {
 
 struct VisualBoundsFn {
 	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
-		return getCenteredBB({obj.x, obj.y}, {vid.graphics().imgWidth, vid.graphics().imgHeight});
+		return getCenteredBB({obj.x, obj.y}, {vid.graphics().width, vid.graphics().height});
 	}
 };
 struct PhysicalBoundsFn {

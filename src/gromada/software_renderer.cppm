@@ -36,8 +36,8 @@ constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) {
 void DrawSprite_Type0(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
 	std::mdspan indexedImage{
 		reinterpret_cast<const std::uint8_t*>(data.frames[spriteIndex].data.data()),
-		data.imgHeight,
-		data.imgWidth,
+		data.height,
+		data.width,
 	};
 	// TODO: check is it produces decent asm
 	for (int j = srcBounds.top; j < srcBounds.down; ++j) {
@@ -54,7 +54,7 @@ void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_
 	const int height = reader.read<std::uint16_t>();
 
 	// Temporary
-	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
+	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
 		return;
 	}
 
@@ -103,7 +103,7 @@ void DrawSprite_Type4(const VidGraphics& data, BoundingBox srcBounds, std::size_
 	const int height = reader.read<std::uint16_t>();
 
 	// Temporary
-	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
+	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
 		return;
 	}
 
@@ -136,7 +136,7 @@ void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_
 	const int height = reader.read<std::uint16_t>();
 
 	// Temporary
-	if (srcBounds.right - srcBounds.left < data.imgWidth || startY - srcBounds.top < 0) {
+	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
 		return;
 	}
 
@@ -180,7 +180,7 @@ void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, 
 		throw std::out_of_range("Sprite index out of range");
 	}
 
-	if (x + data.imgWidth < 0 || y + data.imgHeight < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
+	if (x + data.width < 0 || y + data.height < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
 		return;
 	}
 
@@ -190,9 +190,9 @@ void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, 
 
 	const BoundingBox srcBounds{
 		.left = std::max(-x, 0),
-		.right = static_cast<int>(data.imgWidth) - std::max(x + static_cast<int>(data.imgWidth) - framebuffer.extent(1), 0),
+		.right = static_cast<int>(data.width) - std::max(x + static_cast<int>(data.width) - framebuffer.extent(1), 0),
 		.top = std::max(-y, 0),
-		.down = static_cast<int>(data.imgHeight) - std::max(y + static_cast<int>(data.imgHeight) - framebuffer.extent(0), 0),
+		.down = static_cast<int>(data.height) - std::max(y + static_cast<int>(data.height) - framebuffer.extent(0), 0),
 	};
 
 	SpanStreamReader reader{data.frames[spriteIndex].data};

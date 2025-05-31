@@ -116,8 +116,8 @@ void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream) {
 		//{"frameDuration", MakePrintFunction<VidGraphics, &VidGraphics::frameDuration>()},
 		//{"numOfFrames", MakePrintFunction<VidGraphics, &VidGraphics::numOfFrames>()},
 		//{"dataSize", MakePrintFunction<VidGraphics, &VidGraphics::dataSize>()},
-		//{"imgWidth", MakePrintFunction<VidGraphics, &VidGraphics::imgWidth>()},
-		//{"imgHeight", MakePrintFunction<VidGraphics, &VidGraphics::imgHeight>()},
+		//{"width", MakePrintFunction<VidGraphics, &VidGraphics::width>()},
+		//{"height", MakePrintFunction<VidGraphics, &VidGraphics::height>()},
 	};
 
 	for (const auto& [name, _] : printFunctions) {

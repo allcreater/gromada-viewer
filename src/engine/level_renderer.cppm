@@ -28,7 +28,7 @@ public:
 		    auto vid = entity.get_ref<const Vid>();
 		    auto animation = entity.get_ref<const AnimationComponent>();
 
-			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().imgWidth / 2, obj->y - vid->graphics().imgHeight / 2} - viewportOffset;
+			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().width / 2, obj->y - vid->graphics().height / 2} - viewportOffset;
 			DrawSprite(vid->graphics(), animation->current_frame, pos.x, pos.y, framebuffer);
 		}
 	}
@@ -42,7 +42,7 @@ private:
 			[](flecs::entity entity) {
 			    auto obj = entity.get_ref<const GameObject>();
 			    auto vid = entity.get_ref<const Vid>();
-			    return std::tuple{vid->z_layer, obj->y + vid->graphics().imgHeight / 2};
+			    return std::tuple{vid->z_layer, obj->y + vid->graphics().height / 2};
 			});
 	}
 
