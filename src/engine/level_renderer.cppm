@@ -45,7 +45,7 @@ private:
 			[](flecs::entity entity) {
 			    auto obj = entity.get_ref<const GameObject>();
 			    auto vid = entity.get_ref<const Vid>();
-			    return std::tuple{vid->z, obj->y + vid->graphics().imgHeight / 2};
+			    return std::tuple{vid->z_layer, obj->y + vid->graphics().imgHeight / 2};
 			});
 	}
 

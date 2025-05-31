@@ -202,10 +202,9 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	ImGui::Text("Behave: %i ", self.behave);
 	ImGui::Text("Flags % i", self.flags);
 	ImGui::Text("Collision mask: %x", self.collisionMask);
-	ImGui::Text("Sizes (W,H,Z): %i %i %i", self.anotherWidth, self.anotherHeight, self.z_or_height);
+	ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);
 	ImGui::Text("max HP: %i", self.maxHP);
 	ImGui::Text("grid radius: %i", self.gridRadius);
-	ImGui::Text("???: %i", self.p6);
 
 	ImGui::Text("Speed %i %i", self.speedX, self.speedY);
 	ImGui::Text("Acceleration: %i", self.acceleration);
@@ -213,17 +212,14 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 	ImGui::Text("Army: %i", self.army);
 	ImGui::Text("Weapon?: %i", self.someWeaponIndex);
-	ImGui::Text("???: %i", self.hz4);
+	ImGui::Text("???: %i", self.unused2);
 	ImGui::Text("Damage radius: % i", self.deathDamageRadius);
 	ImGui::Text("Damage: %i", self.deathDamage);
-	ImGui::Text("some X: %i", self.linkX);
-	ImGui::Text("some Y: %i", self.linkY);
-	ImGui::Text("some Z: %i", self.linkZ);
+	ImGui::Text("Linked object offset (X,Y,Z): %i %i %i", self.linkX, self.linkY, self.linkZ);
 
 	ImGui::Text("Linked nVid: %i", self.linkedObjectVid);
-	ImGui::Text("???: %i", self.hz6);
 	ImGui::Text("Directions count: % i", self.directionsCount);
-	ImGui::Text("z2 : % i", self.z);
+	ImGui::Text("Z Layer : % i", self.z_layer);
 
 
 	ImGui::Spacing();
@@ -239,7 +235,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 				   [&self](const Vid::Graphics& arg) {
 					   ImGui::Text("frames size: %i", self.dataSizeOrNvid);
 					   ImGui::Text("data format: %x (%s)", arg->dataFormat, classifyDataFormat(arg->dataFormat));
-					   ImGui::Text("???: %i", arg->hz7);
+					   ImGui::Text("frame duration: %i (%i fps)", arg->frameDuration, 1000 / arg->frameDuration);
 					   ImGui::Text("numOfFrames: %i", arg->numOfFrames);
 					   ImGui::Text("dataSize: %i", arg->dataSize);
 					   ImGui::Text("imgWidth: %i", arg->imgWidth);

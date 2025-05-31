@@ -102,7 +102,7 @@ private:
 
 	    // selection visualization
 	    m_selectionQuery.each([&](const GameObject& obj, const Vid& vid) {
-	        const glm::ivec2 halfSize {vid.anotherWidth / 2, vid.anotherHeight / 2};
+	        const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
             const glm::ivec2 pos {obj.x, obj.y};
 
             const auto color = objectSelectionColor(vid.unitType);

@@ -42,7 +42,7 @@ export struct RGBA8 {
 
 export struct VidGraphics {
 	std::uint8_t dataFormat;
-	std::uint16_t hz7;
+	std::uint16_t frameDuration;
 	std::uint16_t numOfFrames;
 	std::uint32_t dataSize;
 	std::uint16_t imgWidth;
@@ -81,12 +81,12 @@ export struct Vid {
 	std::uint16_t flags;
 
 	std::uint8_t collisionMask;
-	std::uint16_t anotherWidth;
-	std::uint16_t anotherHeight;
-	std::uint16_t z_or_height;
+	std::uint16_t sizeX;
+	std::uint16_t sizeY;
+	std::uint16_t sizeZ;
 	std::uint8_t maxHP;
 	std::uint16_t gridRadius;
-	std::uint8_t p6;
+	std::uint8_t unused1;
 
 	std::uint16_t speedX;
 	std::uint16_t speedY;
@@ -95,7 +95,7 @@ export struct Vid {
 
 	std::uint8_t army;
 	std::uint8_t someWeaponIndex;
-	std::uint8_t hz4;
+	std::uint8_t unused2;
 	std::uint16_t deathDamageRadius;
 	std::uint8_t deathDamage;
 
@@ -104,9 +104,9 @@ export struct Vid {
 	std::uint8_t linkZ;
 	std::uint16_t linkedObjectVid;
 
-	std::uint16_t hz6;
+	std::uint16_t unused3;
 	std::uint8_t directionsCount;
-	std::uint8_t z; // z_priority?
+	std::uint8_t z_layer;
 
 	// TODO: std::array<std::uint8_t, 16> animationLengths; ?
 	std::array<std::uint8_t, 144> supportedActions;
@@ -185,12 +185,12 @@ void Vid::read(BinaryStreamReader reader)
 	reader.read_to(flags);
 
 	reader.read_to(collisionMask);
-	reader.read_to(anotherWidth);
-	reader.read_to(anotherHeight);
-	reader.read_to(z_or_height);
+	reader.read_to(sizeX);
+	reader.read_to(sizeY);
+	reader.read_to(sizeZ);
 	reader.read_to(maxHP);
 	reader.read_to(gridRadius);
-	reader.read_to(p6);
+	reader.read_to(unused1);
 
 	reader.read_to(speedX);
 	reader.read_to(speedY);
@@ -199,7 +199,7 @@ void Vid::read(BinaryStreamReader reader)
 
 	reader.read_to(army);
 	reader.read_to(someWeaponIndex);
-	reader.read_to(hz4);
+	reader.read_to(unused2);
 	reader.read_to(deathDamageRadius);
 	reader.read_to(deathDamage);
 
@@ -208,9 +208,9 @@ void Vid::read(BinaryStreamReader reader)
 	reader.read_to(linkZ);
 	reader.read_to(linkedObjectVid);
 
-	reader.read_to(hz6);
+	reader.read_to(unused3);
 	reader.read_to(directionsCount);
-	reader.read_to(z);
+	reader.read_to(z_layer);
 
 	reader.read_to(supportedActions);
 	reader.read_to(children);
@@ -230,7 +230,7 @@ void Vid::read(BinaryStreamReader reader)
 
 void VidGraphics::read(BinaryStreamReader& reader) {
 	reader.read_to(dataFormat);
-	reader.read_to(hz7);
+	reader.read_to(frameDuration);
 	reader.read_to(numOfFrames);
 	reader.read_to(dataSize);
 	reader.read_to(imgWidth);
