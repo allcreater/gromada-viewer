@@ -67,8 +67,9 @@ public:
 			if (ImGui::MenuItem("Export map JSON")) {
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
-			    const auto* activeMapPath = m_model.component<ActiveLevel>().get<Path>();
-				std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
+			    if (const auto* activeMapPath = m_model.component<ActiveLevel>().get<Path>()) {
+			        std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
+			    }
 			}
 
 			// TODO: reuse popup from previous item

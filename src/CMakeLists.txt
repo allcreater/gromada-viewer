@@ -25,6 +25,7 @@ add_executable (GromadaEditor
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"
+ 		"cp866.cppm"
 		"framebuffer.cppm"
 		"imgui_utils.cpp"
 		"utils.cppm"

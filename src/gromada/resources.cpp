@@ -16,6 +16,7 @@ export module Gromada.Resources;
 import Gromada.ResourceReader;
 import std;
 import utils;
+import cp866;
 import nlohmann_json_adapter;
 
 export enum class UnitType : std::uint8_t {
