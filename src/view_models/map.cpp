@@ -41,7 +41,7 @@ public:
 		return m_screenToWorldMat * glm::vec3{screenPos, 1.0f};
 	}
 	glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const {
-	    return m_screenToWorldMat * glm::vec3{worldPos, 1.0f};
+	    return m_worldToScreenMat * glm::vec3{worldPos, 1.0f};
 	}
 
 	void updateUI() {

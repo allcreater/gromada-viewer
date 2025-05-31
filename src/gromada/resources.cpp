@@ -75,7 +75,7 @@ private:
 };
 
 export struct Vid {
-	std::array<char, 34> name;
+	std::array<char, 34> name; // In CP-866
 	UnitType unitType;
 	std::uint8_t behave;
 	std::uint16_t flags;
@@ -119,6 +119,7 @@ export struct Vid {
 	std::variant<std::int32_t, Graphics> graphicsData;
 
 	//
+	std::u8string getName() const { return cp866_to_utf8(std::string_view{name.data()}); }
     const VidGraphics& graphics() const {
         const auto* graphics = std::get_if<Vid::Graphics>(&graphicsData);
         if (!graphics || !graphics->get())

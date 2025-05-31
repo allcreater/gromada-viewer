@@ -71,10 +71,11 @@ class App {
 
 		// use sokol-imgui with all default-options (we're not doing
 		// multi-sampled rendering or using non-default pixel formats)
-		simgui_desc_t simgui_desc = { };
-		simgui_desc.logger.func = slog_func;
-		simgui_setup(&simgui_desc);
-
+		simgui_setup({
+			//.no_default_font = true,
+			.logger = {.func = slog_func},
+		});
+		
 		// initial clear color
 		pass_action.colors[0].load_action = SG_LOADACTION_CLEAR;
 		pass_action.colors[0].clear_value = {0.0f, 0.5f, 0.7f, 1.0f};
@@ -114,8 +115,6 @@ class App {
 	void input(const sapp_event* event) {
 		assert(event);
 		app->on_event(*event);
-
-		simgui_handle_event(event);
 	}
 
 	template <auto MemberFn, typename... Args>

@@ -114,7 +114,7 @@ public:
 				}
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", vid.name.data());
+				ImGui::Text("%s", vid.getName().c_str());
 
 				ImGui::TableNextColumn();
 				ImGui::Text("%i", vid.behave);
@@ -188,7 +188,7 @@ namespace {
 
 
 void VidsWindowViewModel::VidUI(const Vid& self) {
-	ImGui::Text("%s", self.name.data());
+	ImGui::Text("%s", self.getName().c_str());
 	ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
 	ImGui::Text("Behave: %i ", self.behave);
 	ImGui::Text("Flags % i", self.flags);
