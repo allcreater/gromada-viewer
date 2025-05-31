@@ -43,9 +43,6 @@ public:
     const std::filesystem::path& gamePath() const { return m_gamePath; }
     std::filesystem::path mapsPath() const { return m_gamePath / "maps"; }
 
-    std::tuple<const Vid&, const VidGraphics&> getVid(std::size_t index) const {
-        return {m_vids[index], *std::get<Vid::Graphics>(m_vids[index].graphicsData)};
-    }
 private:
     std::filesystem::path m_gamePath;
     GromadaResourceReader m_reader;

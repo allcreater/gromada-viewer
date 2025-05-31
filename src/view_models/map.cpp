@@ -37,8 +37,6 @@ public:
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;
 
-	int animationFps = 10;
-
 	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
 		return (m_camPos - m_viewportSize / 2) + (screenPos / magnificationFactor);
 	}
@@ -48,7 +46,6 @@ public:
 
 	void updateUI() {
 		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
-		animationFps = std::clamp(animationFps, 1, 60);
 
 		updateViewport();
 
@@ -86,10 +83,8 @@ private:
 		m_levelFramebuffer.resize(m_viewportSize);
 		m_levelFramebuffer.clear({0, 0, 0, 0});
 
-		const auto frameCounter = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(1000 / animationFps);
-
 		const auto time = std::chrono::high_resolution_clock::now();
-		m_levelRenderer.drawMap(m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize, frameCounter);
+		m_levelRenderer.drawMap(m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize);
 		const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
 		
 		m_levelFramebuffer.commitToGpu();

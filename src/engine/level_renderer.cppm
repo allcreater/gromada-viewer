@@ -8,6 +8,7 @@ import std;
 
 import engine.bounding_box;
 import engine.objects_view;
+import engine.world_components;
 
 import Gromada.Resources;
 import Gromada.SoftwareRenderer;
@@ -20,19 +21,15 @@ public:
 	LevelRenderer(const flecs::world& world)
 		: m_world{world} {}
 
-	void drawMap(FramebufferRef framebuffer, glm::ivec2 viewportOffset, glm::ivec2 viewportSize, std::uint32_t frameCounter) {
+	void drawMap(FramebufferRef framebuffer, glm::ivec2 viewportOffset, glm::ivec2 viewportSize) {
 		updateObjectsView(viewportOffset, viewportOffset + viewportSize);
 		for (flecs::entity entity : m_visibleObjects) {
 		    auto obj = entity.get_ref<const GameObject>();
 		    auto vid = entity.get_ref<const Vid>();
+		    auto animation = entity.get_ref<const AnimationComponent>();
 
 			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().imgWidth / 2, obj->y - vid->graphics().imgHeight / 2} - viewportOffset;
-			auto [minIndex, maxIndex] = getAnimationFrameRange(*vid.get(), Action::Stand, obj->direction);
-			assert(maxIndex < vid->graphics().numOfFrames);
-
-			const auto animationOffset = frameCounter + static_cast<std::uint32_t>(reinterpret_cast<const std::uintptr_t>(obj.get()) / 57);
-			const auto frameNumber = animationOffset % (maxIndex - minIndex + 1) + minIndex;
-			DrawSprite(vid->graphics(), frameNumber, pos.x, pos.y, framebuffer);
+			DrawSprite(vid->graphics(), animation->current_frame, pos.x, pos.y, framebuffer);
 		}
 	}
 
