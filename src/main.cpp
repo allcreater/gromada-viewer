@@ -1,23 +1,17 @@
 #include <argparse/argparse.hpp>
-
+#include <flecs.h>
 #include <sokol_gfx.h>
 #include <sokol_app.h>
 #include <sokol_log.h>
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
-#if __INTELLISENSE__
-#endif
-
-
-import application;
-
-static sg_pass_action pass_action;
-
 #include <cassert>
 
-
+import application;
 import std;
+
+static sg_pass_action pass_action;
 
 auto to_writtable_path = [](auto&& str) {
 	return std::filesystem::path{std::forward<decltype(str)>(str)}; 
