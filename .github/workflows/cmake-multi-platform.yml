@@ -18,8 +18,10 @@ jobs:
 
       matrix:
         os: [ubuntu-latest, windows-latest]
-        cmake_preset: [cl-x64-release, clang-x64-release]
+        cmake_preset: [cl-x64-debug, cl-x64-release, clang-x64-release]
         include:
+          - os: windows-latest
+            cmake_preset: cl-x64-debug
           - os: windows-latest
             cmake_preset: cl-x64-release
           - os: ubuntu-latest
@@ -27,6 +29,8 @@ jobs:
         exclude:
           - os: windows-latest
             cmake_preset: clang-x64-release
+          - os: ubuntu-latest
+            cmake_preset: cl-x64-debug
           - os: ubuntu-latest
             cmake_preset: cl-x64-release
 
@@ -72,7 +76,7 @@ jobs:
       if : matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
       with:
-        name: windows-binaries
+        name: windows-binaries-${{ matrix.cmake_preset }}
         path: |
             ${{ steps.strings.outputs.build-output-dir }}/src
             !${{ steps.strings.outputs.build-output-dir }}/src/cmake*
