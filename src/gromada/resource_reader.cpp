@@ -120,7 +120,7 @@ export {
 			, m_header{ header }
 			, m_beginPos{ beginPos } {}
 
-		const SectionHeader& header() const noexcept { return m_header; }
+		[[nodiscard]] const SectionHeader& header() const noexcept { return m_header; }
 
 	private:
 		SectionHeader m_header;
@@ -170,7 +170,7 @@ export {
 		//	m_stream.seekg(pos);
 		//}
 
-		std::uint32_t getNumSections() const { return m_sectionsCount;  }
+		[[nodiscard]] std::uint32_t getNumSections() const noexcept { return m_sectionsCount;  }
 
 	private:
 		std::ifstream m_stream;
@@ -197,7 +197,7 @@ export {
 			}
 		}
 
-		std::span<const Section> getSections() const { return m_sections; }
+		[[nodiscard]] std::span<const Section> getSections() const noexcept { return m_sections; }
 
 	private:
 		std::vector<Section> m_sections;

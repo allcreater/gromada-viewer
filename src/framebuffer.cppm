@@ -39,7 +39,7 @@ public:
 
 	void commitToGpu() { sg_update_image(m_image, sg_image_data{{{{.ptr = m_data.data(), .size = m_data.size() * sizeof(RGBA8)}}}}); }
 
-	const sg_image getImage() const { return m_image; }
+    [[nodiscard]]  sg_image getImage() const { return m_image; }
 
 	operator FramebufferRef() { return m_dataDesc; }
 

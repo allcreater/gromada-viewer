@@ -35,10 +35,10 @@ public:
 
         world.add<ActiveLevel>();
 
-	    world.observer<const GameObject>()
+	    world.observer<const GameResources, const GameObject>()
+	        .term_at(0).singleton().filter()
 	        .event(flecs::OnSet)
-			.each([](flecs::entity entity, const GameObject& object) { // TODO: try param GameResources
-			    const auto& res = *entity.world().get<const GameResources>();
+			.each([](flecs::entity entity, const GameResources& res, const GameObject& object) {
 	            entity.emplace<Vid>(res.vids()[object.nvid]);
 			    entity.emplace<AnimationComponent>(AnimationComponent{.frame_phase = static_cast<std::uint32_t>(std::hash<std::uint64_t>{}(entity.id()))});
 	        });

@@ -59,7 +59,7 @@ export struct VidGraphics {
 	std::vector<Frame> frames;
 
 	// TODO: move out of there
-	RGBA8 getPaletteColor(std::uint8_t index) const {
+	[[nodiscard]] RGBA8 getPaletteColor(std::uint8_t index) const noexcept {
 		auto offset = index * 3;
 		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
 	}
@@ -120,7 +120,7 @@ export struct Vid {
 	std::variant<std::int32_t, Graphics> graphicsData;
 
 	//
-	std::u8string getName() const { return cp866_to_utf8(std::string_view{name.data()}); }
+	[[nodiscard]] std::u8string getName() const { return cp866_to_utf8(std::string_view{name.data()}); }
     const VidGraphics& graphics() const {
         const auto* graphics = std::get_if<Vid::Graphics>(&graphicsData);
         if (!graphics || !graphics->get())

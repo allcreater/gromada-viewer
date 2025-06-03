@@ -113,7 +113,7 @@ class App {
 
 	template <auto MemberFn, typename... Args>
 	static void bind(Args... args, void* userdata) {
-		auto* self = reinterpret_cast<App*>(userdata);
+		auto* self = static_cast<App*>(userdata);
 		std::invoke(MemberFn, self, args...);
 	};
 
