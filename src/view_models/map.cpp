@@ -25,7 +25,7 @@ import Gromada.SoftwareRenderer;
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
 
-
+/*
 export class MapViewModel {
 public:
 	explicit MapViewModel(Model& model)
@@ -37,10 +37,10 @@ public:
 	// actual range is from 1 to 8
 	int magnificationFactor = 1;
 
-	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
+	[[nodiscard]] glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const noexcept {
 		return m_screenToWorldMat * glm::vec3{screenPos, 1.0f};
 	}
-	glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const {
+	[[nodiscard]] glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const noexcept {
 	    return m_worldToScreenMat * glm::vec3{worldPos, 1.0f};
 	}
 
@@ -77,7 +77,7 @@ public:
 			updateSelection(mouseWorldPos);
 
 		    if (ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel != 0.0f) {
-		        magnificationFactor += glm::sign(ImGui::GetIO().MouseWheel);
+		        magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
 		    }
 		}
 	}
@@ -189,4 +189,76 @@ private:
     flecs::query<const GameObject, const Vid> m_selectionQuery;
 	LevelRenderer m_levelRenderer;
 	Framebuffer m_levelFramebuffer;
+};
+*/
+
+export class MapViewModel {
+    public:
+    explicit MapViewModel(flecs::world& world) :m_world(world) {
+
+        world.component<Framebuffer>();
+        world.set<Framebuffer>({1024, 768});
+
+        struct RenderOrder {
+            auto operator <=>(const RenderOrder&) const = default;
+
+            std::tuple<unsigned char, int> tuple;
+        };
+        world.component<RenderOrder>();
+        world.system<const GameObject, const Vid>()
+        .kind(flecs::OnUpdate)
+        .each([](flecs::entity entity, const GameObject& obj, const Vid& vid) {
+            entity.ensure<RenderOrder>().tuple = std::tuple<unsigned char, int>{vid.z_layer, obj.y + vid.graphics().height / 2};
+        });
+
+
+        //m_selectionQuery = m_model.query_builder<const GameObject, const Vid>().with<Selected>().cached().build();
+        world.system<Framebuffer, const GameObject, const Vid, const AnimationComponent>()
+            .term_at(0).singleton()
+            .kind(flecs::OnStore)
+            .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return (*a <=> *b)._Value;})
+            .each([](Framebuffer& framebuffer, const GameObject& obj, const Vid& vid, const AnimationComponent& animation) {
+                const glm::ivec2 pos = glm::ivec2{obj.x - vid.graphics().width / 2, obj.y - vid.graphics().height / 2}; //- viewportOffset;
+                DrawSprite(vid.graphics(), animation.current_frame, pos.x, pos.y, framebuffer);
+        });
+
+        world.system<Framebuffer>()
+            .kind(flecs::PreStore)
+            .each([](Framebuffer& framebuffer) {
+                framebuffer.clear({0, 0, 0, 0});
+            });
+
+        // world.system<Framebuffer>()
+        //     .kind(0)//(flecs::OnStore)
+        //     .each([](Framebuffer& framebuffer) {
+        //         framebuffer.commitToGpu();
+        //         ImGui::Image(simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0});
+        //     });
+    }
+
+    // actual range is from 1 to 8
+    int magnificationFactor = 1;
+
+    // [[nodiscard]] glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const noexcept {
+    //     return m_screenToWorldMat * glm::vec3{screenPos, 1.0f};
+    // }
+    // [[nodiscard]] glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const noexcept {
+    //     return m_worldToScreenMat * glm::vec3{worldPos, 1.0f};
+    // }
+
+    void updateUI() {
+        Framebuffer& framebuffer = *(m_world.get_mut<Framebuffer>());
+        framebuffer.commitToGpu();
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddImage(
+            simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0},
+            ImGui::GetMainViewport()->Size,
+            ImVec2{0, 0},
+            ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
+
+    }
+
+    flecs::world& m_world;
+    glm::mat3x3 m_screenToWorldMat, m_worldToScreenMat;
 };
