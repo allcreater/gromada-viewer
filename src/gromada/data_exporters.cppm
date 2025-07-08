@@ -32,6 +32,14 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 			[](const std::monostate&) { return nlohmann::json{}; },
 		};
 
+	    auto commandToJson = [](const ObjectCommand& command) {
+	        return nlohmann::json{
+	            {"opcode", command.command},
+	            {"p1", command.p1},
+	            {"p2", command.p2}
+	        };
+	    };
+
 		return nlohmann::json{
 			{"nvid", obj.nvid},
 			{"x", obj.x},
@@ -39,6 +47,7 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 			{"z", obj.z},
 			{"direction", obj.direction},
 			{"payload", std::visit(payloadVisitor, obj.payload)},
+		    {"commands", obj.commands | std::views::transform(commandToJson) | std::ranges::to<std::vector>()},
 		};
 	};
 
