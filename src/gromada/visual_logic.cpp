@@ -5,30 +5,12 @@ export module Gromada.VisualLogic;
 
 import std;
 import utils;
+import Gromada.Actions;
 import Gromada.Resources;
-
-export enum class Action {
-	Stand,
-	Build,
-	Go,
-	StartMove,
-	RotateLeft,
-	RotateRight,
-	Open,
-	Close,
-	Fight,
-	Salut,
-	StandOpen,
-	Load,
-	Unload,
-	Wound,
-	Birth,
-	Death,
-};
 
 // TODO: check is it works for different actions
 export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid, Action action, std::uint8_t direction) {
-	assert(action == Action::Stand);
+	assert(action == Action::act_stand);
 	auto actionIndex = std::to_underlying(action);
 	assert(actionIndex >= 0 && actionIndex < 16);
 

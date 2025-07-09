@@ -13,7 +13,7 @@ export {
 struct DestroyAfterUpdate {};
 struct ActiveLevel {};
 struct AnimationComponent {
-    Action action = Action::Stand;
+    Action action = Action::act_stand;
     std::uint32_t frame_phase = 0;
     float next_frame_delay = 0.0f;
     std::uint32_t current_frame = 0;

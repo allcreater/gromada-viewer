@@ -13,6 +13,7 @@ add_executable (GromadaEditor
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"engine/world_components.cppm"
+	 	"gromada/actions.ixx"
 		"gromada/data_exporters.cppm"
 		"gromada/game_resources.cppm"
 		"gromada/resource_reader.cpp"

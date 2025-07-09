@@ -14,6 +14,7 @@ module;
 
 export module Gromada.Resources;
 
+export import Gromada.Actions;
 import Gromada.ResourceReader;
 import std;
 import utils;
@@ -133,7 +134,7 @@ export struct Vid {
 };
 
 export struct ObjectCommand {
-    std::uint8_t command;
+    Action command;
     std::uint32_t p1, p2;
 };
 
@@ -156,6 +157,7 @@ export struct GameObject {
 	using Payload = std::variant<std::monostate, BasePayload, AdvancedPayload>;
 	Payload payload;
 
+    std::uint32_t id; // Unique ID for the object, used for commands
     std::vector<ObjectCommand> commands;
 };
 
@@ -503,7 +505,7 @@ void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<Gam
         commandArray.reserve(count);
         for (int i = 0; i < count; i++) {
             commandArray.push_back(ObjectCommand {
-                .command = reader.read<std::uint8_t>(),
+                .command = Action{reader.read<std::uint8_t>()},
                 .p1 =  reader.read<std::uint32_t>(),
                 .p2 =  reader.read<std::uint32_t>(),
             });
@@ -527,6 +529,11 @@ std::vector<GameObject> loadDynamicObjects(
 
     if (result.size() != objectIds.size())
         throw std::runtime_error("Map is probably corrupted: ids not matches to objects");
+
+    // linking the objects with their respecive IDs
+	for (std::size_t i = 0; i < result.size(); ++i) {
+	    result[i].id = objectIds[i];
+	}
 
     visitSectionsOfType(SectionType::Command, std::bind_front(readCommandsSection, std::span{objectIds}, std::span{result}));
 
