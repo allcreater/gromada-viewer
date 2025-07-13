@@ -20,6 +20,7 @@ import engine.bounding_box;
 import engine.level_renderer;
 import engine.objects_view;
 
+import Gromada.Actions;
 import Gromada.SoftwareRenderer;
 
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
@@ -107,6 +108,17 @@ private:
             const auto color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
             draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
+
+	        if (!obj.commands.empty()) {
+	            ImGui::SetNextWindowPos(to_imvec(worldToScreenPos(pos)));
+	            ImGui::PushID(&obj);
+	            ImGui::BeginChild("Commands", ImVec2{200.0f, obj.commands.size() * 25.0f}, ImGuiChildFlags_FrameStyle);
+                std::ranges::for_each(obj.commands, [&, index = 0](const ObjectCommand& cmd) mutable {
+                    ImGui::TextUnformatted(std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2).c_str());
+                });
+	            ImGui::EndChild();
+	            ImGui::PopID();
+	        }
 	    });
 
 
@@ -121,7 +133,7 @@ private:
 	void updateViewport() {
 		m_viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 
-		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
 			m_camPos -= from_imvec(ImGui::GetIO().MouseDelta);
 		}
 

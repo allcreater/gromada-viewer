@@ -10,9 +10,11 @@ module;
 #endif
 
 #include <cassert>
+#include <cstdint>
 
 export module Gromada.Resources;
 
+export import Gromada.Actions;
 import Gromada.ResourceReader;
 import std;
 import utils;
@@ -131,6 +133,11 @@ export struct Vid {
 	void read(BinaryStreamReader reader);
 };
 
+export struct ObjectCommand {
+    Action command;
+    std::uint32_t p1, p2;
+};
+
 export struct GameObject {
 	unsigned int nvid;
 	int x;
@@ -149,6 +156,9 @@ export struct GameObject {
 	};
 	using Payload = std::variant<std::monostate, BasePayload, AdvancedPayload>;
 	Payload payload;
+
+    std::uint32_t id; // Unique ID for the object, used for commands
+    std::vector<ObjectCommand> commands;
 };
 
 export enum /*class*/ MapVersion : std::uint32_t {
@@ -471,15 +481,61 @@ void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVe
 	}
 }
 
+void readObjectIdsSection(std::vector<std::uint32_t>& objectIds, BinaryStreamReader reader) {
+    const auto count = reader.read<std::uint32_t>();
+
+    objectIds.resize(objectIds.size() + count);
+    reader.read_to(std::as_writable_bytes(std::span{objectIds}.subspan(objectIds.size() - count)));
+}
+
+void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<GameObject> objects, BinaryStreamReader reader) {
+    //const std::map<std::uint32_t, std::size_t>& objectsLookup,
+    auto lookupSubject = [&](std::uint32_t subjectId) -> GameObject& {
+        const auto it = std::ranges::find(objectIds, subjectId);
+        if (it == objectIds.end()) [[unlikely]]
+            throw std::out_of_range("Invalid object id");
+
+        return objects[std::distance(objectIds.begin(), it)];
+    };
+
+    for (std::uint32_t subjectId; subjectId = reader.read<std::uint32_t>(); ) {
+        auto& commandArray = lookupSubject(subjectId).commands;
+
+        const auto count = reader.read<std::int32_t>();
+        commandArray.reserve(count);
+        for (int i = 0; i < count; i++) {
+            commandArray.push_back(ObjectCommand {
+                .command = Action{reader.read<std::uint8_t>()},
+                .p1 =  reader.read<std::uint32_t>(),
+                .p2 =  reader.read<std::uint32_t>(),
+            });
+        }
+    }
+}
+
 std::vector<GameObject> loadDynamicObjects(
 	MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-	std::vector<GameObject> result;
-	
-	std::ranges::for_each(
-		resourceNavigator.getSections() | std::views::filter([](const Section& section) { return section.header().type == SectionType::Objects; }),
-		[&](const Section& section) { return readDynamicObjectsSection(result, mapVersion, vids, reader.beginRead(section)); }
+    auto visitSectionsOfType = [&](SectionType sectionType, std::invocable<BinaryStreamReader> auto&& visitor) {
+        std::ranges::for_each(
+            resourceNavigator.getSections() | std::views::filter([&](const Section& section) { return section.header().type == sectionType; }),
+            [&](const Section& section) { visitor(reader.beginRead(section)); });
+    };
 
-	);
+    std::vector<GameObject> result;
+    visitSectionsOfType(SectionType::Objects, std::bind_front(readDynamicObjectsSection, std::ref(result), mapVersion, vids));
+
+    std::vector<std::uint32_t> objectIds;
+    visitSectionsOfType(SectionType::ObjectsIds, std::bind_front(readObjectIdsSection, std::ref(objectIds)));
+
+    if (result.size() != objectIds.size())
+        throw std::runtime_error("Map is probably corrupted: ids not matches to objects");
+
+    // linking the objects with their respecive IDs
+	for (std::size_t i = 0; i < result.size(); ++i) {
+	    result[i].id = objectIds[i];
+	}
+
+    visitSectionsOfType(SectionType::Command, std::bind_front(readCommandsSection, std::span{objectIds}, std::span{result}));
 
 	return result;
 }
