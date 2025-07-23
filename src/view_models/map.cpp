@@ -27,27 +27,6 @@ import Gromada.SoftwareRenderer;
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
 
-// NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
-void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader) {
-    const auto magnificationFactor = vp.magnificationFactor = std::clamp(vp.magnificationFactor, 1, 8);
-    vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
-
-    if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
-        vp.camPos -= from_imvec(ImGui::GetIO().MouseDelta);
-    }
-
-    vp.camPos = glm::clamp(vp.camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
-
-
-    vp.viewportPos = vp.camPos - vp.viewportSize / 2;
-    vp.screenToWorldMat = glm::mat3x3{
-        1.0f / magnificationFactor, 0.0f, 0.0f,
-        0.0f, 1.0f / magnificationFactor, 0.0f,
-        vp.viewportPos.x, vp.viewportPos.y, 1.0f,
-    };
-    vp.worldToScreenMat = glm::inverse(vp.screenToWorldMat);
-}
-
 constexpr static ImU32 objectSelectionColor(UnitType unitType);
 
 struct SelectionRect {
@@ -170,6 +149,27 @@ export class MapViewModel {
         }
     }
 
+    // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
+    static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader) {
+        const auto magnificationFactor = vp.magnificationFactor = std::clamp(vp.magnificationFactor, 1, 8);
+        vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
+
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+            vp.camPos -= from_imvec(ImGui::GetIO().MouseDelta);
+        }
+
+        vp.camPos = glm::clamp(vp.camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
+
+
+        vp.viewportPos = vp.camPos - vp.viewportSize / 2;
+        vp.screenToWorldMat = glm::mat3x3{
+            1.0f / magnificationFactor, 0.0f, 0.0f,
+            0.0f, 1.0f / magnificationFactor, 0.0f,
+            vp.viewportPos.x, vp.viewportPos.y, 1.0f,
+        };
+        vp.worldToScreenMat = glm::inverse(vp.screenToWorldMat);
+    }
+
     void updateSelection(glm::ivec2 mouseWorldPos) {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
             if (!m_selectionFrame) {
@@ -194,8 +194,6 @@ export class MapViewModel {
     flecs::query<const GameObject, const Vid> m_selectionQuery;
     std::optional<SelectionRect> m_selectionFrame;
 };
-
-//module : private;
 
 constexpr static ImU32 objectSelectionColor(UnitType unitType) {
     using enum UnitType;
