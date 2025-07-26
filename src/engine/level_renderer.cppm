@@ -6,6 +6,8 @@ export module engine.level_renderer;
 
 import std;
 
+import framebuffer;
+
 import engine.bounding_box;
 import engine.objects_view;
 import engine.world_components;
@@ -14,39 +16,60 @@ import Gromada.Resources;
 import Gromada.SoftwareRenderer;
 import Gromada.VisualLogic;
 
-// TODO: struct Viewport?
+import utils;
+
+export struct Viewport {
+    glm::ivec2 camPos{0.0f, 0.0f};
+    glm::ivec2 viewportSize;
+    int magnificationFactor = 1; // actual range is from 1 to 8
+
+    // derivatives
+    glm::ivec2 viewportPos;
+    glm::mat3x3 screenToWorldMat, worldToScreenMat;
+
+    [[nodiscard]] glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const noexcept {
+        return screenToWorldMat * glm::vec3{screenPos, 1.0f};
+    }
+    [[nodiscard]] glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const noexcept {
+        return worldToScreenMat * glm::vec3{worldPos, 1.0f};
+    }
+};
 
 export class LevelRenderer {
 public:
-	LevelRenderer(const flecs::world& world)
-		: m_world{world} {}
+	LevelRenderer(const flecs::world& world) {
+	    struct RenderOrder {
+	        auto operator <=>(const RenderOrder&) const = default;
+	        RenderOrder() = default;
+	        RenderOrder(const GameObject& obj, const Vid& vid) : m_tuple{vid.z_layer, obj.y + vid.graphics().height / 2} {}
 
-	void drawMap(FramebufferRef framebuffer, glm::ivec2 viewportOffset, glm::ivec2 viewportSize) {
-		updateObjectsView(viewportOffset, viewportOffset + viewportSize);
-		for (flecs::entity entity : m_visibleObjects) {
-		    auto obj = entity.get_ref<const GameObject>();
-		    auto vid = entity.get_ref<const Vid>();
-		    auto animation = entity.get_ref<const AnimationComponent>();
+	    private:
+	        std::tuple<unsigned char, int> m_tuple;
+	    };
+	    world.component<RenderOrder>();
+	    world.system<const GameObject, const Vid>()
+            .kind(flecs::OnUpdate)
+	        .write<RenderOrder>()
+            .each([](flecs::entity entity, const GameObject& obj, const Vid& vid) {
+                entity.ensure<RenderOrder>() = {obj, vid};
+        });
 
-			const glm::ivec2 pos = glm::ivec2{obj->x - vid->graphics().width / 2, obj->y - vid->graphics().height / 2} - viewportOffset;
-			DrawSprite(vid->graphics(), animation->current_frame, pos.x, pos.y, framebuffer);
-		}
+	    world.component<Viewport>();
+	    world.set<Viewport>({.viewportSize = {1024, 768}});
+
+	    world.component<Framebuffer>();
+	    world.set<Framebuffer>({1024, 768});
+
+	    // const auto time = std::chrono::high_resolution_clock::now();
+	    // const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
+	    world.system<Framebuffer, const Viewport, const GameObject, const Vid, const AnimationComponent>()
+            .term_at(0).singleton()
+            .term_at(1).singleton()
+            .kind(flecs::PreStore)
+            .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return ordering_to_int(*a <=> *b);})
+            .each([](Framebuffer& framebuffer, const Viewport& viewport, const GameObject& obj, const Vid& vid, const AnimationComponent& animation) {
+                const glm::ivec2 pos = glm::ivec2{obj.x - vid.graphics().width / 2, obj.y - vid.graphics().height / 2} - viewport.viewportPos;
+                DrawSprite(vid.graphics(), animation.current_frame, pos.x, pos.y, framebuffer);
+        });
 	}
-
-private:
-	void updateObjectsView(glm::ivec2 min, glm::ivec2 max) {
-	    m_visibleObjects.clear();
-	    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::visualBounds, BoundingBox{min.x, max.x, min.y, max.y}, [&](flecs::entity entity){ m_visibleObjects.push_back(entity); });
-
-		std::ranges::sort(m_visibleObjects, {},
-			[](flecs::entity entity) {
-			    auto obj = entity.get_ref<const GameObject>();
-			    auto vid = entity.get_ref<const Vid>();
-			    return std::tuple{vid->z_layer, obj->y + vid->graphics().height / 2};
-			});
-	}
-
-private:
-	const flecs::world& m_world;
-	std::vector<flecs::entity> m_visibleObjects;
 };

@@ -40,13 +40,20 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("Maps")) {
-				//auto onMapReloaded = [this] { 
-				//	m_mapViewModel.cameraPos() = {m_model.map().header.observerX, m_model.map().header.observerY};
-				//};
-
 				m_mapsSelectorViewModel.updateUI();
 				ImGui::EndTabItem();
 			}
+
+		    if (ImGui::BeginTabItem("Help")) {
+				ImGui::TextUnformatted(
+					R"(
+Controls:
+- Ctrl+Wheel - zoom in/out
+- Right mouse button / Ctrl + mouse - move camera
+- Left mouse button - select object
+)");
+		        ImGui::EndTabItem();
+		    }
 
 			ImGui::EndTabBar();
 		}
@@ -83,16 +90,6 @@ public:
 
 			if (ImGui::MenuItem("Exit")) {
 				sapp_request_quit();
-			}
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("View")) {
-			if (ImGui::MenuItem("Zoom in", "Ctrl + Wheel up")) {
-				m_mapViewModel.magnificationFactor++;
-			}
-			if (ImGui::MenuItem("Zoom out", "Ctrl + Wheel down")) {
-				m_mapViewModel.magnificationFactor--;
 			}
 			ImGui::EndMenu();
 		}

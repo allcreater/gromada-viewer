@@ -30,4 +30,14 @@ export {
 		using type = T;
 	};
 	template <typename T> using type_from_member_t = type_from_member<T>::type;
+
+
+    constexpr int ordering_to_int (std::strong_ordering ordering) {
+        if (ordering < 0)
+            return -1;
+        else if (ordering > 0)
+            return 1;
+
+        return 0;
+    }
 }

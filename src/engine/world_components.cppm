@@ -43,7 +43,7 @@ public:
 			    entity.emplace<AnimationComponent>(AnimationComponent{.frame_phase = static_cast<std::uint32_t>(std::hash<std::uint64_t>{}(entity.id()))});
 	        });
 
-	    world.system<DestroyAfterUpdate>().kind(flecs::OnStore).each([](flecs::entity entity, DestroyAfterUpdate) {
+	    world.system<DestroyAfterUpdate>().kind(flecs::PostFrame).each([](flecs::entity entity, DestroyAfterUpdate) {
 	        entity.destruct();
 	    });
 

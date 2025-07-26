@@ -14,6 +14,7 @@ export module application.view_model : map;
 import std;
 import framebuffer;
 import imgui_utils;
+import utils;
 
 import application.model;
 import engine.bounding_box;
@@ -26,179 +27,186 @@ import Gromada.SoftwareRenderer;
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
 
+constexpr static ImU32 objectSelectionColor(UnitType unitType);
+
+struct SelectionRect {
+    glm::ivec2 min;
+    glm::ivec2 max;
+};
 
 export class MapViewModel {
-public:
-	explicit MapViewModel(Model& model)
-		: m_model{model}, m_levelRenderer{model} {
+    public:
+    explicit MapViewModel(flecs::world& world) : m_world(world) {
 
-	    m_selectionQuery = m_model.query_builder<const GameObject, const Vid>().with<Selected>().cached().build();
-	}
+        world.import<LevelRenderer>();
 
-	// actual range is from 1 to 8
-	int magnificationFactor = 1;
+        world.system<Framebuffer, const Viewport>()
+            .term_at(0).singleton()
+            .term_at(1).singleton()
+            .kind(flecs::PreUpdate)
+            .each([](Framebuffer& framebuffer, const Viewport& viewport) {
+                framebuffer.resize(viewport.viewportSize);
+                framebuffer.clear({0, 0, 0, 0});
+            });
 
-	glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const {
-		return m_screenToWorldMat * glm::vec3{screenPos, 1.0f};
-	}
-	glm::ivec2 worldToScreenPos(glm::ivec2 worldPos) const {
-	    return m_worldToScreenMat * glm::vec3{worldPos, 1.0f};
-	}
 
-	void updateUI() {
-		magnificationFactor = std::clamp(magnificationFactor, 1, 8);
+        // TODO: is this coordinates are even used by original game?
+        world.observer<const MapHeaderRawData, Viewport>()
+            .term_at(1).singleton().filter()
+            .event(flecs::OnSet)
+            .each([](flecs::entity, const MapHeaderRawData& mapHeader, Viewport& viewport) {
+                viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
+            });
 
-		updateViewport();
+        m_selectionQuery = world.query_builder<const GameObject, const Vid>().with<Selected>().cached().build();
 
-		const auto mouseWorldPos = screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+        // world.system<Framebuffer>()
+        //     .kind(0)//(flecs::OnStore)
+        //     .each([](Framebuffer& framebuffer) {
+        //         framebuffer.commitToGpu();
+        //         ImGui::Image(simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0});
+        //     });
+    }
 
-		const auto* vp = ImGui::GetMainViewport();
-		if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
-			ImGuiDragDropFlags target_flags = 0;
-			target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
-			//target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
-			if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
-				auto _ = m_model.entity()
-			    .set<GameObject>({
-					.nvid = payload->first.nvid,
-					.x = mouseWorldPos.x,
-					.y = mouseWorldPos.y,
-					.z = 0,
-					.direction = payload->first.direction,
-				})
-			    .add_if<DestroyAfterUpdate>(!(payload->second->IsDelivery()));
+    void handleDragDrop(const Viewport& viewport) {
+        const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
 
-			}
-			ImGui::EndDragDropTarget();
-		}
+        const auto* vp = ImGui::GetMainViewport();
+        if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
+            ImGuiDragDropFlags target_flags = 0;
+            target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
+            //target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
+            if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
+                auto _ = m_world.entity()
+                .set<GameObject>({
+                    .nvid = payload->first.nvid,
+                    .x = mouseWorldPos.x,
+                    .y = mouseWorldPos.y,
+                    .z = 0,
+                    .direction = payload->first.direction,
+                })
+                .child_of<ActiveLevel>()
+                .add_if<DestroyAfterUpdate>(!(payload->second->IsDelivery()));
 
-		drawMap();
+            }
+            ImGui::EndDragDropTarget();
+        }
+    }
 
-		if (!ImGui::IsDragDropActive()) {
-			updateSelection(mouseWorldPos);
+    void updateUI() {
+        auto levelInfo = m_world.component<ActiveLevel>().get<MapHeaderRawData>();
+        auto viewport = m_world.get_mut<Viewport>();
+        {
+            if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
+                viewport->magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
+            }
+        }
 
-		    if (ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel != 0.0f) {
-		        magnificationFactor += glm::sign(ImGui::GetIO().MouseWheel);
-		    }
-		}
-	}
+        handleDragDrop(*viewport);
 
-private:
-	void drawMap() {
-		m_levelFramebuffer.resize(m_viewportSize);
-		m_levelFramebuffer.clear({0, 0, 0, 0});
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        {
+            Framebuffer& framebuffer = *(m_world.get_mut<Framebuffer>());
+            framebuffer.commitToGpu();
 
-		const auto time = std::chrono::high_resolution_clock::now();
-		m_levelRenderer.drawMap(m_levelFramebuffer, (m_camPos - m_viewportSize / 2), m_viewportSize);
-		const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
-		
-		m_levelFramebuffer.commitToGpu();
-		ImDrawList* draw_list = ImGui::GetWindowDrawList();
-		draw_list->AddImage(
-			simgui_imtextureid(m_levelFramebuffer.getImage()), ImVec2{0, 0}, 
-			ImGui::GetMainViewport()->Size,
-			ImVec2{0, 0},
-			ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
+            draw_list->AddImage(
+                simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0},
+                ImGui::GetMainViewport()->Size,
+                ImVec2{0, 0},
+                ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
-	    // selection visualization
-	    m_selectionQuery.each([&](const GameObject& obj, const Vid& vid) {
-	        const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
+            displaySelection(draw_list, *viewport);
+        }
+
+        updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+        updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+
+    }
+
+    void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
+        m_selectionQuery.each([&](const GameObject& obj, const Vid& vid) {
+            const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
             const glm::ivec2 pos {obj.x, obj.y};
 
             const auto color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
-            draw_list->AddRectFilled(to_imvec(worldToScreenPos(pos - halfSize)), to_imvec(worldToScreenPos(pos + halfSize)), color, rounding);
+            draw_list->AddRectFilled(to_imvec(viewport.worldToScreenPos(pos - halfSize)), to_imvec(viewport.worldToScreenPos(pos + halfSize)), color, rounding);
 
-	        if (!obj.commands.empty()) {
-	            ImGui::SetNextWindowPos(to_imvec(worldToScreenPos(pos)));
-	            ImGui::PushID(&obj);
-	            ImGui::BeginChild("Commands", ImVec2{200.0f, obj.commands.size() * 25.0f}, ImGuiChildFlags_FrameStyle);
+            if (!obj.commands.empty()) {
+                ImGui::SetNextWindowPos(to_imvec(viewport.worldToScreenPos(pos)));
+                ImGui::PushID(&obj);
+                ImGui::BeginChild("Commands", ImVec2{200.0f, obj.commands.size() * 25.0f}, ImGuiChildFlags_FrameStyle);
                 std::ranges::for_each(obj.commands, [&, index = 0](const ObjectCommand& cmd) mutable {
                     ImGui::TextUnformatted(std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2).c_str());
                 });
-	            ImGui::EndChild();
-	            ImGui::PopID();
-	        }
-	    });
+                ImGui::EndChild();
+                ImGui::PopID();
+            }
+        });
+
+        if (m_selectionFrame) {
+            draw_list->AddRect(to_imvec(viewport.worldToScreenPos(m_selectionFrame->min)), to_imvec(viewport.worldToScreenPos(m_selectionFrame->max)), IM_COL32(0, 255, 0, 200));
+        }
+    }
+
+    // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
+    static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader) {
+        const auto magnificationFactor = vp.magnificationFactor = std::clamp(vp.magnificationFactor, 1, 8);
+        vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
+
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+            vp.camPos -= from_imvec(ImGui::GetIO().MouseDelta);
+        }
+
+        vp.camPos = glm::clamp(vp.camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
 
 
-		if (m_selectionFrame) {
-			draw_list->AddRect(to_imvec(worldToScreenPos(m_selectionFrame->first)), to_imvec(worldToScreenPos(m_selectionFrame->second)), IM_COL32(0, 255, 0, 200));
-		}
-
-		std::array<char, 128> stringBuffer;
-		draw_list->AddText({10, 30}, 0xFFFFFFFF, stringBuffer.data(), std::format_to(stringBuffer.data(), "map render time: {}", std::chrono::duration<float, std::milli>{renderDuration}));
-	}
-
-	void updateViewport() {
-		m_viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
-
-		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
-			m_camPos -= from_imvec(ImGui::GetIO().MouseDelta);
-		}
-
-	    const auto activeLevel = m_model.component<ActiveLevel>();
-		if (const auto* mapHeader = activeLevel.get<MapHeaderRawData>()) {
-			m_camPos = glm::clamp(m_camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader->width, mapHeader->height});
-		}
-
-	    auto translation = m_camPos - m_viewportSize / 2;
-        m_screenToWorldMat = glm::mat3x3{
+        vp.viewportPos = vp.camPos - vp.viewportSize / 2;
+        vp.screenToWorldMat = glm::mat3x3{
             1.0f / magnificationFactor, 0.0f, 0.0f,
             0.0f, 1.0f / magnificationFactor, 0.0f,
-            translation.x, translation.y, 1.0f,
+            vp.viewportPos.x, vp.viewportPos.y, 1.0f,
         };
-	    m_worldToScreenMat = glm::inverse(m_screenToWorldMat);
+        vp.worldToScreenMat = glm::inverse(vp.screenToWorldMat);
+    }
 
-	}
-
-	void updateSelection(glm::ivec2 mouseWorldPos) {
-		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-			if (!m_selectionFrame) {
-				m_selectionFrame = std::pair{mouseWorldPos, mouseWorldPos};
-			}
-			else {
-				m_selectionFrame->second = mouseWorldPos;
-			    m_model.remove_all<Selected>();
-                m_model.defer([&] {
-                    m_model.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->first.x, m_selectionFrame->first.y, m_selectionFrame->second.x, m_selectionFrame->second.y), [](flecs::entity entity) {
+    void updateSelection(glm::ivec2 mouseWorldPos) {
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            if (!m_selectionFrame) {
+                m_selectionFrame = {mouseWorldPos, mouseWorldPos};
+            }
+            else {
+                m_selectionFrame->max = mouseWorldPos;
+                m_world.remove_all<Selected>();
+                m_world.defer([&] {
+                    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [](flecs::entity entity) {
                         entity.add<Selected>();
                     });
                 });
-			}
-		}
-		else if (m_selectionFrame) {
-			m_selectionFrame.reset();
-		}
-	}
+            }
+        }
+        else if (m_selectionFrame) {
+            m_selectionFrame.reset();
+        }
+    }
 
-private:
-	constexpr static ImU32 objectSelectionColor(UnitType unitType) {
-		using enum UnitType;
-		constexpr auto alpha = 70;
-		switch (unitType) {
-			case Terrain: return IM_COL32(50, 200, 50, alpha);
-			case Object: return IM_COL32(200, 200, 200, alpha);
-			case Monster: return IM_COL32(255, 100, 100, alpha);
-			case Avia: return IM_COL32(50, 100, 200, alpha);
-			case Cannon: return IM_COL32(128, 80, 50, alpha);
-			case Sprite: return IM_COL32(100, 100, 100, alpha);
-			case Item: return IM_COL32(200, 200, 50, alpha);
-			default:
-				return IM_COL32_BLACK;
-		}
-	}
-
-private:
-	Model& m_model;
-
-	glm::ivec2 m_camPos{0.0f, 0.0f};
-	glm::ivec2 m_viewportSize;
-
-    glm::mat3x3 m_screenToWorldMat, m_worldToScreenMat;
-
-	std::optional<std::pair<glm::ivec2, glm::ivec2>> m_selectionFrame;
+    flecs::world& m_world;
     flecs::query<const GameObject, const Vid> m_selectionQuery;
-	LevelRenderer m_levelRenderer;
-	Framebuffer m_levelFramebuffer;
+    std::optional<SelectionRect> m_selectionFrame;
 };
+
+constexpr static ImU32 objectSelectionColor(UnitType unitType) {
+    using enum UnitType;
+    constexpr auto alpha = 70;
+    switch (unitType) {
+    case Terrain: return IM_COL32(50, 200, 50, alpha);
+    case Object: return IM_COL32(200, 200, 200, alpha);
+    case Monster: return IM_COL32(255, 100, 100, alpha);
+    case Avia: return IM_COL32(50, 100, 200, alpha);
+    case Cannon: return IM_COL32(128, 80, 50, alpha);
+    case Sprite: return IM_COL32(100, 100, 100, alpha);
+    case Item: return IM_COL32(200, 200, 50, alpha);
+    default:
+        return IM_COL32_BLACK;
+    }
+}
