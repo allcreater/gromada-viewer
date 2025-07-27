@@ -69,7 +69,7 @@ public:
             .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return ordering_to_int(*a <=> *b);})
             .each([](Framebuffer& framebuffer, const Viewport& viewport, const GameObject& obj, const Vid& vid, const AnimationComponent& animation) {
                 const glm::ivec2 pos = glm::ivec2{obj.x - vid.graphics().width / 2, obj.y - vid.graphics().height / 2} - viewport.viewportPos;
-                DrawSprite(vid.graphics(), animation.current_frame, pos.x, pos.y, framebuffer);
+                DrawSprite(vid.graphics().frames[animation.current_frame], pos.x, pos.y, framebuffer);
         });
 	}
 };

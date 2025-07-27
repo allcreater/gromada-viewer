@@ -31,15 +31,14 @@ export enum class UnitType : std::uint8_t {
 	Item = 0x40,
 };
 
-//TODO: move to software_renderer
-export struct RGBA8 {
+
+export struct ColorRgb8 {
 	std::uint8_t r;
 	std::uint8_t g;
 	std::uint8_t b;
-	std::uint8_t a;
 };
 
-//export enum class ObjectFlags : std::uint16_t {
+// export enum class ObjectFlags : std::uint16_t {
 //	Shadow = 0x80,
 //};
 
@@ -51,30 +50,21 @@ export struct VidGraphics {
 	std::uint16_t width;
 	std::uint16_t height;
 
-	std::array<std::uint8_t, 0x300> palette;
+	std::array<ColorRgb8, 256> palette;
 	std::vector<std::byte> data;
 
 	struct Frame {
-		std::uint16_t referenceFrameNumber;
 		std::span<const std::byte> data;
+	    const VidGraphics* parent;
+
+	    SpanStreamReader read() const noexcept {return data; }
+	    [[nodiscard]] std::size_t width() const noexcept { return parent->width; }
+	    [[nodiscard]] std::size_t height() const noexcept { return parent->height; }
 	};
 	std::vector<Frame> frames;
 
-	// TODO: move out of there
-	[[nodiscard]] RGBA8 getPaletteColor(std::uint8_t index) const noexcept {
-		auto offset = index * 3;
-		return {palette[offset], palette[offset + 1], palette[offset + 2], 255};
-	}
-
 	// TODO: add validation of the input data because it may cause out of range access 
 	void read(BinaryStreamReader& reader);
-
-	using DecodedData = std::vector<std::vector<RGBA8>>;
-	DecodedData decode() const;
-
-private:
-	void decodeFormat0(DecodedData& out) const;
-	void decodeFormat2(DecodedData& out) const;
 };
 
 export struct Vid {
@@ -266,105 +256,17 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 		frameBegin += sizeof referenceFrameNumber;
 		payloadSize -= 2;
 
-		frames[i] = {
-			.referenceFrameNumber = referenceFrameNumber,
-			.data = {frameBegin, payloadSize},
-		};
+	    if (referenceFrameNumber == 0xFFFF) {
+	        frames[i] = {
+	            .data = {frameBegin, payloadSize},
+                .parent = this,
+            };
+	    } else {
+	        assert(referenceFrameNumber < i);
+	        frames[i] = frames.at(referenceFrameNumber);
+	    }
 
 		frameBegin += payloadSize;
-	}
-}
-
-VidGraphics::DecodedData VidGraphics::decode() const {
-	std::vector<std::vector<RGBA8>> result;
-	result.reserve(frames.size());
-
-	switch (dataFormat) {
-	case 0:
-		decodeFormat0(result);
-		break;
-	case 2:
-		decodeFormat2(result);
-		break;
-	default:
-		break;
-	}
-
-	return result;
-}
-
-void VidGraphics::decodeFormat0(VidGraphics::DecodedData& result) const {
-	assert(dataFormat == 0);
-
-	for (const auto& [referenceFrameNumber, srcData] : frames) {
-		if (srcData.size() > 0) {
-
-			std::vector<RGBA8> frame =  srcData| std::views::transform([this](std::byte color_index) {
-				return getPaletteColor(std::to_underlying(color_index));
-			}) | std::ranges::to<std::vector<RGBA8>>();
-
-			assert(frame.size() == width * height);
-			result.push_back(std::move(frame));
-		}
-		else {
-			result.push_back(result[referenceFrameNumber]);
-		}
-	}
-}
-
-
-void VidGraphics::decodeFormat2(VidGraphics::DecodedData& result) const {
-	assert(dataFormat == 2);
-
-	for (auto [referenceFrameNumber, srcData] : frames) {
-		if (srcData.size() > 0) {
-			std::vector<RGBA8> frameData(width * height);
-			std::mdspan frame{frameData.data(), height, width};
-
-			SpanStreamReader reader{srcData};
-
-			const auto startY = reader.read<std::uint16_t>();
-			const auto height = reader.read<std::uint16_t>();
-
-			for (std::size_t y = startY; y < startY + height; ++y) {
-				std::size_t x = 0;
-				while (true) {
-					const auto currentByte = reader.read<std::uint8_t>();
-					if (currentByte == 0)
-						break;
-					
-					const auto count = currentByte & 0x3F;
-					if ((currentByte & 0x80) == 0) {
-						if ((currentByte & 0x40) == 0) {
-							x += count;
-						}
-						else {
-							for (auto i = 0; i < count; ++i) {
-								frame[y, x++] = {0, 0, 0, 128};
-							}
-						}
-					} else {
-						if ((currentByte & 0x40) == 0) {
-							for (auto i = 0; i < count; ++i) {
-								const auto index = reader.read<std::uint8_t>();
-								frame[y, x++] = getPaletteColor(index);
-							}
-						}
-						else {
-							const auto index = reader.read<std::uint8_t>();
-							for (auto i = 0; i < count; ++i) {
-								frame[y, x++] = getPaletteColor(index);
-							}
-						}
-					}
-				}
-			}
-
-			result.push_back(std::move(frameData));
-		}
-		else {
-			result.push_back(result[referenceFrameNumber]);
-		}
 	}
 }
 

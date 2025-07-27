@@ -19,8 +19,11 @@ import engine.bounding_box;
 import Gromada.Resources;
 
 
+export struct RGBA8 : ColorRgb8 {
+	std::uint8_t a = 255;
+};
 export using FramebufferRef = std::mdspan<RGBA8, std::dextents<int, 2>>;
-export void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer);
+export void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef framebuffer);
 
 
 // Implementation
@@ -41,14 +44,16 @@ concept CanvasInterfaceConcept = requires(T canvas, int sourceX, int sourceY, in
 	{ canvas.draw_pixels_alpha_blend(sourceX, alpha, colors_data) };
 };
 
-void Decode_mode0(const VidGraphics& data, SpanStreamReader reader, int maxHeight, CanvasInterfaceConcept auto canvas) {
-    for (int j = 0; j < std::min<int>(data.height, maxHeight); ++j) { // TODO : clip by y somehow at the decode stage to avoid unnecessary reads? [0,maxHeight] is too big interval
+void Decode_mode0(VidGraphics::Frame frame, int maxHeight, CanvasInterfaceConcept auto canvas) {
+    auto reader = frame.read();
+    for (int j = 0; j < std::min<int>(frame.height(), maxHeight); ++j) { // TODO : clip by y somehow at the decode stage to avoid unnecessary reads? [0,maxHeight] is too big interval
         canvas.set_position(0, j);
-        canvas.draw_pixels_indexed(0, reader.read_bytes(data.width));
+        canvas.draw_pixels_indexed(0, reader.read_bytes(frame.width()));
     }
 }
 
-void Decode_mode2(const VidGraphics& data, SpanStreamReader reader, int maxHeight, CanvasInterfaceConcept auto canvas) {
+void Decode_mode2(VidGraphics::Frame frame, int maxHeight, CanvasInterfaceConcept auto canvas) {
+    auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
     const int endY = std::min(reader.read<std::uint16_t>() + startY, maxHeight);
 
@@ -77,11 +82,12 @@ void Decode_mode2(const VidGraphics& data, SpanStreamReader reader, int maxHeigh
             sourceX += commandWord.count;
         }
 
-        assert(sourceX <= data.width); // Should not exceed the width of the sprite
+        assert(sourceX <= frame.width()); // Should not exceed the width of the sprite
     }
 }
 
-void Decode_mode4(const VidGraphics& data, SpanStreamReader reader, int maxHeight, CanvasInterfaceConcept auto canvas) {
+void Decode_mode4(VidGraphics::Frame frame, int maxHeight, CanvasInterfaceConcept auto canvas) {
+    auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
     const int endY = std::min(reader.read<std::uint16_t>() + startY, maxHeight);
 
@@ -104,7 +110,8 @@ void Decode_mode4(const VidGraphics& data, SpanStreamReader reader, int maxHeigh
     }
 }
 
-void Decode_Type8(const VidGraphics& data, SpanStreamReader reader, int maxHeight, CanvasInterfaceConcept auto canvas) {
+void Decode_Type8(VidGraphics::Frame frame, int maxHeight, CanvasInterfaceConcept auto canvas) {
+    auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
     const int endY = std::min(reader.read<std::uint16_t>() + startY, maxHeight);
 
@@ -131,7 +138,7 @@ void Decode_Type8(const VidGraphics& data, SpanStreamReader reader, int maxHeigh
 
 struct Canvas {
     int x0, y0;
-    const VidGraphics& data;
+    std::span<const ColorRgb8, 256> palette;
     FramebufferRef framebuffer;
     int y = 0;
 
@@ -141,7 +148,7 @@ struct Canvas {
 
     void draw_pixels_shadow(int sourceX, int count) noexcept {
         for_clipped_pixels(sourceX, count, [&](int x, int i) {
-            constexpr std::uint8_t ShadowMask = 0b00111111;
+            constexpr std::uint8_t ShadowMask = 0b11000011;
             auto oldColor = framebuffer[y, x];
             framebuffer[y, x] = {static_cast<std::uint8_t>(oldColor.r & ShadowMask), static_cast<std::uint8_t>(oldColor.g & ShadowMask),
                 static_cast<std::uint8_t>(oldColor.b & ShadowMask), 255};
@@ -150,14 +157,14 @@ struct Canvas {
 
     void draw_pixels_indexed(int sourceX, std::span<const std::byte> colors_data) noexcept {
         for_clipped_pixels(sourceX, colors_data.size(), [&](int x, int i) {
-            const auto index = static_cast<std::uint8_t>(colors_data[i]);
-            framebuffer[y, x] = data.getPaletteColor(index);
+            const auto color_index = static_cast<std::uint8_t>(colors_data[i]);
+            framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
     }
 
     void draw_pixels_repeat(int sourceX, int count, std::uint8_t color_index) noexcept {
         for_clipped_pixels(sourceX, count, [&](int x, int i) {
-            framebuffer[y, x] = data.getPaletteColor(color_index);
+            framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
     }
 
@@ -170,8 +177,8 @@ struct Canvas {
 
     void draw_pixels_alpha_blend(int sourceX, std::uint8_t t, std::span<const std::byte> colors_data) noexcept {
         for_clipped_pixels(sourceX, colors_data.size(), [&](int x, int i) {
-            const auto index = static_cast<std::uint8_t>(colors_data[i]);
-            const auto srcColor = data.getPaletteColor(index);
+            const auto color_index = static_cast<std::uint8_t>(colors_data[i]);
+            const auto srcColor = RGBA8{palette[color_index], 255};
             const auto dstColor = framebuffer[y, x];
             framebuffer[y, x] = {lerp(srcColor.r, dstColor.r, t), lerp(srcColor.g, dstColor.g, t), lerp(srcColor.b, dstColor.b, t), 255};
         });
@@ -190,33 +197,25 @@ private:
     }
 };
 
-void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
+void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef framebuffer) {
     assert(x > std::numeric_limits<int>::min() / 2 && y > std::numeric_limits<int>::min() / 2);
-    assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
+	assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
 
-    if (data.frames.size() <= spriteIndex) {
-        throw std::out_of_range("Sprite index out of range");
-    }
+	const VidGraphics& data = *frame.parent;
+	if (x + data.width < 0 || y + data.height < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
+		return;
+	}
 
-    if (x + data.width < 0 || y + data.height < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
-        return;
-    }
-
-    if (data.frames[spriteIndex].referenceFrameNumber != 0xFFFF) {
-        spriteIndex = data.frames[spriteIndex].referenceFrameNumber;
-    }
-
-    SpanStreamReader reader{data.frames[spriteIndex].data};
-    Canvas canvas{x, y, data, framebuffer};
+	Canvas canvas{x, y, std::span{data.palette}, framebuffer};
 
     switch (data.dataFormat) {
     case 0:
-        return Decode_mode0(data, reader, framebuffer.extent(0), canvas);
+        return Decode_mode0(frame, framebuffer.extent(0), canvas);
     case 2:
-        return Decode_mode2(data, reader, framebuffer.extent(0), canvas);
+        return Decode_mode2(frame, framebuffer.extent(0), canvas);
     case 4:
-        return Decode_mode4(data, reader, framebuffer.extent(0), canvas);
+        return Decode_mode4(frame, framebuffer.extent(0), canvas);
     case 8:
-        return Decode_Type8(data, reader, framebuffer.extent(0), canvas);
+        return Decode_Type8(frame, framebuffer.extent(0), canvas);
     };
 }

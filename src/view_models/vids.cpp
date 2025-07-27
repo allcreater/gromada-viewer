@@ -14,6 +14,9 @@ import imgui_utils;
 import framebuffer;
 import application.model;
 
+import Gromada.SoftwareRenderer;
+import framebuffer;
+
 import utils;
 
 auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
@@ -259,13 +262,11 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 }
 
 std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
-	return vid.decode() | std::views::transform([&](const std::vector<RGBA8>& data) -> SgUniqueImage {
-		return sg_image_desc{.type = SG_IMAGETYPE_2D,
-			.width = static_cast<int>(vid.width),
-			.height = static_cast<int>(vid.height),
-			.num_slices = 1,
-			.pixel_format = SG_PIXELFORMAT_RGBA8,
-			.data = {{{{.ptr = data.data(), .size = data.size() * sizeof(RGBA8)}}}}};
+	return vid.frames | std::views::transform([&](const VidGraphics::Frame& frame) {
+	    Framebuffer vidFramebuffer{static_cast<int>(vid.width), static_cast<int>(vid.height)};
+        DrawSprite(frame, 0, 0, vidFramebuffer);
+        vidFramebuffer.commitToGpu();
+	    return std::move(vidFramebuffer).getImage();
 	}) | std::ranges::to<std::vector>();
 
 }
