@@ -18,6 +18,10 @@ export {
 			data = data.subspan(sizeof result);
 			return result;
 		}
+	    std::span<const std::byte> read_bytes(std::size_t size) {
+		    return std::exchange(data, data.subspan(size)).subspan(0, size);
+		}
+
 		operator std::span<const std::byte>() const { return data; }
 
 	private:

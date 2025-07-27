@@ -19,8 +19,6 @@ import engine.bounding_box;
 import Gromada.Resources;
 
 
-//using Rgb565 = std::uint16_t;
-//export struct RGBA8;
 export using FramebufferRef = std::mdspan<RGBA8, std::dextents<int, 2>>;
 export void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer);
 
@@ -58,40 +56,40 @@ void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_
 		return;
 	}
 
+	struct ControlWord {
+		std::uint8_t count : 6;
+		std::uint8_t command : 2;
+	};
+
 	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
 		int x = x0;
-		for (std::uint8_t commandByte; commandByte = reader.read<std::uint8_t>(), commandByte != 0;) {
+		for (ControlWord commandWord; commandWord = reader.read<ControlWord>(), commandWord.count != 0;) {
 
-			const auto count = commandByte & 0x3F;
-			switch (commandByte & 0xC0) {
-			case 0x00: {
-				x += count;
+			switch (commandWord.command) {
+			case 0: {
+				x += commandWord.count;
 			} break;
-			case 0x40: {
-				for (auto i = 0; i < count; ++i) {
+			case 1: {
+				for (auto i = 0; i < commandWord.count; ++i) {
 					constexpr std::uint8_t ShadowMask = 0b00011111;
 					auto oldColor = framebuffer[y, x];
 					framebuffer[y, x++] = {static_cast<std::uint8_t>(oldColor.r & ShadowMask), static_cast<std::uint8_t>(oldColor.g & ShadowMask),
 						static_cast<std::uint8_t>(oldColor.b & ShadowMask), 255};
 				}
 			} break;
-			case 0x80: {
-				for (auto i = 0; i < count; ++i) {
+			case 2: {
+				for (auto i = 0; i < commandWord.count; ++i) {
 					const auto index = reader.read<std::uint8_t>();
 					framebuffer[y, x++] = data.getPaletteColor(index);
 				}
 			} break;
-			case 0xC0: {
+			case 3: {
 				const auto index = reader.read<std::uint8_t>();
-				for (auto i = 0; i < count; ++i) {
+				for (auto i = 0; i < commandWord.count; ++i) {
 					framebuffer[y, x++] = data.getPaletteColor(index);
 				}
 			} break;
-			default:
-				assert(false && "Invalid command byte");
-				break;
 			}
-
 		}
 	}
 }
@@ -173,7 +171,7 @@ void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_
 
 // TODO: source data must be somehow validated before using (after loading?), because it may cause out of range access
 void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
-	assert(x > std::numeric_limits<int>::min()/2 && y > std::numeric_limits<int>::min()/2);
+	assert(x > std::numeric_limits<int>::min() / 2 && y > std::numeric_limits<int>::min() / 2);
 	assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
 
 	if (data.frames.size() <= spriteIndex) {

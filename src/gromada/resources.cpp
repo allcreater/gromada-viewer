@@ -56,7 +56,7 @@ export struct VidGraphics {
 
 	struct Frame {
 		std::uint16_t referenceFrameNumber;
-		std::span<std::byte> data;
+		std::span<const std::byte> data;
 	};
 	std::vector<Frame> frames;
 
