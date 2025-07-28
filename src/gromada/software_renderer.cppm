@@ -15,7 +15,7 @@ export module Gromada.SoftwareRenderer;
 
 import std;
 import utils;
-import engine.bounding_box;
+import engine.bounding_box; // TODO: bounding_box move to Gromada or ether utils
 import Gromada.Resources;
 import Gromada.GraphicsDecoder;
 
@@ -35,11 +35,16 @@ constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) noex
 };
 
 
-struct Canvas {
+struct FramebufferCanvas {
     int x0, y0;
     std::span<const ColorRgb8, 256> palette;
     FramebufferRef framebuffer;
     int y = 0;
+
+    [[nodiscard]] ClippingInfo get_clipping(BoundingBox source_rect) const noexcept {
+        const BoundingBox destination_rect {-x0, framebuffer.extent(1)-x0, -y0, framebuffer.extent(0)-y0};
+        return {source_rect, destination_rect};
+    }
 
     void set_position(int _, int sourceY) noexcept {
         y = y0 + sourceY;
@@ -101,10 +106,10 @@ void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef fr
     assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
 
     const VidGraphics& data = *frame.parent;
-    if (x + data.width < 0 || y + data.height < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
+    if (x + data.width <= 0 || y + data.height <= 0 || x >= framebuffer.extent(1) || y >= framebuffer.extent(0)) {
         return;
     }
 
-    Canvas canvas{x, y, std::span{data.palette}, framebuffer};
+    FramebufferCanvas canvas{x, y, std::span{data.palette}, framebuffer};
     DecodeFrame(frame, canvas);
 }

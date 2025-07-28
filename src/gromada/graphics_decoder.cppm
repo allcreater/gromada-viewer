@@ -5,10 +5,19 @@ export module Gromada.GraphicsDecoder;
 
 import std;
 import Gromada.Resources;
+import engine.bounding_box;
 
 export {
+    struct ClippingInfo {
+        int skip_first_x, skip_last_x, skip_first_y, skip_last_y;
+        int last_x, last_y;
+
+        ClippingInfo (BoundingBox source_rect, BoundingBox destination_rect) noexcept;
+    };
+
     template <typename T>
-    concept CanvasInterfaceConcept = requires(T canvas, int sourceX, int sourceY, int count, std::span<const std::byte> colors_data, std::uint8_t color, std::uint8_t alpha) { //TODO: span<const uint8_t>
+    concept CanvasInterfaceConcept = requires(T canvas, int sourceX, int sourceY, int count, std::span<const std::byte> colors_data, std::uint8_t color, std::uint8_t alpha, BoundingBox source_rect) { //TODO: span<const uint8_t>
+        { canvas.get_clipping(source_rect) } -> std::same_as<ClippingInfo>;
         { canvas.set_position(sourceX, sourceY) };
         { canvas.draw_pixels_shadow(sourceX, count) };
         { canvas.draw_pixels_indexed(sourceX, colors_data) };
@@ -23,18 +32,19 @@ export {
 
 // Implementation
 
-void Decode_mode0(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) {
-    auto reader = frame.read();
-    for (int j = 0; j < frame.height(); ++j) { // TODO : clip by y somehow at the decode stage to avoid unnecessary reads?
-        canvas.set_position(0, j);
-        canvas.draw_pixels_indexed(0, reader.read_bytes(frame.width()));
+void Decode_mode0(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
+    const auto stride = frame.width();
+
+    for (int y = clipping_info.skip_first_y; y != clipping_info.last_y; ++y) {
+        canvas.set_position(0, y);
+        canvas.draw_pixels_indexed(0, frame.data.subspan(y * stride, stride));
     }
 }
 
-void Decode_mode2(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) {
+void Decode_mode2(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
     auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
-    const int endY = reader.read<std::uint16_t>() + startY;
+    const int endY = std::min(reader.read<std::uint16_t>() + startY, clipping_info.last_y);
 
     struct ControlWord {
         std::uint8_t count : 6;
@@ -65,10 +75,10 @@ void Decode_mode2(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) 
     }
 }
 
-void Decode_mode4(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) {
+void Decode_mode4(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
     auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
-    const int endY = reader.read<std::uint16_t>() + startY;
+    const int endY = std::min(reader.read<std::uint16_t>() + startY, clipping_info.last_y);
 
     struct ControlWord {
         std::uint16_t count : 7;
@@ -89,10 +99,10 @@ void Decode_mode4(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) 
     }
 }
 
-void Decode_Type8(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) {
+void Decode_Type8(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
     auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
-    const int endY = reader.read<std::uint16_t>() + startY;
+    const int endY = std::min(reader.read<std::uint16_t>() + startY, clipping_info.last_y);
 
     struct ControlWord {
         std::uint8_t count : 5;
@@ -115,16 +125,32 @@ void Decode_Type8(VidGraphics::Frame frame, CanvasInterfaceConcept auto canvas) 
     }
 }
 
+ClippingInfo::ClippingInfo (BoundingBox source_rect, BoundingBox destination_rect) noexcept
+    : skip_first_x{ std::max(0, destination_rect.left - source_rect.left)}
+    , skip_last_x {std::max( 0, source_rect.right - destination_rect.right)}
+    , skip_first_y{ std::max(0, destination_rect.top - source_rect.top)}
+    , skip_last_y {std::max( 0, source_rect.down - destination_rect.down)}
+    , last_x{ source_rect.right - skip_last_x }
+    , last_y{ source_rect.down - skip_last_y }
+{}
+
 void DecodeFrame(const VidGraphics::Frame& frame, CanvasInterfaceConcept auto canvas) {
+    // NOTE: Unfortunately data of formats 2, 4, 8 is compressed, so we can do clipping only by last_y
+    const auto clipping_info = canvas.get_clipping({0, frame.width(), 0, frame.height()});
+    assert(clipping_info.skip_last_x >= 0 && clipping_info.skip_first_x >= 0 && clipping_info.skip_last_y >= 0 && clipping_info.skip_first_y >= 0);
+    assert(clipping_info.skip_first_x + clipping_info.skip_last_x < frame.width());
+    assert(clipping_info.skip_first_y + clipping_info.skip_last_y < frame.height());
+
+
     switch (frame.parent->dataFormat) {
     case 0:
-        return Decode_mode0(frame, canvas);
+        return Decode_mode0(frame, clipping_info, canvas);
     case 2:
-        return Decode_mode2(frame, canvas);
+        return Decode_mode2(frame, clipping_info, canvas);
     case 4:
-        return Decode_mode4(frame, canvas);
+        return Decode_mode4(frame, clipping_info, canvas);
     case 8:
-        return Decode_Type8(frame, canvas);
+        return Decode_Type8(frame, clipping_info, canvas);
     case 3:
     case 6:
     case 7:

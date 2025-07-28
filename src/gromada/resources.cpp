@@ -58,8 +58,8 @@ export struct VidGraphics {
 	    const VidGraphics* parent;
 
 	    SpanStreamReader read() const noexcept {return data; }
-	    [[nodiscard]] std::size_t width() const noexcept { return parent->width; }
-	    [[nodiscard]] std::size_t height() const noexcept { return parent->height; }
+	    [[nodiscard]] int width() const noexcept { return parent->width; }
+	    [[nodiscard]] int height() const noexcept { return parent->height; }
 	};
 	std::vector<Frame> frames;
 

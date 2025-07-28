@@ -262,11 +262,11 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 }
 
 std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
-	return vid.frames | std::views::transform([&](const VidGraphics::Frame& frame) {
-	    Framebuffer vidFramebuffer{static_cast<int>(vid.width), static_cast<int>(vid.height)};
+    return vid.frames | std::views::transform([&](const VidGraphics::Frame& frame) {
+        Framebuffer vidFramebuffer{static_cast<int>(vid.width), static_cast<int>(vid.height)};
         DrawSprite(frame, 0, 0, vidFramebuffer);
         vidFramebuffer.commitToGpu();
-	    return std::move(vidFramebuffer).getImage();
-	}) | std::ranges::to<std::vector>();
+        return std::move(vidFramebuffer).getImage();
+    }) | std::ranges::to<std::vector>();
 
 }
