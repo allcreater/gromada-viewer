@@ -33,5 +33,15 @@ export struct BoundingBox {
 		};
 	}
 
+    constexpr BoundingBox getTranslated(int dx, int dy) const noexcept {
+        return {
+            .left = left + dx,
+            .right = right + dx,
+            .top = top + dy,
+            .down = down + dy,
+        };
+    }
+
 	constexpr bool isIntersects(const BoundingBox& other) const noexcept { return !intersection(other).empty(); }
+	constexpr bool isPointInside(int x, int y) const noexcept { return (x >= left && x <= right && y >= top && y <= down); }
 };

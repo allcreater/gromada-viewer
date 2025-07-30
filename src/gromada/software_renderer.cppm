@@ -15,208 +15,118 @@ export module Gromada.SoftwareRenderer;
 
 import std;
 import utils;
-import engine.bounding_box;
+import engine.bounding_box; // TODO: bounding_box move to Gromada or ether utils
 import Gromada.Resources;
+import Gromada.GraphicsDecoder;
 
-
-//using Rgb565 = std::uint16_t;
-//export struct RGBA8;
+export struct RGBA8 : ColorRgb8 {
+    std::uint8_t a = 255;
+};
 export using FramebufferRef = std::mdspan<RGBA8, std::dextents<int, 2>>;
-export void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer);
+export void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef framebuffer);
 
 
 // Implementation
 
-constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) {
+constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) noexcept {
 	const int mult = 0x10000 * t / 255;
 	const int rem = 0x10000 - mult;
 	return static_cast<std::uint8_t>((a * rem + b * mult) / 0x10000);
 };
 
-void DrawSprite_Type0(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
-	std::mdspan indexedImage{
-		reinterpret_cast<const std::uint8_t*>(data.frames[spriteIndex].data.data()),
-		data.height,
-		data.width,
-	};
-	// TODO: check is it produces decent asm
-	for (int j = srcBounds.top; j < srcBounds.down; ++j) {
-		for (int i = srcBounds.left; i < srcBounds.right; ++i) {
-			framebuffer[y + j, x + i] = data.getPaletteColor(indexedImage[j, i]);
-		}
-	}
+constexpr std::uint8_t multiply(std::uint8_t a, std::uint8_t factor) {
+    assert(factor >= 0 && factor < 8);
+    [[assume(factor >= 0 && factor < 8)]];
+    return std::clamp((a * 8) / (8-factor), 0, 255);
 }
 
-void DrawSprite_Type2(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {
-	SpanStreamReader reader{data.frames[spriteIndex].data};
 
-	const int startY = static_cast<int>(reader.read<std::uint16_t>());
-	const int height = reader.read<std::uint16_t>();
+struct SoftwareRendererVisitor {
+    int x0, y0;
+    std::span<const ColorRgb8, 256> palette;
+    FramebufferRef framebuffer;
+    BoundingBox source_rect; // just for validation purposes
+    int x = 0, y = 0;
 
-	// Temporary
-	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
-		return;
-	}
+    [[nodiscard]] ClippingInfo begin_image(BoundingBox source_rect) noexcept {
+        this->source_rect = source_rect;
+        const BoundingBox destination_rect {-x0, framebuffer.extent(1)-x0, -y0, framebuffer.extent(0)-y0};
+        return {source_rect, destination_rect};
+    }
 
-	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
-		int x = x0;
-		for (std::uint8_t commandByte; commandByte = reader.read<std::uint8_t>(), commandByte != 0;) {
+    void set_cursor(int cursor_x, int cursor_y) noexcept {
+        x = x0 + cursor_x;
+        y = y0 + cursor_y;
+        assert(source_rect.isPointInside(cursor_x, cursor_y));
+    }
 
-			const auto count = commandByte & 0x3F;
-			switch (commandByte & 0xC0) {
-			case 0x00: {
-				x += count;
-			} break;
-			case 0x40: {
-				for (auto i = 0; i < count; ++i) {
-					constexpr std::uint8_t ShadowMask = 0b00011111;
-					auto oldColor = framebuffer[y, x];
-					framebuffer[y, x++] = {static_cast<std::uint8_t>(oldColor.r & ShadowMask), static_cast<std::uint8_t>(oldColor.g & ShadowMask),
-						static_cast<std::uint8_t>(oldColor.b & ShadowMask), 255};
-				}
-			} break;
-			case 0x80: {
-				for (auto i = 0; i < count; ++i) {
-					const auto index = reader.read<std::uint8_t>();
-					framebuffer[y, x++] = data.getPaletteColor(index);
-				}
-			} break;
-			case 0xC0: {
-				const auto index = reader.read<std::uint8_t>();
-				for (auto i = 0; i < count; ++i) {
-					framebuffer[y, x++] = data.getPaletteColor(index);
-				}
-			} break;
-			default:
-				assert(false && "Invalid command byte");
-				break;
-			}
+    void advance_cursor(int count) noexcept {
+        x += count;
+        assert(source_rect.isPointInside(x - x0, y - y0));
+    }
 
-		}
-	}
+    void draw_pixels_shadow(int count) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
+            constexpr std::uint8_t ShadowMask = 0b11000011;
+            auto oldColor = framebuffer[y, x];
+            framebuffer[y, x] = {static_cast<std::uint8_t>(oldColor.r & ShadowMask), static_cast<std::uint8_t>(oldColor.g & ShadowMask),
+                static_cast<std::uint8_t>(oldColor.b & ShadowMask), 255};
+        });
+    }
+
+    void draw_pixels_indexed(std::span<const ColorIndex> colors_data) noexcept {
+        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
+            const auto color_index = std::to_underlying(colors_data[i]);
+            framebuffer[y, x] = RGBA8{palette[color_index], 255};
+        });
+    }
+
+    void draw_pixels_repeat(int count, std::uint8_t color_index) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
+            framebuffer[y, x] = RGBA8{palette[color_index], 255};
+        });
+    }
+
+    void draw_pixels_light(int count, std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
+            const auto src = framebuffer[y, x];
+
+            framebuffer[y, x] = {multiply(src.r, r), multiply(src.g, g), multiply(src.b, b) , 255};
+        });
+    }
+
+    void draw_pixels_alpha_blend(std::uint8_t t, std::span<const std::byte> colors_data) noexcept {
+        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
+            const auto color_index = static_cast<std::uint8_t>(colors_data[i]);
+            const auto srcColor = RGBA8{palette[color_index], 255};
+            const auto dstColor = framebuffer[y, x];
+            framebuffer[y, x] = {lerp(srcColor.r, dstColor.r, t), lerp(srcColor.g, dstColor.g, t), lerp(srcColor.b, dstColor.b, t), 255};
+        });
+    }
+
+private:
+    void for_clipped_pixels( int count, auto callback) noexcept {
+        if (y < 0 || y >= framebuffer.extent(0)) {
+            return; // Out of bounds
+        }
+
+        for (int destination_x = std::max(x, 0); destination_x < std::min(x + count, framebuffer.extent(1)); ++destination_x) {
+            callback(destination_x, destination_x - x);
+        }
+
+        advance_cursor(count);
+    }
+};
+
+void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef framebuffer) {
+    assert(x > std::numeric_limits<int>::min() / 2 && y > std::numeric_limits<int>::min() / 2);
+    assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
+
+    const VidGraphics& data = *frame.parent;
+    if (x + data.width <= 0 || y + data.height <= 0 || x >= framebuffer.extent(1) || y >= framebuffer.extent(0)) {
+        return;
+    }
+
+    SoftwareRendererVisitor renderer{x, y, std::span{data.palette}, framebuffer};
+    DecodeFrame(frame, renderer);
 }
-
-void DrawSprite_Type4(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {
-	SpanStreamReader reader{data.frames[spriteIndex].data};
-
-	const int startY = static_cast<int>(reader.read<std::uint16_t>());
-	const int height = reader.read<std::uint16_t>();
-
-	// Temporary
-	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
-		return;
-	}
-
-	struct ControlWord {
-		std::uint16_t count : 7;
-		std::uint16_t command : 3;
-		std::uint16_t factor : 6;
-	};
-
-	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
-		int x = x0;
-		for (ControlWord commandWord; commandWord = reader.read<ControlWord>(), commandWord.count > 0;) {
-			if (commandWord.factor == 0 && commandWord.command == 0) {
-				x += commandWord.count;
-			}
-			else {
-				for (int i = 0; i < commandWord.count; ++i) {
-					framebuffer[y, x++] = {static_cast<std::uint8_t>(commandWord.factor * 4), 0, static_cast<std::uint8_t>(1 << commandWord.command), 255};
-				}
-			}
-		}
-	}
-}
-
-void DrawSprite_Type8(const VidGraphics& data, BoundingBox srcBounds, std::size_t spriteIndex, int x0, int y0, FramebufferRef framebuffer) {	
-
-	SpanStreamReader reader{data.frames[spriteIndex].data};
-
-	const int startY = static_cast<int>(reader.read<std::uint16_t>());
-	const int height = reader.read<std::uint16_t>();
-
-	// Temporary
-	if (srcBounds.right - srcBounds.left < data.width || startY - srcBounds.top < 0) {
-		return;
-	}
-
-	struct ControlWord {
-		std::uint8_t count : 5;
-		std::uint8_t opacity : 3;
-	};
-
-	for (int y = startY + y0, endY = std::min(startY + height + y0, framebuffer.extent(0)); y < endY; ++y) {
-		int x = x0;
-		for (ControlWord command; command = reader.read<ControlWord>(), command.count != 0;) {
-			
-			if (command.opacity == 0) {
-				x += command.count;
-			}
-			else if (command.opacity == 7) {
-				for (auto i = 0; i < command.count; ++i) {
-					const auto index = reader.read<std::uint8_t>();
-					framebuffer[y, x++] = data.getPaletteColor(index);
-				}
-			} else {
-				const std::uint8_t t = 255 - command.opacity * 42;
-				for (auto i = 0; i < command.count; ++i) {
-					const auto index = reader.read<std::uint8_t>();
-					const auto srcColor = data.getPaletteColor(index);
-					const auto dstColor = framebuffer[y, x];
-					framebuffer[y, x++] = {
-						lerp(srcColor.r, dstColor.r, t), lerp(srcColor.g, dstColor.g, t), lerp(srcColor.b, dstColor.b, t), 255};
-				}
-			}
-		}
-	}
-}
-
-// TODO: source data must be somehow validated before using (after loading?), because it may cause out of range access
-void DrawSprite(const VidGraphics& data, std::size_t spriteIndex, int x, int y, FramebufferRef framebuffer) {
-	assert(x > std::numeric_limits<int>::min()/2 && y > std::numeric_limits<int>::min()/2);
-	assert(x < std::numeric_limits<int>::max() / 2 && y < std::numeric_limits<int>::max() / 2);
-
-	if (data.frames.size() <= spriteIndex) {
-		throw std::out_of_range("Sprite index out of range");
-	}
-
-	if (x + data.width < 0 || y + data.height < 0 || x > framebuffer.extent(1) || y > framebuffer.extent(0)) {
-		return;
-	}
-
-	if (data.frames[spriteIndex].referenceFrameNumber != 0xFFFF) {
-		spriteIndex = data.frames[spriteIndex].referenceFrameNumber;
-	}
-
-	const BoundingBox srcBounds{
-		.left = std::max(-x, 0),
-		.right = static_cast<int>(data.width) - std::max(x + static_cast<int>(data.width) - framebuffer.extent(1), 0),
-		.top = std::max(-y, 0),
-		.down = static_cast<int>(data.height) - std::max(y + static_cast<int>(data.height) - framebuffer.extent(0), 0),
-	};
-
-	SpanStreamReader reader{data.frames[spriteIndex].data};
-	switch (data.dataFormat) {
-	case 0:
-		DrawSprite_Type0(data, srcBounds, spriteIndex, x, y, framebuffer);
-		break;
-	case 2:
-		DrawSprite_Type2(data, srcBounds, spriteIndex, x, y, framebuffer);
-		break;
-	case 4:
-		DrawSprite_Type4(data, srcBounds, spriteIndex, x, y, framebuffer);
-		break;
-	case 8:
-		DrawSprite_Type8(data, srcBounds, spriteIndex, x, y, framebuffer);
-		break;
-	default:
-		for (int j = srcBounds.top; j < srcBounds.down; ++j) {
-			for (int i = srcBounds.left; i < srcBounds.right; ++i) {
-				framebuffer[y + j, x + i] = {255, 0, 0, 64};
-			}
-		}
-
-		break;
-	}
-}
-
