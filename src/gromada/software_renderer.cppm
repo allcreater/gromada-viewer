@@ -34,6 +34,12 @@ constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) noex
 	return static_cast<std::uint8_t>((a * rem + b * mult) / 0x10000);
 };
 
+constexpr std::uint8_t multiply(std::uint8_t a, std::uint8_t factor) {
+    assert(factor > 0 && factor < 8);
+    [[assume(factor > 0 && factor < 8)]];
+    return std::clamp((a * 8) / (8-factor), 0, 255);
+}
+
 
 struct FramebufferCanvas {
     int x0, y0;
@@ -72,10 +78,11 @@ struct FramebufferCanvas {
         });
     }
 
-    //TODO: make beautiful effect instead just filling with color
-    void draw_pixels_repeat_mode4(int sourceX, int count, std::uint8_t p1, std::uint8_t p2) noexcept {
+    void draw_pixels_light(int sourceX, int count, std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
         for_clipped_pixels(sourceX, count, [&](int x, int i) {
-            framebuffer[y, x] = {static_cast<std::uint8_t>(p1 * 4), 0, static_cast<std::uint8_t>(1 << p2), 255};
+            const auto src = framebuffer[y, x];
+
+            framebuffer[y, x] = {multiply(src.r, r), multiply(src.g, g), multiply(src.b, b) , 255};
         });
     }
 

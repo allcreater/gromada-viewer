@@ -22,7 +22,7 @@ export {
         { canvas.draw_pixels_shadow(sourceX, count) };
         { canvas.draw_pixels_indexed(sourceX, colors_data) };
         { canvas.draw_pixels_repeat(sourceX, count, color) };
-        { canvas.draw_pixels_repeat_mode4(sourceX, count, std::uint8_t{}, std::uint8_t{}) };
+        { canvas.draw_pixels_light(sourceX, count, std::uint8_t{}, std::uint8_t{}, std::uint8_t{}) };
         { canvas.draw_pixels_alpha_blend(sourceX, alpha, colors_data) };
     };
 
@@ -75,6 +75,29 @@ void Decode_mode2(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasIn
     }
 }
 
+void Decode_mode3(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
+    auto reader = frame.read();
+    const int startY = static_cast<int>(reader.read<std::uint16_t>());
+    const int endY = std::min(reader.read<std::uint16_t>() + startY, clipping_info.last_y);
+
+    struct ControlWord {
+		std::uint8_t count : 5;
+		std::uint8_t factor : 3;
+	};
+
+    for (int y = startY; y < endY; ++y) {
+        canvas.set_position(0, y);
+        auto sourceX = 0;
+        for (ControlWord commandWord; commandWord = reader.read<ControlWord>(), commandWord.count != 0;) {
+            if (commandWord.factor) {
+                canvas.draw_pixels_light(sourceX, commandWord.count, commandWord.factor, commandWord.factor, commandWord.factor);
+            }
+
+            sourceX += commandWord.count;
+        }
+    }
+}
+
 void Decode_mode4(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasInterfaceConcept auto canvas) {
     auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
@@ -82,16 +105,17 @@ void Decode_mode4(VidGraphics::Frame frame, ClippingInfo clipping_info, CanvasIn
 
     struct ControlWord {
         std::uint16_t count : 7;
-        std::uint16_t command : 3;
-        std::uint16_t factor : 6;
-    };
+		std::uint16_t b_factor : 3;
+		std::uint16_t g_factor : 3;
+		std::uint16_t r_factor : 3;
+	};
 
     for (int y = startY; y < endY; ++y) {
         canvas.set_position(0, y);
         auto sourceX = 0;
         for (ControlWord commandWord; commandWord = reader.read<ControlWord>(), commandWord.count > 0;) {
-            if (commandWord.factor != 0 || commandWord.command != 0) {
-                canvas.draw_pixels_repeat_mode4( sourceX, commandWord.count, commandWord.factor, commandWord.command);
+            if (commandWord.r_factor != 0 || commandWord.g_factor != 0 || commandWord.b_factor != 0) {
+                canvas.draw_pixels_light( sourceX, commandWord.count, commandWord.r_factor, commandWord.g_factor, commandWord.b_factor);
             }
 
             sourceX += commandWord.count;
@@ -147,11 +171,12 @@ void DecodeFrame(const VidGraphics::Frame& frame, CanvasInterfaceConcept auto ca
         return Decode_mode0(frame, clipping_info, canvas);
     case 2:
         return Decode_mode2(frame, clipping_info, canvas);
+    case 3:
+        return Decode_mode3(frame, clipping_info, canvas);
     case 4:
         return Decode_mode4(frame, clipping_info, canvas);
     case 8:
         return Decode_Type8(frame, clipping_info, canvas);
-    case 3:
     case 6:
     case 7:
         return; // Not supported yet
