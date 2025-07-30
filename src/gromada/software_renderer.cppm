@@ -35,29 +35,38 @@ constexpr std::uint8_t lerp(std::uint8_t a, std::uint8_t b, std::uint8_t t) noex
 };
 
 constexpr std::uint8_t multiply(std::uint8_t a, std::uint8_t factor) {
-    assert(factor > 0 && factor < 8);
-    [[assume(factor > 0 && factor < 8)]];
+    assert(factor >= 0 && factor < 8);
+    [[assume(factor >= 0 && factor < 8)]];
     return std::clamp((a * 8) / (8-factor), 0, 255);
 }
 
 
-struct FramebufferCanvas {
+struct SoftwareRendererVisitor {
     int x0, y0;
     std::span<const ColorRgb8, 256> palette;
     FramebufferRef framebuffer;
-    int y = 0;
+    BoundingBox source_rect; // just for validation purposes
+    int x = 0, y = 0;
 
-    [[nodiscard]] ClippingInfo get_clipping(BoundingBox source_rect) const noexcept {
+    [[nodiscard]] ClippingInfo begin_image(BoundingBox source_rect) noexcept {
+        this->source_rect = source_rect;
         const BoundingBox destination_rect {-x0, framebuffer.extent(1)-x0, -y0, framebuffer.extent(0)-y0};
         return {source_rect, destination_rect};
     }
 
-    void set_position(int _, int sourceY) noexcept {
-        y = y0 + sourceY;
+    void set_cursor(int cursor_x, int cursor_y) noexcept {
+        x = x0 + cursor_x;
+        y = y0 + cursor_y;
+        assert(source_rect.isPointInside(cursor_x, cursor_y));
     }
 
-    void draw_pixels_shadow(int sourceX, int count) noexcept {
-        for_clipped_pixels(sourceX, count, [&](int x, int i) {
+    void advance_cursor(int count) noexcept {
+        x += count;
+        assert(source_rect.isPointInside(x - x0, y - y0));
+    }
+
+    void draw_pixels_shadow(int count) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
             constexpr std::uint8_t ShadowMask = 0b11000011;
             auto oldColor = framebuffer[y, x];
             framebuffer[y, x] = {static_cast<std::uint8_t>(oldColor.r & ShadowMask), static_cast<std::uint8_t>(oldColor.g & ShadowMask),
@@ -65,29 +74,29 @@ struct FramebufferCanvas {
         });
     }
 
-    void draw_pixels_indexed(int sourceX, std::span<const std::byte> colors_data) noexcept {
-        for_clipped_pixels(sourceX, colors_data.size(), [&](int x, int i) {
-            const auto color_index = static_cast<std::uint8_t>(colors_data[i]);
+    void draw_pixels_indexed(std::span<const ColorIndex> colors_data) noexcept {
+        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
+            const auto color_index = std::to_underlying(colors_data[i]);
             framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
     }
 
-    void draw_pixels_repeat(int sourceX, int count, std::uint8_t color_index) noexcept {
-        for_clipped_pixels(sourceX, count, [&](int x, int i) {
+    void draw_pixels_repeat(int count, std::uint8_t color_index) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
             framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
     }
 
-    void draw_pixels_light(int sourceX, int count, std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
-        for_clipped_pixels(sourceX, count, [&](int x, int i) {
+    void draw_pixels_light(int count, std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
+        for_clipped_pixels( count, [&](int x, int i) {
             const auto src = framebuffer[y, x];
 
             framebuffer[y, x] = {multiply(src.r, r), multiply(src.g, g), multiply(src.b, b) , 255};
         });
     }
 
-    void draw_pixels_alpha_blend(int sourceX, std::uint8_t t, std::span<const std::byte> colors_data) noexcept {
-        for_clipped_pixels(sourceX, colors_data.size(), [&](int x, int i) {
+    void draw_pixels_alpha_blend(std::uint8_t t, std::span<const std::byte> colors_data) noexcept {
+        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
             const auto color_index = static_cast<std::uint8_t>(colors_data[i]);
             const auto srcColor = RGBA8{palette[color_index], 255};
             const auto dstColor = framebuffer[y, x];
@@ -96,15 +105,16 @@ struct FramebufferCanvas {
     }
 
 private:
-    void for_clipped_pixels(int sourceX, int count, auto callback) noexcept {
+    void for_clipped_pixels( int count, auto callback) noexcept {
         if (y < 0 || y >= framebuffer.extent(0)) {
             return; // Out of bounds
         }
 
-        const int x = x0 + sourceX;
         for (int destination_x = std::max(x, 0); destination_x < std::min(x + count, framebuffer.extent(1)); ++destination_x) {
             callback(destination_x, destination_x - x);
         }
+
+        advance_cursor(count);
     }
 };
 
@@ -117,6 +127,6 @@ void DrawSprite(const VidGraphics::Frame& frame, int x, int y, FramebufferRef fr
         return;
     }
 
-    FramebufferCanvas canvas{x, y, std::span{data.palette}, framebuffer};
-    DecodeFrame(frame, canvas);
+    SoftwareRendererVisitor renderer{x, y, std::span{data.palette}, framebuffer};
+    DecodeFrame(frame, renderer);
 }

@@ -43,4 +43,5 @@ export struct BoundingBox {
     }
 
 	constexpr bool isIntersects(const BoundingBox& other) const noexcept { return !intersection(other).empty(); }
+	constexpr bool isPointInside(int x, int y) const noexcept { return (x >= left && x <= right && y >= top && y <= down); }
 };
