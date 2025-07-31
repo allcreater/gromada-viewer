@@ -96,10 +96,9 @@ export class MapViewModel {
     void updateUI() {
         auto levelInfo = m_world.component<ActiveLevel>().get<MapHeaderRawData>();
         auto viewport = m_world.get_mut<Viewport>();
-        {
-            if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
-                viewport->magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
-            }
+
+        if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
+            viewport->magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
         }
 
         handleDragDrop(*viewport);
@@ -119,7 +118,9 @@ export class MapViewModel {
         }
 
         updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
-        updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+        if (!ImGui::IsDragDropActive() ) {
+            updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+        }
 
     }
 
@@ -180,7 +181,9 @@ export class MapViewModel {
                 m_world.remove_all<Selected>();
                 m_world.defer([&] {
                     m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [](flecs::entity entity) {
-                        entity.add<Selected>();
+                        if (entity.child_of<ActiveLevel>()) {
+                            entity.add<Selected>();
+                        }
                     });
                 });
             }
