@@ -261,9 +261,22 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 }
 
+void FillWithCheckerboard(FramebufferRef framebuffer, RGBA8 color1, RGBA8 color2) {
+    const size_t tile_size = 4;
+    for (size_t y = 0; y < framebuffer.extent(0); ++y) {
+        for (int x = 0; x < framebuffer.extent(1); ++x) {
+            framebuffer[y, x] = ((x / tile_size + y / tile_size) % 2 == 0) ? color1 : color2;
+        }
+    }
+}
+
 std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
-    return vid.frames | std::views::transform([&](const VidGraphics::Frame& frame) {
-        Framebuffer vidFramebuffer{static_cast<int>(vid.width), static_cast<int>(vid.height)};
+    return vid.frames | std::views::transform([](const VidGraphics::Frame& frame) {
+        Framebuffer vidFramebuffer{static_cast<int>(frame.width()), static_cast<int>(frame.height())};
+        if (frame.parent->dataFormat == 3 || frame.parent->dataFormat == 4) {
+            FillWithCheckerboard(vidFramebuffer, {0x5a,0x70, 0x96, 0xFF}, {0x9d, 0x4e, 0x5e, 0xFF});
+        }
+
         DrawSprite(frame, 0, 0, vidFramebuffer);
         vidFramebuffer.commitToGpu();
         return std::move(vidFramebuffer).getImage();
