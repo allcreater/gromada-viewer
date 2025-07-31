@@ -92,9 +92,9 @@ export struct Vid {
 	std::uint16_t deathDamageRadius;
 	std::uint8_t deathDamage;
 
-	std::uint8_t linkX;
-	std::uint8_t linkY;
-	std::uint8_t linkZ;
+	std::int8_t linkX;
+	std::int8_t linkY;
+	std::int8_t linkZ;
 	std::uint16_t linkedObjectVid;
 
 	std::uint16_t unused3;

@@ -41,17 +41,18 @@ public:
 	    struct RenderOrder {
 	        auto operator <=>(const RenderOrder&) const = default;
 	        RenderOrder() = default;
-	        RenderOrder(const GameObject& obj, const Vid& vid) : m_tuple{vid.z_layer, obj.y + vid.graphics().height / 2} {}
+	        RenderOrder(const Transform& transform, const Vid& vid) : m_tuple{vid.z_layer, transform.y + vid.graphics().height / 10 + transform.z} {}
 
 	    private:
 	        std::tuple<unsigned char, int> m_tuple;
 	    };
 	    world.component<RenderOrder>();
-	    world.system<const GameObject, const Vid>()
+	    world.system<const Transform, const Vid>()
+	        .term_at(0).second<World>()
             .kind(flecs::OnUpdate)
 	        .write<RenderOrder>()
-            .each([](flecs::entity entity, const GameObject& obj, const Vid& vid) {
-                entity.ensure<RenderOrder>() = {obj, vid};
+            .each([](flecs::entity entity, const Transform& world_transform, const Vid& vid) {
+                entity.ensure<RenderOrder>() = {world_transform, vid};
         });
 
 	    world.component<Viewport>();
@@ -62,13 +63,14 @@ public:
 
 	    // const auto time = std::chrono::high_resolution_clock::now();
 	    // const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
-	    world.system<Framebuffer, const Viewport, const GameObject, const Vid, const AnimationComponent>()
+	    world.system<Framebuffer, const Viewport, const Transform, const Vid, const AnimationComponent>()
             .term_at(0).singleton()
             .term_at(1).singleton()
+	        .term_at(2).second<World>()
             .kind(flecs::PreStore)
             .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return ordering_to_int(*a <=> *b);})
-            .each([](Framebuffer& framebuffer, const Viewport& viewport, const GameObject& obj, const Vid& vid, const AnimationComponent& animation) {
-                const glm::ivec2 pos = glm::ivec2{obj.x - vid.graphics().width / 2, obj.y - vid.graphics().height / 2} - viewport.viewportPos;
+            .each([](Framebuffer& framebuffer, const Viewport& viewport, const Transform& transform, const Vid& vid, const AnimationComponent& animation) {
+                const glm::ivec2 pos = glm::ivec2{transform.x - vid.graphics().width / 2, transform.y - vid.graphics().height / 2 - transform.z} - viewport.viewportPos;
                 DrawSprite(vid.graphics().frames[animation.current_frame], pos.x, pos.y, framebuffer);
         });
 	}
