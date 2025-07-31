@@ -18,3 +18,4 @@ Just put the binaries to the root game directory and run the program.
 	* argparse
 	* nlohmann-json
 	* glm
+    * flecs
