@@ -8,6 +8,22 @@ import Gromada.Resources;
 import engine.bounding_box;
 
 export {
+    using IndexedColor = std::byte;
+    struct CompressedColor {
+		std::uint16_t b : 5;
+		std::uint16_t g : 5;
+		std::uint16_t r : 5;
+		std::uint16_t a : 1;
+
+		[[nodiscard]] constexpr ColorRgb8 to_rgb8() const noexcept {
+            return {
+                static_cast<std::uint8_t>(r * 255 / 31),
+                static_cast<std::uint8_t>(g * 255 / 31),
+                static_cast<std::uint8_t>(b * 255 / 31)
+            };
+        }
+    };
+
     struct ClippingInfo {
         int skip_first_x, skip_last_x, skip_first_y, skip_last_y;
         int last_x, last_y;
@@ -15,18 +31,18 @@ export {
         ClippingInfo (BoundingBox source_rect, BoundingBox destination_rect) noexcept;
     };
 
-    using ColorIndex = std::byte;
-
     template <typename T>
-    concept DecoderVisitor = requires(T visitor, int sourceX, int sourceY, int count, std::span<const ColorIndex> colors_data, std::uint8_t color, std::uint8_t alpha, BoundingBox source_rect) {
+    concept DecoderVisitor = requires(T visitor, int sourceX, int sourceY, int count, std::span<const IndexedColor> color_indices, std::span<const CompressedColor> colors, std::uint8_t alpha, BoundingBox source_rect) {
         { visitor.begin_image(source_rect) } -> std::same_as<ClippingInfo>;
         { visitor.set_cursor(sourceX, sourceY) };
         { visitor.advance_cursor(count) };
         { visitor.draw_pixels_shadow(count) };
-        { visitor.draw_pixels_indexed(colors_data) };
-        { visitor.draw_pixels_repeat(count, color) };
+        { visitor.draw_pixels(colors) };
+        { visitor.draw_pixels_indexed(color_indices) };
+        { visitor.draw_pixels_repeat(count, IndexedColor{}) };
+        { visitor.draw_pixels_repeat(count, CompressedColor{}) };
         { visitor.draw_pixels_light(count, std::uint8_t{}, std::uint8_t{}, std::uint8_t{}) };
-        { visitor.draw_pixels_alpha_blend(alpha, colors_data) };
+        { visitor.draw_pixels_alpha_blend(alpha, color_indices) };
     };
 
     void DecodeFrame(const VidGraphics::Frame& frame, DecoderVisitor auto visitor);
@@ -56,7 +72,6 @@ void Decode_mode2(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
 
     for (int y = startY; y < endY; ++y) {
         visitor.set_cursor(0, y);
-        auto sourceX = 0;
         for (ControlWord command; command = reader.read<ControlWord>(), command.count != 0;) {
             switch (command.command) {
             case 0:
@@ -66,7 +81,7 @@ void Decode_mode2(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
             case 2:
                 visitor.draw_pixels_indexed( reader.read_bytes(command.count)); break;
             case 3:
-                visitor.draw_pixels_repeat( command.count, reader.read<std::uint8_t>()); break;
+                visitor.draw_pixels_repeat( command.count, reader.read<IndexedColor>()); break;
             default:
                 std::unreachable();
             }
@@ -120,6 +135,30 @@ void Decode_mode4(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
     }
 }
 
+void Decode_mode6(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderVisitor auto visitor) {
+    const auto stride = frame.width();
+    auto reader = frame.read();
+
+    struct ControlWord {
+        std::uint8_t count : 7;
+        std::uint8_t repeat : 1;
+    };
+
+    for (int y = 0; y < frame.height(); ++y) {
+        visitor.set_cursor(0, y);
+        for (int x = 0; x < stride; ) {
+            ControlWord command = reader.read<ControlWord>();
+            if (command.repeat) {
+                visitor.draw_pixels_repeat( command.count, reader.read<CompressedColor>());
+            } else {
+                const auto data = reader.read_bytes(2 * command.count);
+                visitor.draw_pixels(std::span<const CompressedColor>{reinterpret_cast<const CompressedColor*>(data.data()), command.count});
+            }
+            x+= command.count;
+        }
+    }
+}
+
 void Decode_Type8(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderVisitor auto visitor) {
     auto reader = frame.read();
     const int startY = static_cast<int>(reader.read<std::uint16_t>());
@@ -168,14 +207,15 @@ void DecodeFrame(const VidGraphics::Frame& frame, DecoderVisitor auto visitor) {
     case 2:
         return Decode_mode2(frame, clipping_info, visitor);
     case 3:
-        return Decode_mode3(frame, clipping_info, visitor);
-    case 4:
-        return Decode_mode4(frame, clipping_info, visitor);
-    case 8:
+		return Decode_mode3(frame, clipping_info, visitor);
+	case 6:
+        return Decode_mode6(frame, clipping_info, visitor);
+	case 7: // Not supported yet
+		return;
+	case 4:
+		return Decode_mode4(frame, clipping_info, visitor);
+	case 8:
         return Decode_Type8(frame, clipping_info, visitor);
-    case 6:
-    case 7:
-        return; // Not supported yet
     default:
         throw std::runtime_error("Unknown graphics format");
     };

@@ -74,16 +74,28 @@ struct SoftwareRendererVisitor {
         });
     }
 
-    void draw_pixels_indexed(std::span<const ColorIndex> colors_data) noexcept {
+    void draw_pixels_indexed(std::span<const IndexedColor> colors_data) noexcept {
         for_clipped_pixels(colors_data.size(), [&](int x, int i) {
             const auto color_index = std::to_underlying(colors_data[i]);
             framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
     }
 
-    void draw_pixels_repeat(int count, std::uint8_t color_index) noexcept {
-        for_clipped_pixels( count, [&](int x, int i) {
-            framebuffer[y, x] = RGBA8{palette[color_index], 255};
+    void draw_pixels(std::span<const CompressedColor> colors_data) noexcept {
+        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
+            framebuffer[y, x] = RGBA8{colors_data[i].to_rgb8(), 255};
+        });
+    }
+
+    void draw_pixels_repeat(int count, IndexedColor color_index) noexcept {
+        for_clipped_pixels( count, [this, color = RGBA8{palette[std::to_underlying(color_index)], 255}](int x, int i) {
+            framebuffer[y, x] = color;
+        });
+    }
+
+    void draw_pixels_repeat(int count, CompressedColor color) noexcept {
+        for_clipped_pixels( count, [this, color = RGBA8{color.to_rgb8(), 255}](int x, int i) {
+            framebuffer[y, x] = color;
         });
     }
 
