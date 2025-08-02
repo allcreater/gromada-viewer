@@ -6,6 +6,7 @@ import std;
 import utils;
 import nlohmann_json_adapter; //TODO: try Glaze instead
 import Gromada.Resources;
+import Gromada.Map;
 
 export { 
 	void ExportMapToJson(const Map& map, std::ostream& stream);

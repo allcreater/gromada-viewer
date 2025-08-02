@@ -22,6 +22,7 @@ import engine.level_renderer;
 import engine.objects_view;
 
 import Gromada.Actions;
+import Gromada.Map;
 import Gromada.SoftwareRenderer;
 
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }

@@ -17,6 +17,7 @@ add_executable (GromadaEditor
 		"gromada/data_exporters.cppm"
 		"gromada/game_resources.cppm"
 		"gromada/graphics_decoder.cppm"
+		"gromada/map.cppm"
 		"gromada/resource_reader.cpp"
 		"gromada/resources.cpp"
 		"gromada/software_renderer.cppm"

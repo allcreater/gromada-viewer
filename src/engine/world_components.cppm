@@ -5,6 +5,7 @@ export module engine.world_components;
 
 import std;
 import Gromada.GameResources;
+import Gromada.Map;
 import Gromada.VisualLogic;
 import engine.objects_view;
 

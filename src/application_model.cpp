@@ -7,6 +7,7 @@ import std;
 import utils;
 
 import Gromada.ResourceReader;
+import Gromada.Map;
 export import Gromada.GameResources;
 
 export import engine.world_components;
@@ -38,7 +39,7 @@ public:
     // TODO: "this->" leaved to remember that it will be a free function soon
 	void loadMap(std::filesystem::path path) {
 		const auto& vids = this->get<const GameResources>()->vids();
-		const auto map = Map::load(vids, path);
+		const auto map = ::loadMap(vids, path);
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
 
