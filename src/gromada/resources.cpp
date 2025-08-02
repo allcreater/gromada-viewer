@@ -229,13 +229,12 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 	}
 }
 
-export std::vector<StreamSpan> getSounds(GromadaResourceReader& reader, const Section& soundSection) {
+export std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader) {
 	assert(soundSection.header().type == SectionType::Sound);
 
 	std::vector<StreamSpan> result;
 	result.reserve(soundSection.header().elementCount);
 
-	BinaryStreamReader soundReader = reader.beginRead(soundSection);
 	for (int i = 0; i < soundSection.header().elementCount; ++i) {
 		const auto _ = soundReader.read<std::uint8_t>();
 		const auto offset = soundReader.read<std::uint32_t>();

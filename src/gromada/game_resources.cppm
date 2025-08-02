@@ -8,14 +8,11 @@ export import Gromada.Resources;
 export class GameResources {
 public:
     explicit GameResources(std::filesystem::path path)
-        : m_gamePath(path.parent_path()), m_reader{path}, m_navigator{m_reader} {
-        // clang-format off
-        m_vids = m_navigator.getSections()
-            | std::views::filter([](const Section& section) { return section.header().type == SectionType::Vid; })
-            | std::views::transform([this](const Section& section) { Vid result;  result.read(m_reader.beginRead(section)); return result; })
-            | std::ranges::to<std::vector>();
-        // clang-format on
+        : m_gamePath(path.parent_path()), m_navigator{GromadaResourceReader{std::move(path)}} {
 
+        m_navigator.visitSectionsOfType(SectionType::Vid, [this](const Section& _, BinaryStreamReader reader) {
+            m_vids.emplace_back().read(reader);
+        });
         std::ranges::for_each(m_vids, [this](Vid& vid) {
             if (const auto referenceNvid = std::get_if<std::int32_t>(&vid.graphicsData)) {
                 vid.graphicsData = m_vids[*referenceNvid].graphicsData;
@@ -25,11 +22,9 @@ public:
             }
         } );
 
-        auto sounds = m_navigator.getSections()
-            | std::views::filter([](const Section& section) { return section.header().type == SectionType::Sound; })
-            | std::views::transform(std::bind_front(getSounds, std::ref(m_reader)))
-            | std::views::join
-            | std::ranges::to<std::vector>();
+        m_navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
+            getSounds(section, reader);
+        });
 
         // for (const auto& [i,sound] : sounds | std::views::enumerate) {
         // 	auto data = m_reader.beginRead(sound).readAll();
@@ -45,7 +40,6 @@ public:
 
 private:
     std::filesystem::path m_gamePath;
-    GromadaResourceReader m_reader;
     GromadaResourceNavigator m_navigator;
 
     std::vector<Vid> m_vids;

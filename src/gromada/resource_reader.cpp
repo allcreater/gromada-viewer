@@ -184,12 +184,12 @@ export {
 	class GromadaResourceNavigator {
 	public:
 		GromadaResourceNavigator() = default;
-		GromadaResourceNavigator(GromadaResourceReader& reader) {
-			reader.goStart();
+		GromadaResourceNavigator(GromadaResourceReader&& reader) : m_reader{std::move(reader)} {
+			m_reader.goStart();
 
-			m_sections.reserve(reader.getNumSections());
-			for (int i = 0; i < reader.getNumSections(); ++i) {
-				auto section = reader.nextSection();
+			m_sections.reserve(m_reader.getNumSections());
+			for (int i = 0; i < m_reader.getNumSections(); ++i) {
+				auto section = m_reader.nextSection();
 				if (!section)
 					break;
 
@@ -199,7 +199,20 @@ export {
 
 		[[nodiscard]] std::span<const Section> getSections() const noexcept { return m_sections; }
 
+	    std::size_t visitSectionsOfType (SectionType sectionType, std::invocable<const Section&, BinaryStreamReader> auto&& visitor) {
+		    std::size_t sectionCount = 0;
+	        std::ranges::for_each(
+                getSections() | std::views::filter([&](const Section& section) { return section.header().type == sectionType; }),
+                [&](const Section& section) {
+                    visitor(section, m_reader.beginRead(section));
+                    sectionCount++;
+                });
+
+		    return sectionCount;
+		};
+
 	private:
+	    GromadaResourceReader m_reader;
 		std::vector<Section> m_sections;
 	};
 

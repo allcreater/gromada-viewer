@@ -112,9 +112,9 @@ GameObject::Payload readObjectPayload(MapVersion mapVersion, std::uint8_t behavi
 	throw std::runtime_error("Unknown object class");
 }
 
-MapHeaderRawData loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-	auto readMapHeader = [&](BinaryStreamReader reader) {
-		MapHeaderRawData result;
+MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {
+    MapHeaderRawData result;
+	auto readMapHeader = [&](const Section& _, BinaryStreamReader reader) {
 		reader.read_to(result.width);
 		reader.read_to(result.height);
 		reader.read_to(result.observerX);
@@ -131,12 +131,14 @@ MapHeaderRawData loadMapInfo(GromadaResourceReader& reader, GromadaResourceNavig
 		return result;
 	};
 
-	auto it = std::ranges::find(resourceNavigator.getSections(), SectionType::MapInfo, [](const Section& section) { return section.header().type; });
-	if (it == resourceNavigator.getSections().end()) {
-		throw std::runtime_error("Invalid map: no header section");
-	}
+    const auto numSections = resourceNavigator.visitSectionsOfType(SectionType::MapInfo, readMapHeader);
+    if (numSections == 0) {
+        throw std::runtime_error("Invalid map: no header section");
+    } else if (numSections > 1) {
+        throw std::runtime_error("Invalid map: multiple header sections");
+    }
 
-	return readMapHeader(reader.beginRead(*it));
+	return result;
 }
 
 //TODO: use output iterator
@@ -188,42 +190,38 @@ void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<Gam
     }
 }
 
-std::vector<GameObject> loadDynamicObjects(
-	MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceReader& reader, GromadaResourceNavigator& resourceNavigator) {
-    auto visitSectionsOfType = [&](SectionType sectionType, std::invocable<BinaryStreamReader> auto&& visitor) {
-        std::ranges::for_each(
-            resourceNavigator.getSections() | std::views::filter([&](const Section& section) { return section.header().type == sectionType; }),
-            [&](const Section& section) { visitor(reader.beginRead(section)); });
-    };
+std::vector<GameObject> loadDynamicObjects(MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceNavigator& resourceNavigator) {
 
-    std::vector<GameObject> result;
-    visitSectionsOfType(SectionType::Objects, std::bind_front(readDynamicObjectsSection, std::ref(result), mapVersion, vids));
+	std::vector<GameObject> result;
+	resourceNavigator.visitSectionsOfType(
+		SectionType::Objects, [&](const Section& _, BinaryStreamReader reader) { readDynamicObjectsSection(result, mapVersion, vids, reader); });
 
-    std::vector<std::uint32_t> objectIds;
-    visitSectionsOfType(SectionType::ObjectsIds, std::bind_front(readObjectIdsSection, std::ref(objectIds)));
+	std::vector<std::uint32_t> objectIds;
+	resourceNavigator.visitSectionsOfType(
+		SectionType::ObjectsIds, [&](const Section& _, BinaryStreamReader reader) { readObjectIdsSection(objectIds, reader); });
 
-    if (result.size() != objectIds.size())
-        throw std::runtime_error("Map is probably corrupted: ids not matches to objects");
+	if (result.size() != objectIds.size())
+		throw std::runtime_error("Map is probably corrupted: ids not matches to objects");
 
-    // linking the objects with their respecive IDs
+	// linking the objects with their respecive IDs
 	for (std::size_t i = 0; i < result.size(); ++i) {
-	    result[i].id = objectIds[i];
+		result[i].id = objectIds[i];
 	}
 
-    visitSectionsOfType(SectionType::Command, std::bind_front(readCommandsSection, std::span{objectIds}, std::span{result}));
+	resourceNavigator.visitSectionsOfType(
+		SectionType::Command, [&](const Section& _, BinaryStreamReader reader) { readCommandsSection(objectIds, std::span{result}, reader); });
 
 	return result;
 }
 
 Map loadMap(std::span<const Vid> vids, const std::filesystem::path& path) {
-	GromadaResourceReader reader{path};
-	GromadaResourceNavigator resourceNavigator{reader};
+	GromadaResourceNavigator resourceNavigator{GromadaResourceReader{path}};
 
-	auto header = loadMapInfo(reader, resourceNavigator);
+	auto header = loadMapInfo(resourceNavigator);
 
 	return Map{
 		.header = header,
-		.objects = loadDynamicObjects(header.mapVersion, vids, reader, resourceNavigator),
+		.objects = loadDynamicObjects(header.mapVersion, vids, resourceNavigator),
 	};
 }
 
