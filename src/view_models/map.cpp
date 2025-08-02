@@ -205,7 +205,7 @@ export class MapViewModel {
                 m_world.remove_all<Selected>();
                 m_world.defer([&] {
                     m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
-                        if (entity.child_of<ActiveLevel>() && (std::to_underlying(entity.get<Vid>()->unitType) & m_selectionType) != 0) {
+                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const Vid>()->unitType) & m_selectionType) != 0) {
                             entity.add<Selected>();
                         }
                     });
