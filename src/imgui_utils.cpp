@@ -19,7 +19,7 @@ import std;
 namespace MyImUtils {
 
 export template<typename T, typename Fn = std::identity>
-bool ListBox(const char* label, int* current_item, std::span<T> items, Fn textToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
+bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn textToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
 {
     const auto items_count = items.size();
     //using namespace ImGui

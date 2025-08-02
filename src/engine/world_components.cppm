@@ -19,16 +19,9 @@ struct AnimationComponent {
     std::uint32_t current_frame = 0;
 };
 
-struct Local {};
-struct Global {};
-struct Transform {
-    int x = 0, y = 0, z = 0;
-    std::uint8_t direction = 0;
-};
-
-class World {
+class WorldModule {
 public:
-	World(flecs::world& world) {
+	WorldModule(flecs::world& world) {
 		world.component<GameObject>();
 		world.component<Vid>(); // TODO: are we need a copy?
 		world.component<MapHeaderRawData>();

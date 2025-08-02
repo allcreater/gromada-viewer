@@ -94,6 +94,11 @@ Controls:
 			ImGui::EndMenu();
 		}
 
+		if (ImGui::BeginMenu("Map")) {
+		    m_mapViewModel.onMenu();
+		    ImGui::EndMenu();
+		}
+
 		if (openPopup != nullptr) {
 			ImGui::OpenPopup(openPopup);
 		}

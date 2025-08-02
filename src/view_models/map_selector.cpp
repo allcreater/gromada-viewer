@@ -25,7 +25,7 @@ public:
 
 	    const auto activeLevel = m_model.component<ActiveLevel>();
 
-		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span{m_maps}, std::move(pathToCStr))) {
+		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span<const MapEntry>{m_maps}, std::move(pathToCStr))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
 			if (auto* currentPath = activeLevel.get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
 				m_model.loadMap(selectedMap.path);

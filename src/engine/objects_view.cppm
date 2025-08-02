@@ -24,13 +24,20 @@ BoundingBox getCenteredBB(glm::ivec2 pos, glm::ivec2 size) {
 
 export {
 
+struct Local {};
+struct World {};
+struct Transform {
+    int x = 0, y = 0, z = 0;
+    std::uint8_t direction = 0;
+};
+
 struct VisualBoundsFn {
-	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
+	BoundingBox operator()(const Vid& vid, const Transform& obj) const {
 		return getCenteredBB({obj.x, obj.y}, {vid.graphics().width, vid.graphics().height});
 	}
 };
 struct PhysicalBoundsFn {
-	BoundingBox operator()(const Vid& vid, const GameObject& obj) const {
+	BoundingBox operator()(const Vid& vid, const Transform& obj) const {
 		return getCenteredBB({obj.x, obj.y}, {vid.sizeX, vid.sizeY});
 	}
 };
@@ -42,7 +49,7 @@ public:
 	constexpr static inline VisualBounds visualBounds{};
 	constexpr static inline PhysicalBounds physicalBounds{};
 
-	ObjectsView(flecs::world& world) { m_query = world.query_builder<const Vid, const GameObject>().cached().build(); }
+	ObjectsView(flecs::world& world) { m_query = world.query_builder<const Vid, const Transform>().term_at(1).second<World>().cached().build(); }
 
     inline void queryObjectsInRegion([[maybe_unused]] VisualBounds, BoundingBox region, const auto& callback) const {
 	    queryObjectsInRegionImpl(VisualBoundsFn{}, region, callback);
@@ -53,7 +60,7 @@ public:
 	 }
 private:
     void queryObjectsInRegionImpl(auto&& boundsFn, BoundingBox region, const auto& callback) const {
-        m_query.each([region, boundsFn, &callback](flecs::entity entity, const Vid& vid, const GameObject& obj) {
+        m_query.each([region, boundsFn, &callback](flecs::entity entity, const Vid& vid, const Transform& obj) {
             if (boundsFn(vid, obj).isIntersects(region)) {
                 std::invoke(callback,entity/*, vid, obj*/);
             }
@@ -62,7 +69,7 @@ private:
     }
 
 private:
-	flecs::query<const Vid, const GameObject> m_query;
+	flecs::query<const Vid, const Transform> m_query;
 };
 
 }

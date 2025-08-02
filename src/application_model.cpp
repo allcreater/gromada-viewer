@@ -68,7 +68,7 @@ public:
 private:
 	flecs::world create_world(GameResources&& resources) {
 		flecs::world world{};
-        world.import<World>();
+        world.import<WorldModule>();
         world.import<EditorComponents>();
 
         world.emplace<GameResources>(std::move(resources));

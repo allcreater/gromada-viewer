@@ -58,7 +58,10 @@ export class MapViewModel {
                 viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
             });
 
-        m_selectionQuery = world.query_builder<const GameObject, const Vid>().with<Selected>().cached().build();
+        m_selectionQuery = world.query_builder<const GameObject, const Transform, const Vid>()
+            .with<Selected>()
+            .term_at(1).second<World>()
+            .cached().build();
 
         // world.system<Framebuffer>()
         //     .kind(0)//(flecs::OnStore)
@@ -93,6 +96,22 @@ export class MapViewModel {
         }
     }
 
+    void onMenu() {
+        if (ImGui::BeginMenu("Selection")) {
+			constexpr static std::array<UnitType, 7> flags = {
+				UnitType::Terrain, UnitType::Object, UnitType::Monster, UnitType::Avia, UnitType::Cannon, UnitType::Sprite, UnitType::Item};
+			for (UnitType unitType : flags) {
+				const auto flag = std::to_underlying(unitType);
+				bool isSelected = (m_selectionType & flag) != 0;
+				if (ImGui::MenuItem(to_string(unitType).data(), nullptr, isSelected)) {
+					m_selectionType ^= flag;
+				}
+			}
+
+            ImGui::EndMenu();
+        }
+    }
+
     void updateUI() {
         auto levelInfo = m_world.component<ActiveLevel>().get<MapHeaderRawData>();
         auto viewport = m_world.get_mut<Viewport>();
@@ -119,15 +138,19 @@ export class MapViewModel {
 
         updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
         if (!ImGui::IsDragDropActive() ) {
-            updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+            if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+                updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+            } else {
+                moveSelectedObjects(*viewport);
+            }
         }
 
     }
 
     void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
-        m_selectionQuery.each([&](const GameObject& obj, const Vid& vid) {
+        m_selectionQuery.each([&](const GameObject& obj, const Transform& transform, const Vid& vid) {
             const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
-            const glm::ivec2 pos {obj.x, obj.y};
+            const glm::ivec2 pos {transform.x, transform.y};
 
             const auto color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
@@ -180,8 +203,8 @@ export class MapViewModel {
                 m_selectionFrame->max = mouseWorldPos;
                 m_world.remove_all<Selected>();
                 m_world.defer([&] {
-                    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [](flecs::entity entity) {
-                        if (entity.child_of<ActiveLevel>()) {
+                    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
+                        if (entity.child_of<ActiveLevel>() && (std::to_underlying(entity.get<Vid>()->unitType) & m_selectionType) != 0) {
                             entity.add<Selected>();
                         }
                     });
@@ -193,9 +216,22 @@ export class MapViewModel {
         }
     }
 
+    void moveSelectedObjects(const Viewport& viewport) {
+        const auto delta_ws = viewport.screenToWorldMat * glm::vec3{from_imvec(ImGui::GetMouseDragDelta(0)), 0.0f};
+        m_selectionQuery.each([delta_ws](flecs::entity id, const GameObject& obj, const Transform& _, const Vid& vid) {
+            auto transform_ls = id.get_mut<Transform, Local>();
+            assert(transform_ls);
+
+            transform_ls->x += static_cast<int>(delta_ws.x);
+            transform_ls->y += static_cast<int>(delta_ws.y);
+        });
+        ImGui::ResetMouseDragDelta();
+    }
+
     flecs::world& m_world;
-    flecs::query<const GameObject, const Vid> m_selectionQuery;
+    flecs::query<const GameObject, const Transform, const Vid> m_selectionQuery;
     std::optional<SelectionRect> m_selectionFrame;
+    std::underlying_type_t<UnitType> m_selectionType = 0b01111110; // Default selection type
 };
 
 constexpr static ImU32 objectSelectionColor(UnitType unitType) {

@@ -31,6 +31,21 @@ export enum class UnitType : std::uint8_t {
 	Item = 0x40,
 };
 
+export constexpr std::string_view to_string(UnitType unitType) {
+    using enum UnitType;
+    switch (unitType) {
+    case Terrain: return "Terrain";
+    case Object: return "Object";
+    case Monster: return "Monster";
+    case Avia: return "Avia";
+    case Cannon: return "Cannon";
+    case Sprite: return "Sprite";
+    case Item: return "Item";
+    default:
+        return "Unknown";
+    }
+}
+
 
 export struct ColorRgb8 {
 	std::uint8_t r;
