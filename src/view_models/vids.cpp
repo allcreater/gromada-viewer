@@ -100,9 +100,10 @@ public:
 																			  // treenodes/tabs while dragging
 					// src_flags |= ImGuiDragDropFlags_SourceNoPreviewTooltip; // Hide the tooltip
 					if (ImGui::BeginDragDropSource(src_flags)) {
+					    assert(nvid < std::numeric_limits<std::uint16_t>::max());
 						static std::uint8_t s_CurrentDirection = 0;
 						MyImUtils::SetDragDropPayload(ObjectToPlaceMessage{
-							.nvid = nvid,
+							.nvid = static_cast<std::uint16_t>(nvid),
 							.direction = s_CurrentDirection,
 						});
 

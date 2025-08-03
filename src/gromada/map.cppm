@@ -13,11 +13,11 @@ export struct ObjectCommand {
 };
 
 export struct GameObject {
-    unsigned int nvid;
-    int x;
-    int y;
-    int z;
-    int direction;
+    std::uint16_t nvid;
+    std::int16_t x;
+    std::int16_t y;
+    std::int16_t z;
+    std::int16_t direction;
 
     struct BasePayload {
         std::uint8_t hp;
@@ -53,10 +53,18 @@ export struct MapHeaderRawData {
     MapVersion mapVersion;
 };
 
+export struct Army {
+    using Squad = std::vector<std::uint32_t>;
+    std::uint32_t a, b, c;
+    std::uint32_t flagman_id;
+    std::vector<Squad> squads;
+};
+
 export struct Map
 {
     MapHeaderRawData header;
     std::vector<GameObject> objects;
+    std::array<Army, 2> armies;
 };
 
 export Map loadMap(std::span<const Vid> vids, const std::filesystem::path& path);
@@ -132,11 +140,8 @@ MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {
 	};
 
     const auto numSections = resourceNavigator.visitSectionsOfType(SectionType::MapInfo, readMapHeader);
-    if (numSections == 0) {
-        throw std::runtime_error("Invalid map: no header section");
-    } else if (numSections > 1) {
-        throw std::runtime_error("Invalid map: multiple header sections");
-    }
+    if (numSections != 1)
+        throw std::runtime_error("Invalid map: should be exactly one map info section");
 
 	return result;
 }
@@ -144,11 +149,11 @@ MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {
 //TODO: use output iterator
 void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVersion, std::span<const Vid> vids, BinaryStreamReader reader) {
 	for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0;) {
-		std::array<std::uint16_t, 4> rawData;
+		std::array<std::int16_t, 4> rawData;
 		reader.read_to(rawData);
 
 		result.push_back({
-			.nvid = static_cast<unsigned int>(nvid),
+			.nvid = static_cast<std::uint16_t>(nvid),
 			.x = rawData[0],
 			.y = rawData[1],
 			.z = rawData[2],
@@ -190,8 +195,37 @@ void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<Gam
     }
 }
 
-std::vector<GameObject> loadDynamicObjects(MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceNavigator& resourceNavigator) {
+std::array<Army, 2> loadArmies(GromadaResourceNavigator& resourceNavigator) {
+    std::array<Army, 2> armies;
+    size_t numOfSections = resourceNavigator.visitSectionsOfType(
+        SectionType::Army , [&](const Section& _, BinaryStreamReader reader) {
+            if(reader.read<std::uint8_t>() != 2)
+                throw std::runtime_error("Invalid map: should be exactly 2 armies");
 
+            for (auto& army : armies) {
+                reader.read_to(army.a);
+                reader.read_to(army.b);
+                reader.read_to(army.c);
+                reader.read_to(army.flagman_id);
+
+                for (std::uint32_t id = 0; id = reader.read<std::uint32_t>(), id != 0;) {
+                    auto& squad = army.squads.emplace_back();
+                    squad.push_back(id);
+                    for (std::uint32_t memberId = 0; memberId = reader.read<std::uint32_t>(), memberId != 0;) {
+                        squad.push_back(memberId);
+                    }
+                }
+            }
+        });
+
+    if (numOfSections != 1) {
+        throw std::runtime_error("Invalid map: should be exactly one army section");
+    }
+
+    return armies;
+}
+
+std::vector<GameObject> loadDynamicObjects(MapVersion mapVersion, std::span<const Vid> vids, GromadaResourceNavigator& resourceNavigator) {
 	std::vector<GameObject> result;
 	resourceNavigator.visitSectionsOfType(
 		SectionType::Objects, [&](const Section& _, BinaryStreamReader reader) { readDynamicObjectsSection(result, mapVersion, vids, reader); });
@@ -222,6 +256,7 @@ Map loadMap(std::span<const Vid> vids, const std::filesystem::path& path) {
 	return Map{
 		.header = header,
 		.objects = loadDynamicObjects(header.mapVersion, vids, resourceNavigator),
+	    .armies = loadArmies(resourceNavigator),
 	};
 }
 

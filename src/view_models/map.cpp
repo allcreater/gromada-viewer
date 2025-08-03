@@ -84,8 +84,8 @@ export class MapViewModel {
                 auto _ = m_world.entity()
                 .set<GameObject>({
                     .nvid = payload->first.nvid,
-                    .x = mouseWorldPos.x,
-                    .y = mouseWorldPos.y,
+                    .x = static_cast<std::int16_t>(mouseWorldPos.x),
+                    .y = static_cast<std::int16_t>(mouseWorldPos.y),
                     .z = 0,
                     .direction = payload->first.direction,
                 })

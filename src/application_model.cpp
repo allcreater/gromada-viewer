@@ -14,7 +14,7 @@ export import engine.world_components;
 
 //TODO: move
 export struct ObjectToPlaceMessage {
-	unsigned int nvid;
+	std::uint16_t nvid;
 	std::uint8_t direction;
 };
 
