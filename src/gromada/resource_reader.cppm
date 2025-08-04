@@ -30,11 +30,13 @@ export {
 		}
 
 		template <typename T>
+	    requires std::is_trivially_copyable_v<T>
 		void read_to(T& out) {
 			read_to(std::span{ reinterpret_cast<std::byte*>(&out), sizeof (T) });
 		}
 
 		template <typename T>
+	    requires std::is_trivially_copyable_v<T>
 		T read() {
 			T result;
 			read_to(result);
@@ -80,7 +82,8 @@ export {
 		TilesTable = '%',
 	};
 
-	struct SectionHeader {
+
+	struct SectionHeader  {
 		SectionType type = SectionType::None;
 		std::uint32_t nextSectionOffset;
 		std::uint32_t elementCount;
@@ -134,6 +137,9 @@ export {
 
 			m_stream.read(reinterpret_cast<char*>(&m_sectionsCount), sizeof(std::uint32_t));
 			m_currentSectionBegin = m_stream.tellg();
+
+		    if (m_sectionsCount > 10000)
+		        throw std::runtime_error("GromadaResourceReader: too many sections in resource file");
 		}
 
 		void goStart() {

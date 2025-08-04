@@ -1,7 +1,9 @@
 cmake_minimum_required (VERSION 3.30)
 
 add_executable (GromadaEditor
-	"main.cpp"
+		"gromada/map_loader.cpp"
+		"gromada/map_saver.cpp"
+		"main.cpp"
 )
 
 
@@ -18,10 +20,10 @@ add_executable (GromadaEditor
 		"gromada/game_resources.cppm"
 		"gromada/graphics_decoder.cppm"
 		"gromada/map.cppm"
-		"gromada/resource_reader.cpp"
+		"gromada/resource_reader.cppm"
 		"gromada/resources.cpp"
 		"gromada/software_renderer.cppm"
-		"gromada/visual_logic.cpp"
+		"gromada/visual_logic.cppm"
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"

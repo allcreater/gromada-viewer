@@ -79,6 +79,11 @@ Controls:
 			    }
 			}
 
+		    if (ImGui::MenuItem("Save map")) {
+		        std::ofstream file {"maps/EXPERIMENTAL_SAVE.map", std::ios_base::out | std::ios_base::binary};
+		        saveMap(m_model.saveMap(), file);
+		    }
+
 			// TODO: reuse popup from previous item
 			if (ImGui::MenuItem("Export vids to CSV")) {
 				std::ofstream stream{"vids.csv", std::ios_base::out};
