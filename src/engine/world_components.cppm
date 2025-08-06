@@ -54,7 +54,7 @@ public:
                         .x = vid.linkX,
                         .y = vid.linkY,
                         .z = vid.linkZ,
-                        .direction = object.direction,
+                        .direction = 0,
                     }).child_of(entity);
                 }
 
@@ -70,9 +70,10 @@ public:
 	        entity.destruct();
 	    });
 
-	    world.system<AnimationComponent, const Vid, const GameObject>()
+	    world.system<AnimationComponent, const Vid, const Transform>()
 	        .kind(flecs::OnUpdate)
-	        .each([](flecs::iter& it, size_t, AnimationComponent& animation, const Vid& vid, const GameObject& object) {
+	        .term_at(2).second<World>()
+	        .each([](flecs::iter& it, size_t, AnimationComponent& animation, const Vid& vid, const Transform& wt) {
 	            animation.next_frame_delay -=  it.delta_time() * 1000.0f; //ms
 	            if (animation.next_frame_delay < 0.0f) {
 	                int increment = std::ceil(-animation.next_frame_delay / vid.graphics().frameDuration);
@@ -81,7 +82,7 @@ public:
 	                animation.frame_phase += increment;
 	            }
 
-	            auto [minIndex, maxIndex] = getAnimationFrameRange(vid, animation.action, object.direction);
+	            auto [minIndex, maxIndex] = getAnimationFrameRange(vid, animation.action, wt.direction);
 	            animation.current_frame = animation.frame_phase % (maxIndex - minIndex + 1) + minIndex;
 	            assert(animation.current_frame <= vid.graphics().numOfFrames);
 	    });
@@ -91,13 +92,13 @@ public:
 	        .term_at(1).second<World>()//.parent().cascade()
 	        .term_at(2).second<World>()
 	        .term_at(1).parent().cascade()
-	        .each([](const Transform& local, const Transform* parent, Transform& out) {
-                out = local;
-	            if (parent) {
-	                out.x += parent->x;
-	                out.y += parent->y;
-                    out.z += parent->z;
-	                out.direction += parent->direction;
+	        .each([](const Transform& local, const Transform* parent_world, Transform& out_world) {
+                out_world = local;
+	            if (parent_world) {
+                    out_world.x += parent_world->x;
+                    out_world.y += parent_world->y;
+                    out_world.z += parent_world->z;
+                    out_world.direction += parent_world->direction;
 	            }
 	    });
 

@@ -30,7 +30,7 @@ public:
 		
 		m_mapViewModel.updateUI();
 
-		ImGui::SetNextWindowPos({10, 50}, ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos({10, 20}, ImGuiCond_Appearing);
 		ImGui::SetNextWindowSize(ImVec2{300, 500}, ImGuiCond_Appearing);
 		ImGui::Begin("Panel");
 		if (ImGui::BeginTabBar("Tabs")) {

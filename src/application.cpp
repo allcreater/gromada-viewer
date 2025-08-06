@@ -76,6 +76,7 @@ public:
             return;
 
 		ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 		ImFontConfig cfg;
 		cfg.SizePixels = 17.0f * io.DisplayFramebufferScale.x;
