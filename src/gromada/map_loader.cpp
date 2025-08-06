@@ -10,50 +10,37 @@ import Gromada.ResourceReader;
 
 // Implementation
 GameObject::Payload readObjectPayload(MapVersion mapVersion, std::uint8_t behavior, BinaryStreamReader& reader) {
-	const auto readStaticObj = [&](GameObject::BasePayload& result) { result.hp = reader.read<std::uint8_t>(); };
+    GameObject::Payload result;
+    switch(getObjectSerializationClass(behavior)) {
+	case ObjectSerializationClass::Static: {
+	    result.hp = reader.read<std::uint8_t>();
+	} break;
+	case ObjectSerializationClass::Dynamic: {
+	    result.hp = reader.read<std::uint8_t>();
+	    if (std::to_underlying(mapVersion) > 2) {
+	        result.buildTime = reader.read<std::uint8_t>();
+	    }
 
-	const auto readObject2 = [&](GameObject::AdvancedPayload& result) {
-		readStaticObj(result);
+	    if (std::to_underlying(mapVersion) > 1) {
+	        result.army = reader.read<std::uint8_t>();
+	    }
 
-		if (std::to_underlying(mapVersion) > 2) {
-			result.buildTime = reader.read<std::uint8_t>();
-		}
+	    result.behave = reader.read<std::uint8_t>();
 
-		if (std::to_underlying(mapVersion) > 1) {
-			result.army = reader.read<std::uint8_t>();
-		}
+	    if (std::to_underlying(mapVersion) == 0)
+	        break;
 
-		result.behave = reader.read<std::uint8_t>();
+	    for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0;) {
+	        result.items.push_back(itemId);
+	    }
+	} break;
+	case ObjectSerializationClass::NoPayload:
+        break;
+    default:
+        throw std::runtime_error("Unknown object class");
+    }
 
-		if (std::to_underlying(mapVersion) == 0)
-			return;
-
-		for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0;) {
-			result.items.push_back(itemId);
-		}
-	};
-
-	static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
-	static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
-	static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
-
-
-	const auto containsClassPredicate = [behavior](std::uint8_t x) { return x == behavior; };
-	if (std::ranges::any_of(staticClasses, containsClassPredicate)) {
-		GameObject::BasePayload result;
-		readStaticObj(result);
-		return result;
-	}
-	else if (std::ranges::any_of(dynamicClasses, containsClassPredicate)) {
-		GameObject::AdvancedPayload result;
-		readObject2(result);
-		return result;
-	}
-	else if (std::ranges::any_of(otherClasses, containsClassPredicate)) {
-		return std::monostate{};
-	}
-
-	throw std::runtime_error("Unknown object class");
+    return result;
 }
 
 MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {

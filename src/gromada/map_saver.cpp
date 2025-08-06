@@ -39,7 +39,7 @@ public:
 
 };
 
-void saveMap(const Map& map, std::ostream& stream) {
+void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
     const std::uint32_t sectionCount = 5; // MapInfo, Objects, ObjectsIds, Command, Army
     stream.write(reinterpret_cast<const char*>(&sectionCount), sizeof(sectionCount));
 
@@ -59,25 +59,21 @@ void saveMap(const Map& map, std::ostream& stream) {
             writer.write(obj.z);
             writer.write(obj.direction);
 
-			std::visit(overloaded{
-						   [&](const GameObject::BasePayload& payload) {
-						       writer.write(payload.hp);
-						   },
-						   [&](const GameObject::AdvancedPayload& payload) {
-							   writer.write(payload.hp);
-							   writer.write(payload.buildTime.value_or<std::uint8_t>(0));
-							   writer.write(payload.army.value_or<std::uint8_t>(0));
-							   writer.write(payload.behave);
-							   for (const auto itemId : payload.items) {
-								   writer.write(itemId);
-							   }
-							   writer.write(static_cast<std::int16_t>(-1)); // Items terminator
-						   },
-						   [&](const std::monostate&) {
-							   // No payload
-						   },
-					   },
-				obj.payload);
+            switch(getObjectSerializationClass(vids[obj.nvid].behave)) {
+            case ObjectSerializationClass::Static: {
+                    writer.write(obj.payload.hp);
+                } break;
+            case ObjectSerializationClass::Dynamic: {
+                    writer.write(obj.payload.hp);
+                    writer.write(obj.payload.buildTime);
+                    writer.write(obj.payload.army);
+                    writer.write(obj.payload.behave);
+                    for (const auto itemId : obj.payload.items) {
+                        writer.write(itemId);
+                    }
+                    writer.write(static_cast<std::int16_t>(-1)); // Items terminator
+                } break;
+            }
         }
         writer.write<std::uint16_t>(-1); // Objects terminator
     }

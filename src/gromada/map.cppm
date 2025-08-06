@@ -8,66 +8,93 @@ import utils;
 import Gromada.ResourceReader;
 import Gromada.Resources;
 
-export struct ObjectCommand {
-    Action command;
-    std::uint32_t p1, p2;
-};
-
-export struct GameObject {
-    std::uint16_t nvid;
-    std::int16_t x;
-    std::int16_t y;
-    std::int16_t z;
-    std::int16_t direction;
-
-    struct BasePayload {
-        std::uint8_t hp;
+export {
+    struct ObjectCommand {
+        Action command;
+        std::uint32_t p1, p2;
     };
-    struct AdvancedPayload : BasePayload {
-        std::optional<std::uint8_t> buildTime;
-        std::optional<std::uint8_t> army;
-        std::uint8_t behave;
-        std::vector<std::int16_t> items;
+
+    struct GameObject {
+        std::uint16_t nvid;
+        std::int16_t x;
+        std::int16_t y;
+        std::int16_t z;
+        std::int16_t direction;
+
+        // NOTE: this is all fields that are loaded in the original game
+        // Not all of them may be saved/loaded at same time: it depends on the object type (specifically, vid[nvid].behave)
+        struct Payload {
+            // for most static objects
+            std::uint8_t hp = 0;
+            // For units
+            std::uint8_t buildTime = 20;
+            std::uint8_t army = 0; // Real default is vid[nvid].army
+            std::uint8_t behave = 1;
+            std::vector<std::int16_t> items;
+        } payload;
+
+        std::uint32_t id; // Unique ID for the object, used for commands
+        std::vector<ObjectCommand> commands;
     };
-    using Payload = std::variant<std::monostate, BasePayload, AdvancedPayload>;
-    Payload payload;
 
-    std::uint32_t id; // Unique ID for the object, used for commands
-    std::vector<ObjectCommand> commands;
-};
+    enum /*class*/ MapVersion : std::uint32_t {
+        V0 = 0,
+        V1 = 1,
+        V2 = 2,
+        V3 = 3,
+    };
 
-export enum /*class*/ MapVersion : std::uint32_t {
-    V0 = 0,
-    V1 = 1,
-    V2 = 2,
-    V3 = 3,
-};
+    struct MapHeaderRawData {
+        std::uint32_t width;
+        std::uint32_t height;
+        std::int16_t observerX;
+        std::int16_t observerY;
+        std::uint32_t e;
+        std::uint32_t f;
+        std::uint32_t startTimer;
+        MapVersion mapVersion;
+    };
 
-export struct MapHeaderRawData {
-    std::uint32_t width;
-    std::uint32_t height;
-    std::int16_t observerX;
-    std::int16_t observerY;
-    std::uint32_t e;
-    std::uint32_t f;
-    std::uint32_t startTimer;
-    MapVersion mapVersion;
-};
+    struct Army {
+        using Squad = std::vector<std::uint32_t>;
+        std::uint32_t a, b, c;
+        std::uint32_t flagman_id;
+        std::vector<Squad> squads;
+    };
 
-export struct Army {
-    using Squad = std::vector<std::uint32_t>;
-    std::uint32_t a, b, c;
-    std::uint32_t flagman_id;
-    std::vector<Squad> squads;
-};
+    struct Map
+    {
+        MapHeaderRawData header;
+        std::vector<GameObject> objects;
+        std::array<Army, 2> armies;
+    };
 
-export struct Map
-{
-    MapHeaderRawData header;
-    std::vector<GameObject> objects;
-    std::array<Army, 2> armies;
-};
+    Map loadMap(std::span<const Vid> vids, const std::filesystem::path& path);
+    std::vector<GameObject> loadMenu(std::span<const Vid> vids, std::istream&& stream);
+    void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream);
 
-export Map loadMap(std::span<const Vid> vids, const std::filesystem::path& path);
-export std::vector<GameObject> loadMenu(std::span<const Vid> vids, std::istream&& stream);
-export void saveMap(const Map& map, std::ostream& stream);
+    enum class ObjectSerializationClass : std::uint8_t {
+        Unknown,
+        NoPayload,
+        Static,
+        Dynamic,
+    };
+    ObjectSerializationClass getObjectSerializationClass(std::uint8_t behavior) noexcept;
+}
+
+// Implementation
+ObjectSerializationClass getObjectSerializationClass(std::uint8_t behavior) noexcept {
+    static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
+    static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
+    static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
+
+    const auto containsClassPredicate = [behavior](std::uint8_t x) { return x == behavior; };
+    if (std::ranges::any_of(staticClasses, containsClassPredicate))
+        return ObjectSerializationClass::Static;
+    if (std::ranges::any_of(dynamicClasses, containsClassPredicate))
+        return ObjectSerializationClass::Dynamic;
+    if (std::ranges::any_of(otherClasses, containsClassPredicate))
+        return ObjectSerializationClass::NoPayload;
+
+    return ObjectSerializationClass::Unknown;
+}

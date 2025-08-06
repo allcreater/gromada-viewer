@@ -9,29 +9,31 @@ import Gromada.Resources;
 import Gromada.Map;
 
 export { 
-	void ExportMapToJson(const Map& map, std::ostream& stream);
+	void ExportMapToJson(std::span<const Vid> vids, const Map& map, std::ostream& stream);
 	void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream);
 }
 
 
-void ExportMapToJson(const Map& map, std::ostream& stream) {
-	auto objectToJson = [](const GameObject& obj) {
-		overloaded payloadVisitor{
-			[](const GameObject::BasePayload& payload) { return nlohmann::json{{"hp", payload.hp}}; },
-			[](const GameObject::AdvancedPayload& payload) {
-				return nlohmann::json{
-					{"hp", payload.hp},
-					//{"buildTime", payload.buildTime},
-					//{"army", payload.army},
-					payload.buildTime.transform([](std::uint8_t x) { return nlohmann::json{"buildTime", x}; }).value_or(nlohmann::json{}),
-					payload.army.transform([](std::uint8_t x) { return nlohmann::json{"army", x}; }).value_or(nlohmann::json{}),
-					{"buildTime", payload.buildTime.value_or(0)},
-					{"behave", payload.behave},
-					{"items", payload.items},
-				};
-			},
-			[](const std::monostate&) { return nlohmann::json{}; },
-		};
+void ExportMapToJson(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
+	auto objectToJson = [vids](const GameObject& obj) {
+	    auto payloadToJson = [objectSerializationClass = getObjectSerializationClass(vids[obj.nvid].behave)](const GameObject::Payload& payload) {
+	        switch (objectSerializationClass) {
+	            case ObjectSerializationClass::Static:
+                    return nlohmann::json{{"hp", payload.hp}};
+
+	            case ObjectSerializationClass::Dynamic:
+	                return nlohmann::json{
+					        {"hp", payload.hp},
+                            {"buildTime", payload.buildTime},
+                            {"army", payload.army},
+                            {"behave", payload.behave},
+                            {"items", payload.items},
+                        };
+
+	            default:
+	                return nlohmann::json{}; // No payload or unknown class
+	        }
+	    };
 
 	    auto commandToJson = [](const ObjectCommand& command) {
 	        return nlohmann::json{
@@ -47,7 +49,7 @@ void ExportMapToJson(const Map& map, std::ostream& stream) {
 			{"y", obj.y},
 			{"z", obj.z},
 			{"direction", obj.direction},
-			{"payload", std::visit(payloadVisitor, obj.payload)},
+			{"payload", payloadToJson(obj.payload)},
 		    {"id", obj.id},
 		    !obj.commands.empty() ? nlohmann::json{"commands", obj.commands | std::views::transform(commandToJson) | std::ranges::to<std::vector>()} : nlohmann::json{},
 		};

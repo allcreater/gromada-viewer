@@ -69,6 +69,8 @@ Controls:
 		constexpr const char* ExportPopup = "Export map JSON";
 		const char* openPopup = nullptr;
 
+	    const auto vids = m_model.get<const GameResources>()->vids();
+
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Export map JSON")) {
@@ -81,7 +83,7 @@ Controls:
 
 		    if (ImGui::MenuItem("Save map")) {
 		        std::ofstream file {"maps/EXPERIMENTAL_SAVE.map", std::ios_base::out | std::ios_base::binary};
-		        saveMap(m_model.saveMap(), file);
+		        saveMap(vids, m_model.saveMap(), file);
 		    }
 
 			// TODO: reuse popup from previous item
@@ -89,7 +91,6 @@ Controls:
 				std::ofstream stream{"vids.csv", std::ios_base::out};
 				stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-				const auto vids = m_model.get<const GameResources>()->vids();
 				ExportVidsToCsv(vids, stream);
 			}
 
@@ -115,7 +116,7 @@ Controls:
 				ImGui::CloseCurrentPopup();
 
 				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
-				ExportMapToJson(m_model.saveMap(), stream);
+				ExportMapToJson(vids, m_model.saveMap(), stream);
 			}
 			ImGui::EndPopup();
 		}

@@ -62,22 +62,31 @@ public:
 	    activeLevel.set<Armies>(std::move(map.armies));
 	}
 
-	Map saveMap() const {
+	Map saveMap() {
 		const auto activeLevel = this->component<ActiveLevel>();
 	    auto query = this->query_builder<const GameObject>().with(flecs::ChildOf).second<ActiveLevel>().build();
 
-	    // NOTE: this complex algorithm need just to minimize binary differences between original map and saved map
+	    // NOTE: this pretty complex algorithm need just to minimize binary differences between original map and saved map
 	    std::vector<GameObject> objects;
 		std::vector<std::pair<const GameObject*, const StaticLoaderSpecificAttributes*>> delayedObjects;
+	    std::set<std::uint32_t> knownIds;
 		objects.reserve(query.count());
 
 		query.each([&](flecs::entity entity, const GameObject& obj) {
 	        if (const auto* existing_object_attribs = entity.get<StaticLoaderSpecificAttributes>()) {
 	            delayedObjects.push_back({&obj, existing_object_attribs});
+	            knownIds.insert(obj.id);
 	        } else {
 	            objects.push_back(obj);
 	        }
 		});
+
+	    // generate IDs for objects that were
+	    std::size_t numOfTries = 0;
+	    std::ranges::for_each(objects, [&knownIds, rng = std::mt19937{std::random_device{}()}, &numOfTries](std::uint32_t& id) mutable {
+            std::uniform_int_distribution<std::uint32_t> dist{1, std::numeric_limits<std::uint32_t>::max()};
+	        while (!knownIds.insert(id = dist(rng)).second) { numOfTries++;}
+	    }, &GameObject::id);
 
 	    // NOTE: now it's time to restore original object positions and IDs
 	    constexpr auto index_projection = [](const auto& pair) { return pair.second->original_index; };
