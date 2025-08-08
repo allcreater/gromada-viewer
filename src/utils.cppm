@@ -13,12 +13,20 @@ export {
 		SpanStreamReader(std::span<const std::byte> data)
 			: data{data} {}
 		template <typename T> T read() {
+            if (data.size_bytes() < sizeof(T)) [[unlikely]] {
+                throw std::out_of_range("Not enough data to read");
+            }
+
 			T result;
 			std::memcpy(&result, data.data(), sizeof result);
 			data = data.subspan(sizeof result);
 			return result;
 		}
 	    std::span<const std::byte> read_bytes(std::size_t size) {
+		    if (data.size_bytes() < size) [[unlikely]] {
+		        throw std::out_of_range("Not enough data to read");
+		    }
+
 		    return std::exchange(data, data.subspan(size)).subspan(0, size);
 		}
 

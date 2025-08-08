@@ -11,7 +11,7 @@ public:
         : m_gamePath(path.parent_path()), m_navigator{GromadaResourceReader{std::move(path)}} {
 
         m_navigator.visitSectionsOfType(SectionType::Vid, [this](const Section& _, BinaryStreamReader reader) {
-            m_vids.emplace_back().read(reader);
+            m_vids.emplace_back(reader);
         });
         std::ranges::for_each(m_vids, [this](Vid& vid) {
             if (const auto referenceNvid = std::get_if<std::int32_t>(&vid.graphicsData)) {

@@ -58,6 +58,9 @@ export struct ColorRgb8 {
 //};
 
 export struct VidGraphics {
+    VidGraphics() = default;
+    explicit VidGraphics(BinaryStreamReader& reader);
+
 	std::uint8_t dataFormat;
 	std::uint16_t frameDuration;
 	std::uint16_t numOfFrames;
@@ -77,12 +80,12 @@ export struct VidGraphics {
 	    [[nodiscard]] int height() const noexcept { return parent->height; }
 	};
 	std::vector<Frame> frames;
-
-	// TODO: add validation of the input data because it may cause out of range access 
-	void read(BinaryStreamReader& reader);
 };
 
 export struct Vid {
+    Vid() = default;
+    explicit Vid (BinaryStreamReader reader);
+
 	std::array<char, 34> name; // In CP-866
 	UnitType unitType;
 	std::uint8_t behave;
@@ -136,10 +139,9 @@ export struct Vid {
 
         return **graphics;
     }
-	void read(BinaryStreamReader reader);
 };
 
-void Vid::read(BinaryStreamReader reader)
+Vid::Vid(BinaryStreamReader reader)
 {
 	reader.read_to(name);
 	reader.read_to(unitType);
@@ -184,15 +186,12 @@ void Vid::read(BinaryStreamReader reader)
 
 	if (dataSizeOrNvid < 0) {
 		graphicsData = std::int32_t{-dataSizeOrNvid};
-	}
-	else {
-		graphicsData = std::make_shared<VidGraphics>();
-		std::get<Graphics>(graphicsData)->read(reader);
+	} else {
+		graphicsData = std::make_shared<VidGraphics>(reader);
 	}
 }
 
-
-void VidGraphics::read(BinaryStreamReader& reader) {
+VidGraphics::VidGraphics(BinaryStreamReader& reader) {
 	reader.read_to(dataFormat);
 	reader.read_to(frameDuration);
 	reader.read_to(numOfFrames);
