@@ -206,29 +206,19 @@ void VidGraphics::read(BinaryStreamReader& reader) {
 	frames.resize(numOfFrames);
 	reader.read_to(std::span{ data });
 
-	std::byte* frameBegin = data.data();
+	SpanStreamReader frameDataReader{data};
 	for (std::size_t i = 0; i < frames.size(); ++i) {
-		//auto payloadSize = *std::start_lifetime_as<std::uint32_t>(frameBegin);
-		std::uint32_t payloadSize;
-		std::memcpy(&payloadSize, frameBegin, sizeof payloadSize);
-		frameBegin += sizeof payloadSize;
-
-		std::uint16_t referenceFrameNumber;
-		std::memcpy(&referenceFrameNumber, frameBegin, sizeof referenceFrameNumber);
-		frameBegin += sizeof referenceFrameNumber;
-		payloadSize -= 2;
+		const auto payloadSize = frameDataReader.read<std::uint32_t>() - 2;
+		const auto referenceFrameNumber = frameDataReader.read<std::uint16_t>();
 
 	    if (referenceFrameNumber == 0xFFFF) {
 	        frames[i] = {
-	            .data = {frameBegin, payloadSize},
+	            .data = frameDataReader.read_bytes(payloadSize),
                 .parent = this,
             };
 	    } else {
-	        assert(referenceFrameNumber < i);
 	        frames[i] = frames.at(referenceFrameNumber);
 	    }
-
-		frameBegin += payloadSize;
 	}
 }
 
