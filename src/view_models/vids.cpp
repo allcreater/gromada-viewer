@@ -238,25 +238,33 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     constexpr std::array<const char*, 16> actionNames = {"Stand", "Build", "Go", "Start move", "L Rotate", "R Rotate", "Open", "Close", "Fight", "Salut",
         "Stand open", "Load", "Unload", "Wound", "Birth", "Death"};
 
-    ImGui::BeginTable("Actions", 4);
-    ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("Animation", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-    ImGui::TableSetupColumn("Child nVid", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-    ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthFixed, 40.0f);
-    ImGui::TableHeadersRow();
+    ImGui::BeginTable("Actions", 6);
+    ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+	ImGui::TableSetupColumn("frames count", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+	ImGui::TableSetupColumn("nsfx", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+	ImGui::TableSetupColumn("nvid", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+	ImGui::TableSetupColumn("count", ImGuiTableColumnFlags_WidthFixed, 30.0f);
+	ImGui::TableSetupColumn("offset", ImGuiTableColumnFlags_WidthStretch);
+	ImGui::TableHeadersRow();
 
     for (std::size_t i = 0; i < 16; ++i) {
         ImGui::TableNextColumn();
         ImGui::Text(actionNames[i]);
 
         ImGui::TableNextColumn();
-        ImGui::Text("%i", self.supportedActions[i]);
+        ImGui::Text("%i", self.animationLengths[i]);
 
         ImGui::TableNextColumn();
-        linkToNvidControl(self.children[i]);
+        ImGui::Text("%i", self.nsfx[i]);
+
+        ImGui::TableNextColumn();
+        linkToNvidControl(self.childNvid[i]);
 
         ImGui::TableNextColumn();
         ImGui::Text("%i", self.childrenCount[i]);
+
+        ImGui::TableNextColumn();
+        ImGui::Text("%i %i %i", self.childrenOffsets[0][i], self.childrenOffsets[1][i], self.childrenOffsets[2][i]);
 
         ImGui::TableNextRow();
     }

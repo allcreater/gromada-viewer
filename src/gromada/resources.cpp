@@ -116,9 +116,10 @@ export struct Vid {
 	std::uint8_t directionsCount;
 	std::uint8_t z_layer;
 
-	// TODO: std::array<std::uint8_t, 16> animationLengths; ?
-	std::array<std::uint8_t, 144> supportedActions;
-	std::array<std::int16_t, 16> children;
+	std::array<std::uint8_t, 16> animationLengths;
+    std::array<std::uint16_t, 16> nsfx;
+    std::array<std::array<std::int16_t, 16>, 3> childrenOffsets;
+	std::array<std::int16_t, 16> childNvid;
 	std::array<std::uint8_t, 16> childrenCount;
 
 	std::int32_t dataSizeOrNvid; // if < 0 then it's nvid
@@ -173,8 +174,10 @@ void Vid::read(BinaryStreamReader reader)
 	reader.read_to(directionsCount);
 	reader.read_to(z_layer);
 
-	reader.read_to(supportedActions);
-	reader.read_to(children);
+	reader.read_to(animationLengths);
+	reader.read_to(nsfx);
+	reader.read_to(childrenOffsets);
+	reader.read_to(childNvid);
 	reader.read_to(childrenCount);
 
 	reader.read_to(dataSizeOrNvid);
