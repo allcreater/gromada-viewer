@@ -107,7 +107,7 @@ void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<Gam
     };
 
     for (std::uint32_t subjectId; subjectId = reader.read<std::uint32_t>(); ) {
-        auto& commandArray = lookupSubject(subjectId).commands;
+        auto& commandArray = lookupSubject(subjectId).payload.commands;
 
         const auto count = reader.read<std::int32_t>();
         commandArray.reserve(count);
