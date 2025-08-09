@@ -89,11 +89,11 @@ void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
     {
         SectionWriter writer{SectionType::Command, 1, stream};
 
-        auto objects = map.objects | std::views::filter([](const GameObject& o) { return !o.commands.empty(); });
+        auto objects = map.objects | std::views::filter([](const GameObject& obj) { return !obj.payload.commands.empty(); });
         for (const auto& obj : objects) {
             writer.write(obj.id);
-            writer.write(static_cast<std::int32_t>(obj.commands.size()));
-            for (const auto& command : obj.commands) {
+            writer.write(static_cast<std::int32_t>(obj.payload.commands.size()));
+            for (const auto& command : obj.payload.commands) {
                 writer.write(static_cast<std::uint8_t>(command.command));
                 writer.write(command.p1);
                 writer.write(command.p2);

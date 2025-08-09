@@ -24,6 +24,8 @@ export {
         // NOTE: this is all fields that are loaded in the original game
         // Not all of them may be saved/loaded at same time: it depends on the object type (specifically, vid[nvid].behave)
         struct Payload {
+            std::vector<ObjectCommand> commands;
+
             // for most static objects
             std::uint8_t hp = 0;
             // For units
@@ -33,8 +35,7 @@ export {
             std::vector<std::int16_t> items;
         } payload;
 
-        std::uint32_t id; // Unique ID for the object, used for commands
-        std::vector<ObjectCommand> commands;
+        std::uint32_t id; // Unique ID for the object, used as a target for some commands and map armies info
     };
 
     enum /*class*/ MapVersion : std::uint32_t {

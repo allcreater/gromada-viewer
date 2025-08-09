@@ -45,14 +45,16 @@ public:
 
     // TODO: "this->" leaved to remember that it will be a free function soon
 	void loadMap(std::filesystem::path path) {
-		const auto& vids = this->get<const GameResources>()->vids();
-		const auto map = ::loadMap(vids, path);
+		const auto* gameResources = this->get<const GameResources>();
+		const auto map = ::loadMap(gameResources->vids(), path);
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
 
 	    for (const auto& obj : map.objects) {
 	        this->entity()
-                .set<GameObject>(obj)
+                .emplace<VidComponent>(*gameResources, obj.nvid)
+	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = static_cast<std::uint8_t>(obj.direction)})
+	            .set<GameObject::Payload>(obj.payload)
 	            .set<StaticLoaderSpecificAttributes>({.original_id = obj.id, .original_index = static_cast<std::uint16_t>(&obj - map.objects.data())})
                 .child_of(activeLevel);
 	    }

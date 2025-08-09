@@ -34,6 +34,14 @@ public:
     }
 
     const std::span<const Vid> vids() const { return m_vids; }
+    // unfortunately std::span yet do not have .at method
+    const Vid& getVid(int nvid) const {
+        if (nvid < 0 || nvid >= static_cast<int>(m_vids.size())) {
+            throw std::out_of_range("GameResources: nvid out of range");
+        }
+
+        return m_vids[nvid];
+    }
 
     const std::filesystem::path& gamePath() const { return m_gamePath; }
     std::filesystem::path mapsPath() const { return m_gamePath / "maps"; }

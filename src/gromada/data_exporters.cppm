@@ -51,7 +51,7 @@ void ExportMapToJson(std::span<const Vid> vids, const Map& map, std::ostream& st
 			{"direction", obj.direction},
 			{"payload", payloadToJson(obj.payload)},
 		    {"id", obj.id},
-		    !obj.commands.empty() ? nlohmann::json{"commands", obj.commands | std::views::transform(commandToJson) | std::ranges::to<std::vector>()} : nlohmann::json{},
+		    !obj.payload.commands.empty() ? nlohmann::json{"commands", obj.payload.commands | std::views::transform(commandToJson) | std::ranges::to<std::vector>()} : nlohmann::json{},
 		};
 	};
 
