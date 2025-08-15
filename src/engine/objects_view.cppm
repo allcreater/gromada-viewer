@@ -54,6 +54,11 @@ public:
     operator const Vid&() const { return m_vid; }
     const Vid* operator->() const { return &m_vid; }
     const GameResources& parent() const { return m_parent; }
+    std::uint16_t nvid() const noexcept {
+        auto distance = std::distance(parent().vids().data(), &m_vid);
+        assert(distance < std::numeric_limits<std::uint16_t>::max());
+        return static_cast<std::uint16_t>(distance);
+    }
 };
 
 class ObjectsView {
