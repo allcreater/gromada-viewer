@@ -51,7 +51,7 @@ public:
 	    for (const auto& obj : map.objects) {
 	        this->entity()
                 .emplace<VidComponent>(*gameResources, obj.nvid)
-	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = static_cast<std::uint8_t>(obj.direction)})
+	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
 	            .set<GameObject::Payload>(obj.payload)
 	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})
                 .child_of(activeLevel);
@@ -72,6 +72,7 @@ public:
             .y = static_cast<std::int16_t>(transform.y),
             .z = static_cast<std::int16_t>(transform.z),
             .direction = transform.direction,
+            .action = std::to_underlying(Action::act_stand), // TODO: save real action
             .payload = payload ? *payload : GameObject::Payload{},
             .id = id,
         };

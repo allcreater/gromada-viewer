@@ -58,6 +58,7 @@ void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
             writer.write(obj.y);
             writer.write(obj.z);
             writer.write(obj.direction);
+            writer.write(obj.action);
 
             switch(getObjectSerializationClass(vids[obj.nvid].behave)) {
             case ObjectSerializationClass::Static: {

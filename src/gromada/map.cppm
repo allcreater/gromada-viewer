@@ -16,10 +16,11 @@ export {
 
     struct GameObject {
         std::uint16_t nvid;
-        std::int16_t x;
+        std::int16_t x; // TODO: or unsigned?
         std::int16_t y;
         std::int16_t z;
-        std::int16_t direction;
+        std::uint8_t direction;
+        std::uint8_t action = 0; // It seems usually not used in original game
 
         // NOTE: this is all fields that are loaded in the original game
         // Not all of them may be saved/loaded at same time: it depends on the object type (specifically, vid[nvid].behave)

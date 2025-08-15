@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <cassert>
 
 module Gromada.Map;
 
@@ -75,15 +76,17 @@ void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVe
         if (nvid < 0 || nvid >= vids.size()) [[unlikely]]
 	        throw std::runtime_error("Map's object nvid is out of range");
 
-		std::array<std::int16_t, 4> rawData;
-		reader.read_to(rawData);
+		const auto position = reader.read<std::array<std::int16_t, 3>>();
+		const auto [direction, action] = reader.read<std::array<std::uint8_t, 2>>();
 
+	    assert(action == 0 && "not an error, but seems it should not happen with original game's maps");
 		result.push_back({
 			.nvid = static_cast<std::uint16_t>(nvid),
-			.x = rawData[0],
-			.y = rawData[1],
-			.z = rawData[2],
-			.direction = rawData[3], // maybe it's direction + action (1 + 1 b)
+			.x = position[0],
+			.y = position[1],
+			.z = position[2],
+			.direction = direction,
+		    .action = action,
 			.payload = readObjectPayload(mapVersion, vids[nvid].behave, reader),
 		});
 	}
