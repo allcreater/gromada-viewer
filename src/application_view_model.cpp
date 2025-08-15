@@ -51,6 +51,7 @@ Controls:
 - Ctrl+Wheel - zoom in/out
 - Right mouse button / Ctrl + mouse - move camera
 - Left mouse button - select object
+- Del - delete selected objects
 )");
 		        ImGui::EndTabItem();
 		    }

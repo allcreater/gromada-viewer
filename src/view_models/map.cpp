@@ -146,6 +146,9 @@ export class MapViewModel {
             }
         }
 
+        if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+            deleteSelectedObjects();
+        }
     }
 
     void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
@@ -228,6 +231,15 @@ export class MapViewModel {
         });
         ImGui::ResetMouseDragDelta();
     }
+
+    void deleteSelectedObjects() {
+        m_world.defer([&] {
+            m_selectionQuery.each([](flecs::entity id, const Vid& vid, const Transform& _) {
+                id.destruct();
+            });
+        });
+    }
+
 
     flecs::world& m_world;
     flecs::query<const VidComponent, const Transform> m_selectionQuery;
