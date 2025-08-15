@@ -19,20 +19,18 @@ export struct ObjectToPlaceMessage {
 };
 
 
-export struct StaticLoaderSpecificAttributes {
-    std::uint32_t original_id;
-    std::uint32_t original_index;
+export struct EditorOrdering {
+    std::uint32_t uid = 0;
+    std::uint32_t index = 0;
 };
 export struct Selected {};
-export struct Selectable {};
 export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
 
 export struct EditorComponents {
     EditorComponents(flecs::world& world) {
-        world.component<StaticLoaderSpecificAttributes>();
+        world.component<EditorOrdering>();
         world.component<Selected>();
-        world.component<Selectable>();
         world.component<Path>();
         world.component<Armies>();
     }
@@ -55,7 +53,7 @@ public:
                 .emplace<VidComponent>(*gameResources, obj.nvid)
 	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = static_cast<std::uint8_t>(obj.direction)})
 	            .set<GameObject::Payload>(obj.payload)
-	            .set<StaticLoaderSpecificAttributes>({.original_id = obj.id, .original_index = static_cast<std::uint16_t>(&obj - map.objects.data())})
+	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})
                 .child_of(activeLevel);
 	    }
 
@@ -64,55 +62,94 @@ public:
 	    activeLevel.set<Armies>(std::move(map.armies));
 	}
 
-	Map saveMap() {
-		const auto activeLevel = this->component<ActiveLevel>();
-	    auto query = this->query_builder<const GameObject>().with(flecs::ChildOf).second<ActiveLevel>().build();
+    static GameObject makeGameObject(const VidComponent& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
+	    assert(transform.x >= 0 && transform.y >= 0 && transform.z >= 0);
+	    assert(transform.x < std::numeric_limits<std::int16_t>::max() && transform.y < std::numeric_limits<std::int16_t>::max() && transform.z < std::numeric_limits<std::int16_t>::max());
 
-	    // NOTE: this pretty complex algorithm need just to minimize binary differences between original map and saved map
-	    std::vector<GameObject> objects;
-		std::vector<std::pair<const GameObject*, const StaticLoaderSpecificAttributes*>> delayedObjects;
-	    std::set<std::uint32_t> knownIds;
-		objects.reserve(query.count());
+        return GameObject {
+            .nvid = vid.nvid(),
+            .x = static_cast<std::int16_t>(transform.x),
+            .y = static_cast<std::int16_t>(transform.y),
+            .z = static_cast<std::int16_t>(transform.z),
+            .direction = transform.direction,
+            .payload = payload ? *payload : GameObject::Payload{},
+            .id = id,
+        };
+    }
 
-		query.each([&](flecs::entity entity, const GameObject& obj) {
-	        if (const auto* existing_object_attribs = entity.get<StaticLoaderSpecificAttributes>()) {
-	            delayedObjects.push_back({&obj, existing_object_attribs});
-	            knownIds.insert(obj.id);
+    // this function is so complex to reduce the binary differences between the original and saved map.
+    // It tries to save original objects on the same position and with the same ID
+    std::vector<flecs::entity> prepareObjectsToExport() {
+	    auto query = this->query_builder<const VidComponent, const Transform>()
+	        .term_at(1).second<Local>() // Or world? Anyway, should be the same for top-level objects
+	        .with(flecs::ChildOf).second<ActiveLevel>()
+	        .build();
+
+	    std::unordered_set<std::uint32_t> known_ids;
+	    std::deque<flecs::entity> unordered_objects;
+	    std::vector<flecs::entity> objects(query.count());
+
+	    // First step - collect all known objects and try to place them in the correct order
+	    query.each([&](flecs::entity entity, const VidComponent& vid, const Transform& transform) {
+	        if (auto* existing_object_attribs = entity.get<EditorOrdering>()) {
+	            const auto [id, index] = *existing_object_attribs;
+	            if (index < objects.size()) {
+	                assert(objects[index].id() == 0);
+                    objects[index] = entity;
+                } else {
+                    unordered_objects.push_front(entity);
+                }
+	            known_ids.insert(id);
 	        } else {
-	            objects.push_back(obj);
+	            unordered_objects.push_back(entity);
 	        }
-		});
+	    });
 
-	    // generate IDs for objects that were
-	    std::size_t numOfTries = 0;
-	    std::ranges::for_each(objects, [&knownIds, rng = std::mt19937{std::random_device{}()}, &numOfTries](std::uint32_t& id) mutable {
+        auto generate_new_id = [&known_ids, rng = std::mt19937{std::random_device{}()}] mutable {
             std::uniform_int_distribution<std::uint32_t> dist{1, std::numeric_limits<std::uint32_t>::max()};
-	        while (!knownIds.insert(id = dist(rng)).second) { numOfTries++;}
-	    }, &GameObject::id);
+            std::uint32_t id;
+            do {
+                id = dist(rng);
+            } while (!known_ids.insert(id).second);
+            return id;
+        };
 
-	    // NOTE: now it's time to restore original object positions and IDs
-	    constexpr auto index_projection = [](const auto& pair) { return pair.second->original_index; };
-	    std::ranges::sort(delayedObjects, {}, index_projection);
-	    assert(std::ranges::unique(delayedObjects, {}, index_projection).begin() == delayedObjects.end());
-
-        // NOTE: this is a bit complex, but it allows to minimize binary differences between original map and saved map
-	    for (int index = objects.size(); const auto [object, attribs] : delayedObjects) {
-	        assert(attribs->original_index <= objects.size());
-	        auto& currentObject = objects.emplace_back(*object);
-	        assert(currentObject.id == attribs->original_id);
-	        currentObject.id = attribs->original_id; // restore original ID
-
-	        if (attribs->original_index != (objects.size()-1)) {
-	            std::swap(objects[attribs->original_index], currentObject);
+	    // Second step - fill in the gaps with new objects
+	    auto free_indices = std::views::iota(std::size_t{0}, objects.size()) | std::views::filter([&objects](std::size_t index) {return objects[index].id() == 0;});
+	    for (auto i : free_indices) {
+	        objects[i] = unordered_objects.front();
+	        {
+	            auto& ordering = objects[i].ensure<EditorOrdering>();
+	            ordering.index = static_cast<std::uint32_t>(i);
+	            if (ordering.uid == 0)
+	                ordering.uid = generate_new_id();
 	        }
-        }
-	    assert(activeLevel.get<MapHeaderRawData>() && activeLevel.get<Armies>());
-		return Map {
-		    .header = *activeLevel.get<MapHeaderRawData>(),
-		    .objects = std::move(objects),
-		    .armies = *activeLevel.get<Armies>(),
-		};
+	        unordered_objects.pop_front();
+	    }
+	    assert(unordered_objects.empty());
+
+	    return objects;
 	}
+
+    Map saveMap() {
+	    const auto activeLevel = this->component<ActiveLevel>();
+
+	    auto objects = prepareObjectsToExport() | std::views::transform([i = 0](const flecs::entity& entity) mutable {
+            const auto& vid = *entity.get<VidComponent>();
+            const auto& transform = *entity.get<Transform, Local>();
+            const auto* payload = entity.get<GameObject::Payload>();
+            const auto& ordering = *entity.get<EditorOrdering>();
+            assert(ordering.index == i++);
+            return makeGameObject(vid, transform, payload, ordering.uid);
+        }) | std::ranges::to<std::vector<GameObject>>();
+
+	    return Map {
+	        .header = *activeLevel.get<MapHeaderRawData>(),
+            .objects = objects,
+            .armies = *activeLevel.get<Armies>(),
+        };
+	}
+
 
 private:
 	flecs::world create_world(GameResources&& resources) {
