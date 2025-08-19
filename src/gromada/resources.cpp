@@ -53,9 +53,52 @@ export struct ColorRgb8 {
 	std::uint8_t b;
 };
 
-// export enum class ObjectFlags : std::uint16_t {
-//	Shadow = 0x80,
-//};
+ export enum /*class*/ ObjectFlags : std::uint16_t {
+     RandomDirection = 0x1,
+     Gravity = 0x2,
+     Calltact = 0x4,
+     SkipUpdate = 0x8,
+     SpawnChildren = 0x10,
+     NoCollision = 0x20,
+     PresentOnGrid = 0x40,
+     Shadow = 0x80,
+     Randomized = 0x100,
+     Hz1 = 0x200,
+     InvisibleSubobjects = 0x400,
+     OwnGamma = 0x800,
+     Wind = 0x1000,
+     Hz2 = 0x2000,
+     CollisionBehavior = 0x4000,
+};
+
+export std::string to_string(ObjectFlags flags) {
+    std::string result;
+    if (flags == 0) return "None";
+
+    if (flags & ObjectFlags::RandomDirection) result += "RandomDirection, ";
+    if (flags & ObjectFlags::Gravity) result += "Gravity, ";
+    if (flags & ObjectFlags::Calltact) result += "Calltact, ";
+    if (flags & ObjectFlags::SkipUpdate) result += "SkipUpdate, ";
+    if (flags & ObjectFlags::SpawnChildren) result += "SpawnChildren, ";
+    if (flags & ObjectFlags::NoCollision) result += "NoCollision, ";
+    if (flags & ObjectFlags::PresentOnGrid) result += "PresentOnGrid, ";
+    if (flags & ObjectFlags::Shadow) result += "Shadow, ";
+    if (flags & ObjectFlags::Randomized) result += "Randomized, ";
+    if (flags & ObjectFlags::Hz1) result += "Hz1, ";
+    if (flags & ObjectFlags::InvisibleSubobjects) result += "InvisibleSubobjects, ";
+    if (flags & ObjectFlags::OwnGamma) result += "OwnGamma, ";
+    if (flags & ObjectFlags::Wind) result += "Wind, ";
+    if (flags & ObjectFlags::Hz2) result += "Hz2, ";
+    if (flags & ObjectFlags::CollisionBehavior) result += "CollisionBehavior, ";
+
+    // Remove trailing comma and space
+    if (!result.empty()) {
+        result.pop_back();
+        result.pop_back();
+    }
+
+    return result;
+}
 
 export struct VidGraphics {
     VidGraphics() = default;
@@ -89,7 +132,7 @@ export struct Vid {
 	std::array<char, 34> name; // In CP-866
 	UnitType unitType;
 	std::uint8_t behave;
-	std::uint16_t flags;
+	ObjectFlags flags;
 
 	std::uint8_t collisionMask;
 	std::uint16_t sizeX;

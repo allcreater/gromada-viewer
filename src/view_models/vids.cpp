@@ -212,26 +212,26 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     ImGui::Text("%s", self.getName().c_str());
     ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
     ImGui::Text("Behave: %i ", self.behave);
-    ImGui::Text("Flags %x", self.flags);
+    ImGui::Text("Flags: %s", to_string(self.flags).c_str());
     ImGui::Text("Collision mask: %x", self.collisionMask);
     ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);
     ImGui::Text("max HP: %i", self.maxHP);
     ImGui::Text("grid radius: %i", self.gridRadius);
 
-    ImGui::Text("Speed %i %i", self.speedX, self.speedY);
+    ImGui::Text("Speed: %i %i", self.speedX, self.speedY);
     ImGui::Text("Acceleration: %i", self.acceleration);
     ImGui::Text("Rotation period: %i", self.rotationPeriod);
 
     ImGui::Text("Army: %i", self.army);
     ImGui::Text("Weapon?: %i", self.someWeaponIndex);
     ImGui::Text("???: %i", self.unused2);
-    ImGui::Text("Damage radius: % i", self.deathDamageRadius);
+    ImGui::Text("Damage radius: %i", self.deathDamageRadius);
     ImGui::Text("Damage: %i", self.deathDamage);
     ImGui::Text("Linked object offset (X,Y,Z): %i %i %i", self.linkX, self.linkY, self.linkZ);
 
     ImGui::Text("Linked nVid: "); ImGui::SameLine(); linkToNvidControl(self.linkedObjectVid);
     ImGui::Text("Directions count: % i", self.directionsCount);
-    ImGui::Text("Z Layer : % i", self.z_layer);
+    ImGui::Text("Z Layer: % i", self.z_layer);
 
 
     ImGui::Spacing();
