@@ -1,14 +1,4 @@
 module;
-#if __INTELLISENSE__
-#include <array>
-#include <fstream>
-#include <span>
-#include <mdspan>
-#include <vector>
-#include <optional>
-#include <concepts>
-#include <ranges>
-#endif
 #include <cassert>
 
 export module Gromada.SoftwareRenderer;

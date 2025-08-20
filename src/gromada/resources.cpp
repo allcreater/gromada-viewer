@@ -1,16 +1,5 @@
 module;
-
-#if __INTELLISENSE__
-#include <array>
-#include <bitset>
-#include <filesystem>
-#include <functional>
-#include <ranges>
-#include <mdspan>
-#endif
-
 #include <cassert>
-#include <cstdint>
 
 export module Gromada.Resources;
 

@@ -9,15 +9,6 @@ module;
 #include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
-
-#if __INTELLISENSE__
-#include <array>
-#include <bitset>
-#include <filesystem>
-#include <functional>
-#include <ranges>
-#endif
-
 export module application;
 
 import std;
