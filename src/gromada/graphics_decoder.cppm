@@ -151,8 +151,12 @@ void Decode_mode6(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
             if (command.repeat) {
                 visitor.draw_pixels_repeat( command.count, reader.read<CompressedColor>());
             } else {
-                const auto data = reader.read_bytes(2 * command.count);
-                visitor.draw_pixels(std::span<const CompressedColor>{reinterpret_cast<const CompressedColor*>(data.data()), command.count});
+                // TODO: use std::start_lifetime_as_array when it will be available
+                const auto bytes = reader.read_bytes(2 * command.count);
+                std::array<CompressedColor, 128> colors; assert(command.count < colors.size());
+                std::memcpy(colors.data(), bytes.data(), bytes.size_bytes());
+
+                visitor.draw_pixels(std::span{colors.data(), command.count});
             }
             x+= command.count;
         }
