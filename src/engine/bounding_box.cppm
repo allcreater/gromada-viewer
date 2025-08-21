@@ -33,6 +33,24 @@ export struct BoundingBox {
 		};
 	}
 
+    const BoundingBox unite_with(const BoundingBox& other) const noexcept {
+        return {
+            .left = std::min(left, other.left),
+            .right = std::max(right, other.right),
+            .top = std::min(top, other.top),
+            .down = std::max(down, other.down),
+        };
+    }
+
+    const BoundingBox extend(int x, int y) const noexcept {
+	    return {
+            .left = std::min(left, x),
+            .right = std::max(right, x),
+            .top = std::min(top, y),
+            .down = std::max(down, y),
+        };
+	}
+
     constexpr BoundingBox getTranslated(int dx, int dy) const noexcept {
         return {
             .left = left + dx,

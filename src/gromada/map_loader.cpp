@@ -72,7 +72,7 @@ MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {
 
 //TODO: use output iterator
 void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVersion, std::span<const Vid> vids, BinaryStreamReader reader) {
-	for (auto nvid = 0; nvid = reader.read<std::int16_t>(), nvid > 0;) {
+	for (std::uint16_t nvid = 0; nvid = reader.read<std::uint16_t>(), nvid != 0xFFFF;) {
         if (nvid < 0 || nvid >= vids.size()) [[unlikely]]
 	        throw std::runtime_error("Map's object nvid is out of range");
 
@@ -81,7 +81,7 @@ void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVe
 
 	    assert(action == 0 && "not an error, but seems it should not happen with original game's maps");
 		result.push_back({
-			.nvid = static_cast<std::uint16_t>(nvid),
+			.nvid = nvid,
 			.x = position[0],
 			.y = position[1],
 			.z = position[2],

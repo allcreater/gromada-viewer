@@ -16,7 +16,7 @@ export {
 
     struct GameObject {
         std::uint16_t nvid;
-        std::int16_t x; // TODO: or unsigned?
+        std::int16_t x;
         std::int16_t y;
         std::int16_t z;
         std::uint8_t direction;
@@ -47,14 +47,14 @@ export {
     };
 
     struct MapHeaderRawData {
-        std::uint32_t width;
-        std::uint32_t height;
-        std::int16_t observerX;
-        std::int16_t observerY;
-        std::uint32_t e;
-        std::uint32_t f;
-        std::uint32_t startTimer;
-        MapVersion mapVersion;
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+        std::int16_t observerX = 0;
+        std::int16_t observerY = 0;
+        std::uint32_t e = 0;
+        std::uint32_t f = 0;
+        std::uint32_t startTimer = 0;
+        MapVersion mapVersion = MapVersion::V3;
     };
 
     struct Army {

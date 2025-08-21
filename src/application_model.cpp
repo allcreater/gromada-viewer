@@ -8,6 +8,8 @@ import utils;
 
 import Gromada.ResourceReader;
 import Gromada.Map;
+import engine.bounding_box;
+
 export import Gromada.GameResources;
 
 export import engine.world_components;
@@ -24,6 +26,7 @@ export struct EditorOrdering {
     std::uint32_t index = 0;
 };
 export struct Selected {};
+export struct ObjectPrototype {};
 export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
 
@@ -31,9 +34,10 @@ export struct EditorComponents {
     EditorComponents(flecs::world& world) {
         world.component<EditorOrdering>();
         world.component<Selected>();
-        world.component<Path>();
-        world.component<Armies>();
-    }
+		world.component<ObjectPrototype>();
+		world.component<Path>();
+		world.component<Armies>();
+	}
 };
 
 export class Model : public flecs::world {
@@ -63,7 +67,7 @@ public:
 	}
 
     static GameObject makeGameObject(const VidComponent& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
-	    assert(transform.x >= 0 && transform.y >= 0 && transform.z >= 0);
+	    assert(transform.x > std::numeric_limits<std::int16_t>::min() && transform.y > std::numeric_limits<std::int16_t>::min() && transform.z > std::numeric_limits<std::int16_t>::min());
 	    assert(transform.x < std::numeric_limits<std::int16_t>::max() && transform.y < std::numeric_limits<std::int16_t>::max() && transform.z < std::numeric_limits<std::int16_t>::max());
 
         return GameObject {
@@ -144,10 +148,18 @@ public:
             return makeGameObject(vid, transform, payload, ordering.uid);
         }) | std::ranges::to<std::vector<GameObject>>();
 
+	    const auto map_bounds = std::reduce(objects.begin(), objects.end(), BoundingBox{}, [](BoundingBox bb, const GameObject& obj) {
+            return bb.extend(obj.x, obj.y);
+        });
+
+	    auto& header = activeLevel.ensure<MapHeaderRawData>();
+	    header.height = std::max(header.height, static_cast<std::uint32_t>(std::max(0, map_bounds.down)));
+	    header.width = std::max(header.width, static_cast<std::uint32_t>(std::max(0, map_bounds.right)));
+
 	    return Map {
-	        .header = *activeLevel.get<MapHeaderRawData>(),
-            .objects = objects,
-            .armies = *activeLevel.get<Armies>(),
+	        .header = header,
+            .objects = std::move(objects),
+            .armies = activeLevel.ensure<Armies>(),
         };
 	}
 

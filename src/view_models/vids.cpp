@@ -1,4 +1,5 @@
 module;
+#include <flecs.h>
 #include <imgui.h>
 #include <sokol_gfx.h>
 #include <sokol_app.h>
@@ -87,31 +88,12 @@ public:
 					ImGui::SetItemDefaultFocus();
 				    if (std::exchange(m_selecionInvalidated, false)) {
 				        ImGui::SetScrollHereY(0.5f); // Scroll to the selected item
+
+				        if (m_model.target<ObjectPrototype>().is_valid())
+                            m_model.target<ObjectPrototype>().destruct();
+				        auto prototype = m_model.entity().emplace<VidComponent>(*m_model.get<const GameResources>(), static_cast<std::uint16_t>(nvid));
+				        m_model.add<ObjectPrototype>(prototype);
 				    }
-				}
-
-				{
-					ImGuiDragDropFlags src_flags = 0;
-					src_flags |= ImGuiDragDropFlags_SourceNoDisableHover;	  // Keep the source displayed as hovered
-					src_flags |= ImGuiDragDropFlags_SourceNoHoldToOpenOthers; // Because our dragging is local, we disable the feature of opening foreign
-																			  // treenodes/tabs while dragging
-					// src_flags |= ImGuiDragDropFlags_SourceNoPreviewTooltip; // Hide the tooltip
-					if (ImGui::BeginDragDropSource(src_flags)) {
-					    assert(nvid < std::numeric_limits<std::uint16_t>::max());
-						static std::uint8_t s_CurrentDirection = 0;
-						MyImUtils::SetDragDropPayload(ObjectToPlaceMessage{
-							.nvid = static_cast<std::uint16_t>(nvid),
-							.direction = s_CurrentDirection,
-						});
-
-						if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
-							const auto step = 255 / static_cast<float>(vid.directionsCount);
-							s_CurrentDirection += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
-						}
-
-						ImGui::Text("dir = %i", s_CurrentDirection);
-						ImGui::EndDragDropSource();
-					}
 				}
 
 				ImGui::TableNextColumn();
@@ -128,13 +110,14 @@ public:
 
 			ImGui::EndTable();
 
+		    if (prevSelectedSection != m_selectedSection) {
+		        InvalidateSelection();
+		    }
+
 		    if (m_showDetails) {
 		        ImGui::SetNextWindowPos({320, 20}, ImGuiCond_FirstUseEver);
 		        if (ImGui::Begin("Vid details", &m_showDetails)) {
 					VidUI(*m_selectedSection);
-					if (prevSelectedSection != m_selectedSection) {
-						InvalidateSelection();
-					}
 
 					ImGui::SetNextWindowPos({10, 530}, ImGuiCond_FirstUseEver);
 		            ImGui::SetNextWindowSize({300, 280}, ImGuiCond_FirstUseEver);

@@ -71,34 +71,35 @@ export class MapViewModel {
         //         ImGui::Image(simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0});
         //     });
     }
+    void updatePrototype(const Viewport& viewport, bool enabled) {
+        auto prototype = m_world.target<ObjectPrototype>();//m_world.component<ObjectPrototype>();
+        if (!prototype.is_valid())
+            return;
 
-    void handleDragDrop(const Viewport& viewport) {
-        const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-
-        const auto* vp = ImGui::GetMainViewport();
-        if (ImGui::BeginDragDropTargetCustom(ImRect{vp->WorkPos, vp->WorkSize}, vp->ID)) {
-            ImGuiDragDropFlags target_flags = 0;
-            target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;
-            //target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
-            if (const auto payload = MyImUtils::AcceptDragDropPayload<ObjectToPlaceMessage>(target_flags)) {
-                auto _ = m_world.entity()
-                .set<Transform, Local>({
-                    .x = static_cast<std::int16_t>(mouseWorldPos.x),
-                    .y = static_cast<std::int16_t>(mouseWorldPos.y),
-                    .z = 0,
-                    .direction = payload->first.direction,
-                })
-                .emplace<VidComponent>(*m_world.get<const GameResources>(), payload->first.nvid)
-                .child_of<ActiveLevel>()
-                .add_if<DestroyAfterUpdate>(!(payload->second->IsDelivery()));
-
+        if (enabled) {
+            prototype.enable();
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                prototype.clone().child_of(m_world.component<ActiveLevel>());
             }
-            ImGui::EndDragDropTarget();
+        } else {
+            prototype.disable();
+        }
+
+        auto& prototype_transform = prototype.ensure<Transform, Local>();
+        if (ImGui::IsMousePosValid()) {
+            const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+            prototype_transform.x = mouseWorldPos.x;
+            prototype_transform.y = mouseWorldPos.y;
+        }
+
+        if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
+            const auto step = 255 / static_cast<float>((*prototype.get<const VidComponent>())->directionsCount);
+            prototype_transform.direction += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
         }
     }
 
     void onMenu() {
-        if (ImGui::BeginMenu("Selection")) {
+		if (ImGui::BeginMenu("Selection")) {
 			constexpr static std::array<UnitType, 7> flags = {
 				UnitType::Terrain, UnitType::Object, UnitType::Monster, UnitType::Avia, UnitType::Cannon, UnitType::Sprite, UnitType::Item};
 			for (UnitType unitType : flags) {
@@ -109,19 +110,17 @@ export class MapViewModel {
 				}
 			}
 
-            ImGui::EndMenu();
-        }
-    }
+			ImGui::EndMenu();
+		}
+	}
 
-    void updateUI() {
+	void updateUI() {
         auto levelInfo = m_world.component<ActiveLevel>().get<MapHeaderRawData>();
         auto viewport = m_world.get_mut<Viewport>();
 
         if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
             viewport->magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
         }
-
-        handleDragDrop(*viewport);
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
@@ -138,13 +137,19 @@ export class MapViewModel {
         }
 
         updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+
+        // TODO: remake to some king of state machine instead of this spagetthi logic
+        bool prototype_enabled = ImGui::IsWindowHovered() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
         if (!ImGui::IsDragDropActive() ) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+                prototype_enabled = false;
                 updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
             } else {
                 moveSelectedObjects(*viewport);
             }
         }
+
+        updatePrototype(*viewport, prototype_enabled);
 
         if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
             deleteSelectedObjects();

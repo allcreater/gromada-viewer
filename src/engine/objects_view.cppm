@@ -44,18 +44,19 @@ struct PhysicalBoundsFn {
 
 class VidComponent {
 private:
-    const Vid& m_vid;
-    const GameResources& m_parent;
+    const Vid* m_vid;
+    const GameResources* m_parent;
 
 public:
+    VidComponent() { throw std::runtime_error{"VidComponent must be constructed with a valid GameResources and nvid"}; }
     VidComponent(const GameResources& resources, std::uint16_t nvid)
-        : m_vid{resources.getVid(nvid)}, m_parent{resources} {}
+        : m_vid{&resources.getVid(nvid)}, m_parent{&resources} {}
 
-    operator const Vid&() const { return m_vid; }
-    const Vid* operator->() const { return &m_vid; }
-    const GameResources& parent() const { return m_parent; }
+    operator const Vid&() const { return *m_vid; }
+    const Vid* operator->() const { return m_vid; }
+    const GameResources& parent() const { return *m_parent; }
     std::uint16_t nvid() const noexcept {
-        auto distance = std::distance(parent().vids().data(), &m_vid);
+        auto distance = std::distance(parent().vids().data(), m_vid);
         assert(distance < std::numeric_limits<std::uint16_t>::max());
         return static_cast<std::uint16_t>(distance);
     }
