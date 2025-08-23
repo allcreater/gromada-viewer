@@ -9,6 +9,7 @@ import utils;
 import Gromada.ResourceReader;
 import Gromada.Map;
 import engine.bounding_box;
+import engine.level_renderer;
 
 export import Gromada.GameResources;
 
@@ -44,6 +45,15 @@ export class Model : public flecs::world {
 public:
 	explicit Model(std::filesystem::path path)
 		: flecs::world{create_world(GameResources{path})} {}
+
+    void newMap() {
+	    const auto activeLevel = this->component<ActiveLevel>();
+	    this->delete_with(flecs::ChildOf, activeLevel);
+
+		activeLevel.set<MapHeaderRawData>({});
+		activeLevel.set<Path>({});
+	    activeLevel.set<Armies>({});
+	}
 
     // TODO: "this->" leaved to remember that it will be a free function soon
 	void loadMap(std::filesystem::path path) {
@@ -136,29 +146,42 @@ public:
 	    return objects;
 	}
 
+
     Map saveMap() {
 	    const auto activeLevel = this->component<ActiveLevel>();
-
-	    auto objects = prepareObjectsToExport() | std::views::transform([i = 0](const flecs::entity& entity) mutable {
-            const auto& vid = *entity.get<VidComponent>();
-            const auto& transform = *entity.get<Transform, Local>();
-            const auto* payload = entity.get<GameObject::Payload>();
-            const auto& ordering = *entity.get<EditorOrdering>();
-            assert(ordering.index == i++);
-            return makeGameObject(vid, transform, payload, ordering.uid);
-        }) | std::ranges::to<std::vector<GameObject>>();
-
-	    const auto map_bounds = std::reduce(objects.begin(), objects.end(), BoundingBox{}, [](BoundingBox bb, const GameObject& obj) {
-            return bb.extend(obj.x, obj.y);
-        });
-
 	    auto& header = activeLevel.ensure<MapHeaderRawData>();
-	    header.height = std::max(header.height, static_cast<std::uint32_t>(std::max(0, map_bounds.down)));
-	    header.width = std::max(header.width, static_cast<std::uint32_t>(std::max(0, map_bounds.right)));
+
+        auto entities = prepareObjectsToExport();
+
+	    // translate coordinates so that (0,0) is top-left corner of the map
+        [&] {
+            const auto map_bounds = std::reduce(entities.begin(), entities.end(), BoundingBox{}, [](BoundingBox bb, flecs::entity obj) {
+                auto transform = obj.get<Transform, Local>();
+                return bb.extend(transform->x, transform->y);
+            });
+
+            std::ranges::for_each(entities, [&map_bounds](flecs::entity obj) {
+                auto transform = obj.get_mut<Transform, Local>();
+                transform->x -= map_bounds.left;
+                transform->y -= map_bounds.top;
+            });
+
+            header.height = map_bounds.height();
+            header.width = map_bounds.width();
+            header.observerX -= map_bounds.left;
+            header.observerY -= map_bounds.top;
+        }();
 
 	    return Map {
 	        .header = header,
-            .objects = std::move(objects),
+			.objects = entities | std::views::transform([i = 0](const flecs::entity& entity) mutable {
+				const auto& vid = *entity.get<VidComponent>();
+				const auto& transform = *entity.get<Transform, Local>();
+				const auto* payload = entity.get<GameObject::Payload>();
+				const auto& ordering = *entity.get<EditorOrdering>();
+				assert(ordering.index == i++);
+				return makeGameObject(vid, transform, payload, ordering.uid);
+			}) | std::ranges::to<std::vector<GameObject>>(),
             .armies = activeLevel.ensure<Armies>(),
         };
 	}

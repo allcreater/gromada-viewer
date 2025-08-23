@@ -1,5 +1,6 @@
 module;
 #include <flecs.h>
+#include <glm/glm.hpp>
 #include <imgui.h>
 #include <sokol_app.h>
 
@@ -9,15 +10,20 @@ import std;
 import imgui_utils;
 import Gromada.DataExporters;
 
+import engine.level_renderer; // For Viewport. Better to split
+
 import application.model;
 import :map;
 import :map_selector;
 import :vids_window;
+import :map_properties;
 
 export class ViewModel {
 public:
 	explicit ViewModel(Model& model)
 		: m_model{model} {
+
+	    m_model.newMap();
 	}
 
 	void updateUI() {
@@ -25,9 +31,9 @@ public:
 		const auto* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->WorkPos);
 		ImGui::SetNextWindowSize(viewport->WorkSize);
-		//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		// ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::Begin("Root window", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
-		
+
 		m_mapViewModel.updateUI();
 
 		ImGui::SetNextWindowPos({10, 20}, ImGuiCond_Appearing);
@@ -44,7 +50,12 @@ public:
 				ImGui::EndTabItem();
 			}
 
-		    if (ImGui::BeginTabItem("Help")) {
+			if (ImGui::BeginTabItem("Map properties")) {
+				m_mapPropertiesViewModel.updateUI();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("Help")) {
 				ImGui::TextUnformatted(
 					R"(
 Controls:
@@ -53,8 +64,8 @@ Controls:
 - Left mouse button - select object
 - Del - delete selected objects
 )");
-		        ImGui::EndTabItem();
-		    }
+				ImGui::EndTabItem();
+			}
 
 			ImGui::EndTabBar();
 		}
@@ -62,9 +73,8 @@ Controls:
 
 		ImGui::End();
 
-		//ImGui::ShowDemoWindow();
+		// ImGui::ShowDemoWindow();
 	}
-
 
 	void drawMenu() {
 		constexpr const char* ExportPopup = "Export map JSON";
@@ -74,6 +84,10 @@ Controls:
 
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
+		    if (ImGui::MenuItem("New map")) {
+		        m_model.newMap();
+            }
+
 			if (ImGui::MenuItem("Export map JSON")) {
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
@@ -122,6 +136,14 @@ Controls:
 			ImGui::EndPopup();
 		}
 
+	    {
+		    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
+	        const auto* vp = m_model.get<const Viewport>();
+		    assert(vp != nullptr);
+		    const auto pos = vp->screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), vp->magnificationFactor);
+	    }
+
 		ImGui::EndMainMenuBar();
 	}
 
@@ -133,4 +155,5 @@ private:
 	VidsWindowViewModel m_vidsViewModel{m_model};
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
+    MapPropertiesViewModel m_mapPropertiesViewModel{m_model};
 };

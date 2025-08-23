@@ -22,6 +22,8 @@ export struct BoundingBox {
 		return fromPositions(x, y, x + sizeX, y + sizeY);
 	}
 
+    constexpr int width() const noexcept { return right - left; }
+    constexpr int height() const noexcept { return down - top; }
 	constexpr bool empty() const noexcept { return (right - left <= 0) || (down - top <= 0); }
 
 	constexpr BoundingBox intersection(const BoundingBox& other) const noexcept {

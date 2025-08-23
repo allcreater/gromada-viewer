@@ -27,6 +27,8 @@ export struct Viewport {
     glm::ivec2 viewportPos;
     glm::mat3x3 screenToWorldMat, worldToScreenMat;
 
+    [[nodiscard]] BoundingBox bounds() const noexcept { return BoundingBox::fromPositionAndSize(viewportPos.x, viewportPos.y, viewportSize.x, viewportSize.y); }
+
     [[nodiscard]] glm::ivec2 screenToWorldPos(glm::ivec2 screenPos) const noexcept {
         return screenToWorldMat * glm::vec3{screenPos, 1.0f};
     }

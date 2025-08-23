@@ -51,8 +51,8 @@ export {
         std::uint32_t height = 0;
         std::int16_t observerX = 0;
         std::int16_t observerY = 0;
-        std::uint32_t e = 0;
-        std::uint32_t f = 0;
+        std::uint32_t scaleX = 24;
+        std::uint32_t scaleY = 16;
         std::uint32_t startTimer = 0;
         MapVersion mapVersion = MapVersion::V3;
     };

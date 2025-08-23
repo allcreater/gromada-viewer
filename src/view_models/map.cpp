@@ -72,25 +72,24 @@ export class MapViewModel {
         //     });
     }
     void updatePrototype(const Viewport& viewport, bool enabled) {
-        auto prototype = m_world.target<ObjectPrototype>();//m_world.component<ObjectPrototype>();
-        if (!prototype.is_valid())
-            return;
+        auto prototype = m_world.target<ObjectPrototype>(); // m_world.component<ObjectPrototype>();
+		if (!prototype.is_valid())
+			return;
 
-        if (enabled) {
-            prototype.enable();
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                prototype.clone().child_of(m_world.component<ActiveLevel>());
-            }
-        } else {
-            prototype.disable();
-        }
+		auto& prototype_transform = prototype.ensure<Transform, Local>();
+		if (enabled) {
+			prototype.enable();
 
-        auto& prototype_transform = prototype.ensure<Transform, Local>();
-        if (ImGui::IsMousePosValid()) {
-            const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-            prototype_transform.x = mouseWorldPos.x;
-            prototype_transform.y = mouseWorldPos.y;
-        }
+		    const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+		    prototype_transform.x = mouseWorldPos.x;
+		    prototype_transform.y = mouseWorldPos.y;
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+				prototype.clone().child_of(m_world.component<ActiveLevel>());
+			}
+		}
+		else {
+			prototype.disable();
+		}
 
         if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
             const auto step = 255 / static_cast<float>((*prototype.get<const VidComponent>())->directionsCount);
@@ -134,12 +133,14 @@ export class MapViewModel {
                 ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
             displaySelection(draw_list, *viewport);
+
+            displayMapBounds(draw_list, *viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
         }
 
         updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
 
         // TODO: remake to some king of state machine instead of this spagetthi logic
-        bool prototype_enabled = ImGui::IsWindowHovered() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+        bool prototype_enabled = ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
         if (!ImGui::IsDragDropActive() ) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
                 prototype_enabled = false;
@@ -181,6 +182,15 @@ export class MapViewModel {
             draw_list->AddRect(to_imvec(viewport.worldToScreenPos(m_selectionFrame->min)), to_imvec(viewport.worldToScreenPos(m_selectionFrame->max)), IM_COL32(0, 255, 0, 200));
         }
     }
+
+    void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const MapHeaderRawData& mapHeader) {
+        const auto margins = glm::ivec2{50, 50} * viewport.magnificationFactor;
+        const auto vp_min = viewport.worldToScreenPos(glm::ivec2{});
+        const auto vp_max = viewport.worldToScreenPos(glm::ivec2{mapHeader.width, mapHeader.height });
+
+		ImGui::RenderRectFilledWithHole(
+			draw_list, ImRect{to_imvec(vp_min - margins), to_imvec(vp_max + margins)}, ImRect{to_imvec(vp_min), to_imvec(vp_max)}, IM_COL32(255, 0, 0, 100), 0);
+	}
 
     // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
     static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader) {

@@ -10,6 +10,7 @@ Just put the binaries to the root game directory and run the program.
 * Very draft editor features: object selection, placing
 * Cross-platform (not tested yet :))
 * Export Vids to CSV table and maps as a Json
+* Basic editor features: object selection, placing, deleting
 
 # Dependencies
 * sokol-gfx

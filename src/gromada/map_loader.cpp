@@ -51,8 +51,8 @@ MapHeaderRawData loadMapInfo(GromadaResourceNavigator& resourceNavigator) {
 		reader.read_to(result.height);
 		reader.read_to(result.observerX);
 		reader.read_to(result.observerY);
-		reader.read_to(result.e);
-		reader.read_to(result.f);
+		reader.read_to(result.scaleX);
+		reader.read_to(result.scaleY);
 		reader.read_to(result.startTimer);
 		if (reader.size() < 28) {
 			result.mapVersion = MapVersion::V0;

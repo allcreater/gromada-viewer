@@ -27,6 +27,7 @@ add_executable (GromadaEditor
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"
+		"view_models/map_properties.cpp"
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"
