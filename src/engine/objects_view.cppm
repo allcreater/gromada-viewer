@@ -49,7 +49,7 @@ private:
 
 public:
     VidComponent() { throw std::runtime_error{"VidComponent must be constructed with a valid GameResources and nvid"}; }
-    VidComponent(const GameResources& resources, std::uint16_t nvid)
+    VidComponent(const GameResources& resources, int nvid)
         : m_vid{&resources.getVid(nvid)}, m_parent{&resources} {}
 
     operator const Vid&() const { return *m_vid; }

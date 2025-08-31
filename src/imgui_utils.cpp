@@ -19,7 +19,7 @@ import std;
 namespace MyImUtils {
 
 export template<typename T, typename Fn = std::identity>
-bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn textToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
+bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn itemToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
 {
     const auto items_count = items.size();
     //using namespace ImGui
@@ -42,7 +42,7 @@ bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn 
     while (clipper.Step())
         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
         {
-            const char* item_text = textToStr(items[i]);
+            const char* item_text = itemToStr(items[i]);
             if (item_text == nullptr)
                 item_text = "*Unknown item*";
 
@@ -63,6 +63,36 @@ bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn 
     //    MarkItemEdited(g.LastItemData.ID);
 
     return value_changed;
+}
+
+export template<typename T, typename Fn = std::identity>
+bool ComboBox(const char* label, int* current_item, std::span<const T> items, Fn itemToStr = {}) {
+    struct Context {
+        std::span<const T> items;
+        Fn itemToStr;
+    };
+
+    const auto getter = [](void* user_data, int idx) -> const char* {
+        auto context = static_cast<Context*>(user_data);
+
+        thread_local std::invoke_result_t<Fn, const T> item_text = {};
+        item_text = context->itemToStr(context->items[idx]);
+
+        if constexpr (std::is_convertible_v<decltype(item_text), const char*>) {
+            return item_text;
+        }
+        else if constexpr (requires { std::as_const(item_text).c_str(); }) {
+            static_assert(sizeof(*std::as_const(item_text).c_str()) == 1, "itemToStr must return multi-byte string");
+            return reinterpret_cast<const char*>(std::as_const(item_text).c_str());
+        }
+        else {
+            static_assert(false, "itemToStr must return const char* or string-like type");
+            return "*Unknown item*";
+        }
+    };
+
+    Context ctx{items, std::move(itemToStr)};
+    return ImGui::Combo(label, current_item, getter, &ctx, items.size());
 }
 
 template <typename T> const char* payloadTypeName() noexcept { 

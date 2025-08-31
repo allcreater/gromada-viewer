@@ -173,6 +173,18 @@ export struct Vid {
     }
 };
 
+export struct AdjacencyData {
+    std::vector<std::int16_t> data;
+
+    std::mdspan<const std::int16_t, std::extents<std::size_t, std::dynamic_extent, 16>> matrix() const  {
+        return std::mdspan{data.data(), std::extents<std::size_t, std::dynamic_extent, 16>{data.size() / 16}};
+    }
+};
+
+export std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader);
+export AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader);
+
+// Implementation
 Vid::Vid(BinaryStreamReader reader)
 {
 	reader.read_to(name);
@@ -253,8 +265,9 @@ VidGraphics::VidGraphics(BinaryStreamReader& reader) {
 	}
 }
 
-export std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader) {
-	assert(soundSection.header().type == SectionType::Sound);
+std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader) {
+	if(soundSection.header().type != SectionType::Sound)
+	    throw std::logic_error("Trying to get sounds with invalid section");
 
 	std::vector<StreamSpan> result;
 	result.reserve(soundSection.header().elementCount);
@@ -269,4 +282,15 @@ export std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStr
 	}
 
 	return result;
+}
+
+AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader) {
+    if(section.header().type != SectionType::TilesTable)
+        throw std::logic_error("Trying to get adjacency data with invalid section");
+
+    AdjacencyData adjacencyData;
+    adjacencyData.data.resize(section.header().elementCount * 16);
+    reader.read_to(std::as_writable_bytes(std::span{adjacencyData.data}));
+
+    return adjacencyData;
 }

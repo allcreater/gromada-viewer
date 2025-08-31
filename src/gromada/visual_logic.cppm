@@ -22,7 +22,7 @@ export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid
 		[&](int startIndex, std::uint8_t animationLength) { return startIndex + animationLength * vid.directionsCount; });
 
 	const int animationLength = vid.animationLengths[actionIndex];
-	const std::uint8_t roundAddition = (0xFF / vid.directionsCount) / 2;
+	const std::uint8_t roundAddition = (256 / vid.directionsCount) / 2;
 	firstFrameIndex += (((direction + roundAddition) & 0xFF) * vid.directionsCount / 256) * animationLength;
 
 	const auto lastFrameIndex = firstFrameIndex + std::max(animationLength - 1, 0);

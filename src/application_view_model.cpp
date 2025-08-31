@@ -23,7 +23,7 @@ public:
 	explicit ViewModel(Model& model)
 		: m_model{model} {
 
-	    m_model.newMap();
+	    m_model.newMap(0, 10, 10);
 	}
 
 	void updateUI() {
@@ -78,6 +78,7 @@ Controls:
 
 	void drawMenu() {
 		constexpr const char* ExportPopup = "Export map JSON";
+		constexpr const char* NewMapPopup = "New map";
 		const char* openPopup = nullptr;
 
 	    const auto vids = m_model.get<const GameResources>()->vids();
@@ -85,7 +86,7 @@ Controls:
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
 		    if (ImGui::MenuItem("New map")) {
-		        m_model.newMap();
+		       openPopup = NewMapPopup;
             }
 
 			if (ImGui::MenuItem("Export map JSON")) {
@@ -134,6 +135,30 @@ Controls:
 				ExportMapToJson(vids, m_model.saveMap(), stream);
 			}
 			ImGui::EndPopup();
+		} else if (ImGui::BeginPopupModal(NewMapPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+            ImGui::InputInt("Width", &m_newMapPopupState.width );
+		    ImGui::InputInt("Height", &m_newMapPopupState.height);
+
+		    auto gameResources = m_model.get<GameResources>();
+		    assert(gameResources);
+
+		    auto baseTiles = gameResources->baseTilesVids();
+		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](int nvid) {
+		        return nvid > 0 ? gameResources->getVid(nvid).getName() : std::u8string{u8"None [size in pixels]"};
+		    });
+
+		    if (ImGui::Button("OK", ImVec2(120, 0))) {
+		        ImGui::CloseCurrentPopup();
+
+		        m_model.newMap(baseTiles[m_newMapPopupState.selectedTile], m_newMapPopupState.width, m_newMapPopupState.height);
+		    }
+
+		    ImGui::SameLine();
+		    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+            }
+
+		    ImGui::EndPopup();
 		}
 
 	    {
@@ -151,6 +176,12 @@ private:
 	Model& m_model;
 
 	std::optional<std::array<char, 256>> m_savePopupfilenameBuffer;
+
+    struct NewMapPopupState {
+        int width = 10;
+        int height = 10;
+        int selectedTile = 0;
+    } m_newMapPopupState;
 
 	VidsWindowViewModel m_vidsViewModel{m_model};
 	MapViewModel m_mapViewModel{m_model};
