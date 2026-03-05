@@ -74,10 +74,19 @@ class App {
 		pass_action.colors[0].load_action = SG_LOADACTION_CLEAR;
 		pass_action.colors[0].clear_value = {0.0f, 0.5f, 0.7f, 1.0f};
 
-		app = std::make_unique<Application>(arguments);
+		try {
+			app = std::make_unique<Application>(arguments);
+		}
+		catch (const std::exception& e) {
+			std::cerr << e.what() << std::endl;
+			sapp_quit();
+		}
 	}
 
 	void frame() {
+		if (!app)
+			return;
+
 		const int width = sapp_width();
 		const int height = sapp_height();
 		simgui_new_frame({ width, height, sapp_frame_duration(), sapp_dpi_scale() });

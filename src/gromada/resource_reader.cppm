@@ -120,9 +120,15 @@ export {
 		std::streampos m_beginPos;
 	};
 
+	class GromadaResourceException : public std::runtime_error {
+	public:
+		using std::runtime_error::runtime_error;
+	};
+
 	class GromadaResourceReader {
 	public:
-		explicit GromadaResourceReader(std::filesystem::path path) : m_stream{ path, std::ios_base::in | std::ios_base::binary } {
+		explicit GromadaResourceReader(std::filesystem::path path) try
+		: m_stream{ path, std::ios_base::in | std::ios_base::binary } {
 			m_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
 			m_stream.read(reinterpret_cast<char*>(&m_sectionsCount), sizeof(std::uint32_t));
@@ -130,6 +136,8 @@ export {
 
 		    if (m_sectionsCount > 10000)
 		        throw std::runtime_error("GromadaResourceReader: too many sections in resource file");
+		} catch ( ... ) {
+			std::throw_with_nested(GromadaResourceException{std::format("Failed to read resource file {}", path.generic_string())});
 		}
 
 		void goStart() {
