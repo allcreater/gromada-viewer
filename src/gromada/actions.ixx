@@ -10,7 +10,7 @@ export {
     constexpr std::string_view to_string(Action action) noexcept;
 }
 
-//     event name          index  event arguments                     official comment from the game's maps/header.ini
+//     event name          index  event arguments                     official comment from the game's maps/header.ini, or @ - unofficial comment
 #define GROMADA_ACTIONS_XMACRO_LIST(ACTION)                                                                                                                     \
 ACTION(act_stand          , 0 ,   ()                                ) /**/                                                                                      \
 ACTION(act_build          , 1 ,   ()                                ) /**/                                                                                      \
@@ -35,12 +35,12 @@ ACTION(act_askitem        , 34,   ((int, nvid))                     ) /*var1=nvi
 ACTION(act_changeweapon   , 35,   ((int, nweapon))                  ) /*var1=nweapon*/                                                                          \
 ACTION(act_deleteallitem  , 36,   ()                                ) /**/                                                                                      \
 ACTION(act_changeaction   , 37,   ((Action, action), (int, dir))    ) /*var1=action var2=direct*/                                                               \
-ACTION(act_path_limit     , 38,   ()                                ) /*path is limited of field*/                                                              \
-ACTION(act_attack         , 39,   ()                                ) /**/                                                                                      \
-ACTION(act_move           , 40,   ()                                ) /**/                                                                                      \
+ACTION(act_path_limit     , 38,   ((int, x), (int, y))              ) /*path is limited of field*/                                                              \
+ACTION(act_attack         , 39,   ((int, target_id))                ) /**/                                                                                      \
+ACTION(act_move           , 40,   ((int, x), (int, y))              ) /**/                                                                                      \
 ACTION(act_buildunit      , 41,   ((int, nvid))                     ) /*var1-nvid for building unit*/                                                           \
-ACTION(act_drawselected   , 42,   ()                                ) /**/                                                                                      \
-ACTION(act_damage         , 43,   ()                                ) /**/                                                                                      \
+ACTION(act_drawselected   , 42,   ()                                ) /*@ рисует путевые точки*/                                                                \
+ACTION(act_damage         , 43,   ((int, damage))                   ) /*@ наносит урон 0-255*/                                                                  \
 ACTION(act_select         , 44,   ()                                ) /*вызывает на самом деле act_salut*/                                                      \
 ACTION(act_nextcommand    , 45,   ()                                ) /**/                                                                                      \
 ACTION(act_init           , 46,   ()                                ) /*вызывается из createunit для инициализации нач. значений*/                              \
@@ -48,9 +48,9 @@ ACTION(act_uncom          , 47,   ()                                ) /*запр
 ACTION(act_deletetarget   , 48,   ((int, target_id))                ) /*if target ==var1 then target=NULL*/                                                     \
 ACTION(act_calltact       , 49,   ()                                ) /**/                                                                                      \
 ACTION(act_save           , 51,   ((StreamHandle, stream_id))       ) /*записать информацию относящуюся к данному спрайту в var1*/                              \
-ACTION(act_restore        , 52,   ()                                ) /**/                                                                                      \
+ACTION(act_restore        , 52,   ((StreamHandle, stream_id))       ) /**/                                                                                      \
 ACTION(act_destroy        , 54,   ()                                ) /**/                                                                                      \
-ACTION(act_coor_attack    , 56,   ()                                ) /**/                                                                                      \
+ACTION(act_coor_attack    , 56,   ((int, x), (int, y))              ) /*@ стрелять в точку χ, y*/                                                               \
 ACTION(act_child          , 57,   ()                                ) /*вызывается из createchild при создании child*/                                          \
 ACTION(act_saveframe      , 58,   ((StreamHandle, stream_id))       ) /*записать информацию относящуюся к данному frame в var1*/                                \
 ACTION(act_fullsave       , 59,   ((StreamHandle, stream_id))       ) /*записать всю информацию относящуюся к данному sprite, кроме записанной в act_save*/     \
