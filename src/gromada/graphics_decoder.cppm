@@ -23,6 +23,7 @@ export {
             };
         }
     };
+    static_assert(sizeof(CompressedColor) == sizeof(std::uint16_t));
 
     struct ClippingInfo {
         int skip_first_x, skip_last_x, skip_first_y, skip_last_y;
@@ -69,6 +70,7 @@ void Decode_mode2(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
         std::uint8_t count : 6;
         std::uint8_t command : 2;
     };
+    static_assert(sizeof (ControlWord) == sizeof (std::uint8_t));
 
     for (int y = startY; y < endY; ++y) {
         visitor.set_cursor(0, y);
@@ -98,6 +100,7 @@ void Decode_mode3(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
 		std::uint8_t count : 5;
 		std::uint8_t factor : 3;
 	};
+    static_assert(sizeof (ControlWord) == sizeof (std::uint8_t));
 
     for (int y = startY; y < endY; ++y) {
         visitor.set_cursor(0, y);
@@ -122,6 +125,7 @@ void Decode_mode4(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
 		std::uint16_t g_factor : 3;
 		std::uint16_t r_factor : 3;
 	};
+    static_assert(sizeof (ControlWord) == sizeof (std::uint16_t));
 
     for (int y = startY; y < endY; ++y) {
         visitor.set_cursor(0, y);
@@ -143,6 +147,7 @@ void Decode_mode6(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
         std::uint8_t count : 7;
         std::uint8_t repeat : 1;
     };
+    static_assert(sizeof (ControlWord) == sizeof (std::uint8_t));
 
     for (int y = 0; y < frame.height(); ++y) {
         visitor.set_cursor(0, y);
@@ -172,6 +177,7 @@ void Decode_Type8(VidGraphics::Frame frame, ClippingInfo clipping_info, DecoderV
         std::uint8_t count : 5;
         std::uint8_t opacity : 3;
     };
+    static_assert(sizeof (ControlWord) == sizeof (std::uint8_t));
 
     for (int y = startY; y < endY; ++y) {
         visitor.set_cursor(0, y);
