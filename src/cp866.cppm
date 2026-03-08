@@ -22,20 +22,21 @@ constexpr std::array<std::uint16_t, 128> cp866_to_unicode {
     0x00B0, 0x2219, 0x00B7, 0x221A, 0x2116, 0x00A4, 0x25A0, 0x00A0	// 0xF8-0xFF
 };
 
-export constexpr std::u8string cp866_to_utf8(std::string_view input) {
-    std::u8string result;
+export template <typename CharT = char>
+constexpr std::basic_string<CharT> cp866_to_utf8(std::string_view input) {
+    std::basic_string<CharT> result;
     for (std::uint8_t c : input) {
         if (c < 0x80) {
-            result += static_cast<char8_t>(c);
+            result += static_cast<CharT>(c);
         } else {
             std::uint16_t u = cp866_to_unicode[c - 0x80];
             if (u < 0x800) {
-                result += static_cast<char8_t>(0xC0 | (u >> 6));
-                result += static_cast<char8_t>(0x80 | (u & 0x3F));
+                result += static_cast<CharT>(0xC0 | (u >> 6));
+                result += static_cast<CharT>(0x80 | (u & 0x3F));
             } else {
-                result += static_cast<char8_t>(0xE0 | (u >> 12));
-                result += static_cast<char8_t>(0x80 | ((u >> 6) & 0x3F));
-                result += static_cast<char8_t>(0x80 | (u & 0x3F));
+                result += static_cast<CharT>(0xE0 | (u >> 12));
+                result += static_cast<CharT>(0x80 | ((u >> 6) & 0x3F));
+                result += static_cast<CharT>(0x80 | (u & 0x3F));
             }
         }
     }

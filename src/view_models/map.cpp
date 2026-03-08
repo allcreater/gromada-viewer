@@ -166,21 +166,44 @@ export class MapViewModel {
             const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
             draw_list->AddRectFilled(to_imvec(viewport.worldToScreenPos(pos - halfSize)), to_imvec(viewport.worldToScreenPos(pos + halfSize)), color, rounding);
 
-            if (const auto* payload = id.get<GameObject::Payload>(); payload && !payload->commands.empty()) {
+            // TODO: показывать всего одно окно, зато для любого объекта с payload
+            if (auto* payload = id.get_mut<GameObject::Payload>(); payload && (!payload->commands.empty() || !payload->items.empty()) ) {
                 ImGui::SetNextWindowPos(to_imvec(viewport.worldToScreenPos(pos)));
-                ImGui::PushID(payload);
-                ImGui::BeginChild("Commands", ImVec2{200.0f, payload->commands.size() * 25.0f}, ImGuiChildFlags_FrameStyle);
-                std::ranges::for_each(payload->commands, [&, index = 0](const ObjectCommand& cmd) mutable {
-                    ImGui::TextUnformatted(std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2).c_str());
-                });
-                ImGui::EndChild();
-                ImGui::PopID();
+                showObjectPayloadWindow(*payload);
             }
         });
 
         if (m_selectionFrame) {
             draw_list->AddRect(to_imvec(viewport.worldToScreenPos(m_selectionFrame->min)), to_imvec(viewport.worldToScreenPos(m_selectionFrame->max)), IM_COL32(0, 255, 0, 200));
         }
+    }
+
+    void showObjectPayloadWindow(GameObject::Payload& payload) {
+        ImGui::PushID(&payload);
+        //ImGui::BeginChild("Commands", ImVec2{200.0f, 400.0f}, ImGuiChildFlags_FrameStyle);
+        ImGui::Begin("Info");
+
+        int currentCommand = 0;
+        MyImUtils::ListBox("commands", &currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&, index = 0](const ObjectCommand& cmd) mutable {
+            return std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2);
+        }), {200.0f, 200.0f});
+
+        ImGui::PushItemWidth(100.0f);
+        ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
+        ImGui::InputScalar("Build time",  ImGuiDataType_U8, &payload.buildTime);
+        ImGui::InputScalar("Army",  ImGuiDataType_U8, &payload.army );
+        ImGui::InputScalar("Behavior",  ImGuiDataType_U8, &payload.behave );
+        ImGui::PopItemWidth();
+
+        int currentItem = 0;
+        ImGui::Text("Items:");
+        MyImUtils::ListBox("items", &currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [gr = m_world.get<const GameResources>()](std::int16_t nvid) {
+            return std::format("[{:3}] {}", nvid, gr->getVid(nvid).getName());
+        } ), {200.0f, 200.0f} );
+
+        //ImGui::EndChild();
+        ImGui::End();
+        ImGui::PopID();
     }
 
     void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const MapHeaderRawData& mapHeader) {

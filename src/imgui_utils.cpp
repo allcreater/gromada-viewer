@@ -8,18 +8,37 @@ module;
 
 #include <cassert>
 
-#if __INTELLISENSE__
-#include <span>
-#endif
-
 export module imgui_utils;
 
 import std;
 
 namespace MyImUtils {
 
-export template<typename T, typename Fn = std::identity>
-bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn itemToStr = {}, ImVec2 size = { -FLT_MIN, -FLT_MIN })
+constexpr const char* c_str(const char* c_string) noexcept { return c_string; }
+const char* c_str(const std::string& string) { return string.c_str(); }
+const char* c_str(const std::u8string& string) { return reinterpret_cast<const char*>(string.c_str()); }
+
+template <typename T, typename ItemType>
+concept ListItemCallback = requires(T fn, const ItemType& item, bool item_selected)
+{
+    { fn(item, item_selected) } -> std::same_as<bool>;
+};
+
+export template <typename ItemType, typename Fn = std::identity>
+    requires requires (ItemType item, Fn fn) {  { c_str(std::invoke(fn, item)) } -> std::same_as<const char*>; }
+ListItemCallback<ItemType> auto MakeSelectableCallback(Fn item_to_str) {
+    return [item_to_str = std::move(item_to_str)](const ItemType& item, bool item_selected) mutable {
+        auto&& item_text = std::invoke(item_to_str, item);
+        const char* text_c_str = c_str(item_text);
+        if (text_c_str == nullptr)
+            text_c_str = "*Unknown item*";
+
+        return ImGui::Selectable(text_c_str, item_selected);
+    };
+}
+
+export template<typename ItemType, ListItemCallback<ItemType> Fn>
+bool ListBox(const char* label, int* current_item, std::span<ItemType> items, Fn item_callback, ImVec2 size = { -FLT_MIN, -FLT_MIN })
 {
     const auto items_count = items.size();
     //using namespace ImGui
@@ -42,13 +61,9 @@ bool ListBox(const char* label, int* current_item, std::span<const T> items, Fn 
     while (clipper.Step())
         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
         {
-            const char* item_text = itemToStr(items[i]);
-            if (item_text == nullptr)
-                item_text = "*Unknown item*";
-
             ImGui::PushID(i);
             const bool item_selected = (i == *current_item);
-            if (ImGui::Selectable(item_text, item_selected))
+            if (item_callback(items[i], item_selected))
             {
                 *current_item = i;
                 value_changed = true;
@@ -78,17 +93,7 @@ bool ComboBox(const char* label, int* current_item, std::span<const T> items, Fn
         thread_local std::invoke_result_t<Fn, const T> item_text = {};
         item_text = context->itemToStr(context->items[idx]);
 
-        if constexpr (std::is_convertible_v<decltype(item_text), const char*>) {
-            return item_text;
-        }
-        else if constexpr (requires { std::as_const(item_text).c_str(); }) {
-            static_assert(sizeof(*std::as_const(item_text).c_str()) == 1, "itemToStr must return multi-byte string");
-            return reinterpret_cast<const char*>(std::as_const(item_text).c_str());
-        }
-        else {
-            static_assert(false, "itemToStr must return const char* or string-like type");
-            return "*Unknown item*";
-        }
+        return c_str(item_text);
     };
 
     Context ctx{items, std::move(itemToStr)};

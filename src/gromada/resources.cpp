@@ -163,7 +163,7 @@ export struct Vid {
 	std::variant<std::int32_t, Graphics> graphicsData;
 
 	//
-	[[nodiscard]] std::u8string getName() const { return cp866_to_utf8(std::string_view{name.data()}); }
+	[[nodiscard]] std::string getName() const { return cp866_to_utf8(std::string_view{name.data()}); }
     const VidGraphics& graphics() const {
         const auto* graphics = std::get_if<Vid::Graphics>(&graphicsData);
         if (!graphics || !graphics->get())

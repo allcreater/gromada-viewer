@@ -20,12 +20,9 @@ public:
 		: m_model{model}, m_mapsBaseDirectory{model.get<const GameResources>()->mapsPath()} {}
 
 	void updateUI() {
-		auto pathToCStr = [this, currentStr = std::u8string{}](
-							  const MapEntry& mapEntry) mutable { return reinterpret_cast<const char*>(mapEntry.name.c_str()); };
-
 	    const auto activeLevel = m_model.component<ActiveLevel>();
 
-		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span<const MapEntry>{m_maps}, std::move(pathToCStr))) {
+		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span<const MapEntry>{m_maps}, MyImUtils::MakeSelectableCallback<const MapEntry&>(&MapEntry::name))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
 			if (auto* currentPath = activeLevel.get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
 				m_model.loadMap(selectedMap.path);

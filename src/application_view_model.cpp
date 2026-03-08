@@ -144,7 +144,7 @@ Controls:
 
 		    auto baseTiles = gameResources->baseTilesVids();
 		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](int nvid) {
-		        return nvid > 0 ? gameResources->getVid(nvid).getName() : std::u8string{u8"None [size in pixels]"};
+		        return nvid > 0 ? gameResources->getVid(nvid).getName() : std::string{"None [size in pixels]"};
 		    });
 
 		    if (ImGui::Button("OK", ImVec2(120, 0))) {
