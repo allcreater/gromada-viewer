@@ -133,6 +133,7 @@ export class MapViewModel {
                 ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
             displaySelection(draw_list, *viewport);
+            updateSelectedObjectsPropertiesWindow(draw_list, *viewport);
 
             displayMapBounds(draw_list, *viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
         }
@@ -157,20 +158,19 @@ export class MapViewModel {
         }
     }
 
+    auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& transform, auto&& boundsGetter) {
+        BoundingBox bb = std::invoke(boundsGetter, vid, transform);
+        return std::make_tuple(to_imvec(viewport.worldToScreenPos({bb.left, bb.top})), to_imvec(viewport.worldToScreenPos({bb.right, bb.down})));
+    };
+
     void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
         m_selectionUIState.selectedObjects.clear();
-
-        const auto computeBBScreenSize = [&](const Vid& vid, const Transform& transform) {
-            const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
-            const glm::ivec2 pos {transform.x, transform.y};
-            return std::make_tuple(to_imvec(viewport.worldToScreenPos(pos - halfSize)), to_imvec(viewport.worldToScreenPos(pos + halfSize)));
-        };
 
         m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& transform) {
             const auto  color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(vid.sizeX, vid.sizeY) * 0.25f;
 
-            auto [min, max] = computeBBScreenSize(vid, transform);
+            auto [min, max] = computeBBScreenSize(viewport, vid, transform, PhysicalBoundsFn{});
             draw_list->AddRectFilled(min, max, color, rounding);
 
             if (id.has<GameObject::Payload>()) {
@@ -179,7 +179,9 @@ export class MapViewModel {
                 m_selectionUIState.selectedObjects.push_back( id );
             }
         });
+    }
 
+    void updateSelectedObjectsPropertiesWindow(ImDrawList* draw_list, Viewport& viewport) {
         if (m_selectionUIState.selectedObjects.empty()) {
             m_selectionUIState.selectedObject = -1;
         } else {
@@ -194,7 +196,12 @@ export class MapViewModel {
 
             auto objectHandle = m_selectionUIState.selectedObjects[m_selectionUIState.selectedObject];
 
-            auto [min, max] = computeBBScreenSize(*objectHandle.get<VidComponent>(), *objectHandle.get<Transform, World>());
+            auto& transform = *objectHandle.get<Transform, World>();
+            if (ImGui::Button("Center camera")) {
+                viewport.camPos = {transform.x, transform.y};
+            }
+
+            auto [min, max] = computeBBScreenSize(viewport, *objectHandle.get<VidComponent>(), transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
             showObjectPayloadWindow(*objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
