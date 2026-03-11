@@ -59,7 +59,7 @@ export class MapViewModel {
                 viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
             });
 
-        m_selectionQuery = world.query_builder<const VidComponent, const Transform>()
+        m_selectionQuery = world.query_builder<const VidComponent, const Transform>("selectionQuery")
             .with<Selected>()
             .term_at(1).second<World>()
             .cached().build();
@@ -141,7 +141,7 @@ export class MapViewModel {
 
         // TODO: remake to some king of state machine instead of this spagetthi logic
         bool prototype_enabled = ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
-        if (!ImGui::IsDragDropActive() ) {
+        if (!ImGui::IsDragDropActive() && ImGui::IsWindowHovered()) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
                 prototype_enabled = false;
                 updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
@@ -158,20 +158,47 @@ export class MapViewModel {
     }
 
     void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
-        m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& transform) {
+        m_selectionUIState.selectedObjects.clear();
+
+        const auto computeBBScreenSize = [&](const Vid& vid, const Transform& transform) {
             const glm::ivec2 halfSize {vid.sizeX / 2, vid.sizeY / 2};
             const glm::ivec2 pos {transform.x, transform.y};
+            return std::make_tuple(to_imvec(viewport.worldToScreenPos(pos - halfSize)), to_imvec(viewport.worldToScreenPos(pos + halfSize)));
+        };
 
-            const auto color = objectSelectionColor(vid.unitType);
-            const float rounding = std::min(halfSize.x, halfSize.y) * 0.5f;
-            draw_list->AddRectFilled(to_imvec(viewport.worldToScreenPos(pos - halfSize)), to_imvec(viewport.worldToScreenPos(pos + halfSize)), color, rounding);
+        m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& transform) {
+            const auto  color = objectSelectionColor(vid.unitType);
+            const float rounding = std::min(vid.sizeX, vid.sizeY) * 0.25f;
 
-            // TODO: показывать всего одно окно, зато для любого объекта с payload
-            if (auto* payload = id.get_mut<GameObject::Payload>(); payload && (!payload->commands.empty() || !payload->items.empty()) ) {
-                ImGui::SetNextWindowPos(to_imvec(viewport.worldToScreenPos(pos)));
-                showObjectPayloadWindow(*payload);
+            auto [min, max] = computeBBScreenSize(vid, transform);
+            draw_list->AddRectFilled(min, max, color, rounding);
+
+            if (id.has<GameObject::Payload>()) {
+                //draw_list->AddLine(to_imvec(viewport.worldToScreenPos(pos)), ImGui::GetWindow(), IM_COL32(255, 255, 255, 255), 2.0f);
+
+                m_selectionUIState.selectedObjects.push_back( id );
             }
         });
+
+        if (m_selectionUIState.selectedObjects.empty()) {
+            m_selectionUIState.selectedObject = -1;
+        } else {
+            m_selectionUIState.selectedObject = std::clamp(m_selectionUIState.selectedObject, 0, static_cast<int>(m_selectionUIState.selectedObjects.size()) - 1);
+
+            ImGui::SetNextWindowPos({500, 200}, ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2{200, 300}, ImGuiCond_FirstUseEver);
+            ImGui::Begin("Info");
+            MyImUtils::ComboBox( "object" , &m_selectionUIState.selectedObject, std::span{m_selectionUIState.selectedObjects}, [&](flecs::entity obj) {
+                return (*obj.get<VidComponent>())->getName();
+            } );
+
+            auto objectHandle = m_selectionUIState.selectedObjects[m_selectionUIState.selectedObject];
+
+            auto [min, max] = computeBBScreenSize(*objectHandle.get<VidComponent>(), *objectHandle.get<Transform, World>());
+            draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
+            showObjectPayloadWindow(*objectHandle.get_mut<GameObject::Payload>());
+            ImGui::End();
+        }
 
         if (m_selectionFrame) {
             draw_list->AddRect(to_imvec(viewport.worldToScreenPos(m_selectionFrame->min)), to_imvec(viewport.worldToScreenPos(m_selectionFrame->max)), IM_COL32(0, 255, 0, 200));
@@ -179,31 +206,50 @@ export class MapViewModel {
     }
 
     void showObjectPayloadWindow(GameObject::Payload& payload) {
-        ImGui::PushID(&payload);
-        //ImGui::BeginChild("Commands", ImVec2{200.0f, 400.0f}, ImGuiChildFlags_FrameStyle);
-        ImGui::Begin("Info");
+        if (ImGui::BeginTabBar("PayloadTabs")) {
+            if (ImGui::BeginTabItem("General")) {
+                ImGui::PushItemWidth(100.0f);
+                ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
+                ImGui::InputScalar("Build time",  ImGuiDataType_U8, &payload.buildTime);
+                ImGui::InputScalar("Army",  ImGuiDataType_U8, &payload.army );
+                ImGui::InputScalar("Behavior",  ImGuiDataType_U8, &payload.behave );
+                ImGui::PopItemWidth();
 
-        int currentCommand = 0;
-        MyImUtils::ListBox("commands", &currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&, index = 0](const ObjectCommand& cmd) mutable {
-            return std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2);
-        }), {200.0f, 200.0f});
+                ImGui::EndTabItem();
+            }
 
-        ImGui::PushItemWidth(100.0f);
-        ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
-        ImGui::InputScalar("Build time",  ImGuiDataType_U8, &payload.buildTime);
-        ImGui::InputScalar("Army",  ImGuiDataType_U8, &payload.army );
-        ImGui::InputScalar("Behavior",  ImGuiDataType_U8, &payload.behave );
-        ImGui::PopItemWidth();
+            if (ImGui::BeginTabItem("Commands")) {
+                MyImUtils::ListBox("commands", &m_selectionUIState.currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&, index = 0](const ObjectCommand& cmd) mutable {
+                    return std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2);
+                }), {200.0f, 200.0f});
 
-        int currentItem = 0;
-        ImGui::Text("Items:");
-        MyImUtils::ListBox("items", &currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [gr = m_world.get<const GameResources>()](std::int16_t nvid) {
-            return std::format("[{:3}] {}", nvid, gr->getVid(nvid).getName());
-        } ), {200.0f, 200.0f} );
+                ImGui::EndTabItem();
+            }
 
-        //ImGui::EndChild();
-        ImGui::End();
-        ImGui::PopID();
+            if (ImGui::BeginTabItem("Items")) {
+                MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [gr = m_world.get<const GameResources>()](std::int16_t nvid) {
+                    return std::format("[{:3}] {}", nvid, gr->getVid(nvid).getName());
+                } ), {200.0f, 200.0f} );
+
+                if (ImGui::Button("+")) {
+                    auto prototype = m_world.target<ObjectPrototype>();
+                    if (!prototype.is_valid())
+                        return;
+
+                    payload.items.push_back( prototype.get<VidComponent>()->nvid());
+                }
+                ImGui::SameLine();
+
+                ImGui::BeginDisabled(payload.items.empty());
+                if (ImGui::Button("-")) {
+                    payload.items.erase(payload.items.begin() + m_selectionUIState.currentItem);
+                }
+                ImGui::EndDisabled();
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
     }
 
     void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const MapHeaderRawData& mapHeader) {
@@ -283,6 +329,13 @@ export class MapViewModel {
     flecs::query<const VidComponent, const Transform> m_selectionQuery;
     std::optional<SelectionRect> m_selectionFrame;
     std::underlying_type_t<UnitType> m_selectionType = 0b01111110; // Default selection type
+
+    struct SelectionUIState {
+        int currentCommand = 0;
+        int currentItem = 0;
+        int selectedObject = 0;
+        std::vector<flecs::entity> selectedObjects;
+    } m_selectionUIState;
 };
 
 constexpr static ImU32 objectSelectionColor(UnitType unitType) {
