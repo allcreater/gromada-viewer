@@ -81,7 +81,7 @@ bool ListBox(const char* label, int* current_item, std::span<ItemType> items, Fn
 }
 
 export template<typename T, typename Fn = std::identity>
-bool ComboBox(const char* label, int* current_item, std::span<const T> items, Fn itemToStr = {}) {
+bool ComboBox(const char* label, int* current_item, std::span<T> items, Fn itemToStr = {}) {
     struct Context {
         std::span<const T> items;
         Fn itemToStr;
