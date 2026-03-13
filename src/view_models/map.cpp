@@ -196,12 +196,16 @@ export class MapViewModel {
 
             auto objectHandle = m_selectionUIState.selectedObjects[m_selectionUIState.selectedObject];
 
+            auto& vidComponent = *objectHandle.get<VidComponent>();
             auto& transform = *objectHandle.get<Transform, World>();
+
             if (ImGui::Button("Center camera")) {
                 viewport.camPos = {transform.x, transform.y};
             }
+            ImGui::SameLine( );
+            ImGui::Text("[nvid: %d]", vidComponent.nvid());
 
-            auto [min, max] = computeBBScreenSize(viewport, *objectHandle.get<VidComponent>(), transform, VisualBoundsFn{});
+            auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
             showObjectPayloadWindow(*objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
@@ -226,9 +230,9 @@ export class MapViewModel {
             }
 
             if (ImGui::BeginTabItem("Commands")) {
-                MyImUtils::ListBox("commands", &m_selectionUIState.currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&, index = 0](const ObjectCommand& cmd) mutable {
-                    return std::format("[{:3}] {:^10}\t{}\t{}", index++, to_string(cmd.command), cmd.p1, cmd.p2);
-                }), {200.0f, 200.0f});
+                MyImUtils::ListBox("commands", &m_selectionUIState.currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&](const ObjectCommand& cmd) {
+                    return std::format("[{:3}] {:^10}\t{}\t{}", std::distance(const_cast<const ObjectCommand*>(payload.commands.data()), &cmd), to_string(cmd.command), cmd.p1, cmd.p2);
+                }));
 
                 ImGui::EndTabItem();
             }
@@ -236,7 +240,7 @@ export class MapViewModel {
             if (ImGui::BeginTabItem("Items")) {
                 MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [gr = m_world.get<const GameResources>()](std::int16_t nvid) {
                     return std::format("[{:3}] {}", nvid, gr->getVid(nvid).getName());
-                } ), {200.0f, 200.0f} );
+                } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                 if (ImGui::Button("+")) {
                     auto prototype = m_world.target<ObjectPrototype>();
