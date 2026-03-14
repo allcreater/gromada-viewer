@@ -45,7 +45,14 @@ auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
 export class VidsWindowViewModel {
 public:
 	explicit VidsWindowViewModel(Model& model)
-		: m_model{model} {}
+		: m_model{model} {
+
+		m_model.observer<GlobalEditorState>()
+			.event(flecs::OnSet)
+			.each([this](flecs::entity _, const GlobalEditorState& state) {
+				InvalidateSelection();
+			});
+	}
 
 	void updateUI() {
 		// By default, if we don't enable ScrollX the sizing policy for each column is "Stretch"
@@ -53,7 +60,9 @@ public:
 		static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
 									   ImGuiTableFlags_ContextMenuInBody;
 
-		const auto prevSelectedSection = m_selectedSection;
+		const auto prevSelectedSection = selectedSection();
+
+		const auto getVid = [resources = m_model.get<const GameResources>()](std::uint16_t nvid) -> const auto& { return resources->getVid(nvid); };
 
 	    ImGui::Checkbox("Show details", &m_showDetails);
 		if (ImGui::BeginTable(
@@ -66,33 +75,23 @@ public:
 			ImGui::TableHeadersRow();
 
 			if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty) {
-				const Vid* selectedVid = &(m_selectedSection->get());
-				std::ranges::sort(m_sortedVids, makeComparator(*specs));
-				m_selectedSection = std::ranges::find(m_sortedVids, selectedVid, [](const Vid& vid) { return &vid; });
+				std::ranges::sort(m_sortedVids, makeComparator(*specs), getVid);
 				specs->SpecsDirty = false;
 			}
 
-			for (auto it = m_sortedVids.begin(); it != m_sortedVids.end(); ++it) {
-				const Vid& vid = *it;
+			for (auto nvid : m_sortedVids) {
+				const Vid& vid = getVid(nvid);
 
 				ImGui::TableNextColumn();
-				bool isElementSelected = m_selectedSection == it;
+				bool isElementSelected = (selectedSection() == nvid);
 
-				const auto vids = m_model.get<const GameResources>()->vids();
-				const unsigned int nvid = std::distance(vids.data(), &vid);
 				if (ImGui::Selectable(std::to_string(nvid).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
-					m_selectedSection = it;
-				    //
+					selectedSection(nvid);
 				}
 				if (isElementSelected) {
 					ImGui::SetItemDefaultFocus();
 				    if (std::exchange(m_selecionInvalidated, false)) {
 				        ImGui::SetScrollHereY(0.5f); // Scroll to the selected item
-
-				        if (m_model.target<ObjectPrototype>().is_valid())
-                            m_model.target<ObjectPrototype>().destruct();
-				        auto prototype = m_model.entity().emplace<VidComponent>(*m_model.get<const GameResources>(), static_cast<std::uint16_t>(nvid));
-				        m_model.add<ObjectPrototype>(prototype);
 				    }
 				}
 
@@ -110,18 +109,19 @@ public:
 
 			ImGui::EndTable();
 
-		    if (prevSelectedSection != m_selectedSection) {
+		    if (prevSelectedSection != selectedSection()) {
 		        InvalidateSelection();
 		    }
 
 		    if (m_showDetails) {
 		        ImGui::SetNextWindowPos({320, 20}, ImGuiCond_FirstUseEver);
 		        if (ImGui::Begin("Vid details", &m_showDetails)) {
-					VidUI(*m_selectedSection);
+		        	const auto& vid = getVid(selectedSection());
+					VidUI(vid);
 
 					ImGui::SetNextWindowPos({10, 530}, ImGuiCond_FirstUseEver);
 		            ImGui::SetNextWindowSize({300, 280}, ImGuiCond_FirstUseEver);
-		            ShowFramesWindow(*m_selectedSection);
+		            ShowFramesWindow(vid);
 		        }
 		        ImGui::End();
 		    }
@@ -138,13 +138,20 @@ private:
 	
 	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
+	std::uint16_t selectedSection() {
+		return m_model.get<GlobalEditorState>()->selectedNvid;
+	}
+
+	void selectedSection(std::uint16_t nvid) {
+		m_model.get_mut<GlobalEditorState>()->selectedNvid = nvid;
+		m_model.modified<GlobalEditorState>();
+	}
+
 private:
 	Model& m_model;
     bool m_showDetails = false;
-	std::vector<std::reference_wrapper<const Vid>> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vids()};
-	decltype(m_sortedVids)::iterator m_selectedSection = m_sortedVids.begin();
+	std::vector<std::uint16_t> m_sortedVids{std::from_range, std::views::iota(std::uint16_t{0}, static_cast<std::uint16_t>(m_model.get<const GameResources>()->vids().size()))};
     bool m_selecionInvalidated = true;
-
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
 		.min_filter = SG_FILTER_LINEAR,
 		.mag_filter = SG_FILTER_LINEAR,
@@ -181,7 +188,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
             std::format_to_n(buffer.data(), buffer.size(), "{}", nvid);
             ImGui::PushID(id++);
             if (int index = std::abs(nvid); ImGui::TextLink(buffer.data()) && index < vids.size() ) {
-                m_selectedSection = std::ranges::find(m_sortedVids, &vids[index], [](const Vid& vid) { return &vid; });
+                selectedSection(nvid);
                 InvalidateSelection();
             }
             ImGui::PopID();
@@ -272,7 +279,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 	if (m_decodedFrames.empty()) {
-	    m_decodedFrames = DecodeVidFrames(m_selectedSection->get().graphics(), m_guiImagesSampler);
+	    m_decodedFrames = DecodeVidFrames(m_model.get<const GameResources>()->getVid(selectedSection()).graphics(), m_guiImagesSampler);
 	    if (m_decodedFrames.empty())
 	        return;
 	}

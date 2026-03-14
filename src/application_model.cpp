@@ -31,6 +31,10 @@ export struct ObjectPrototype {};
 export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
 
+export struct GlobalEditorState {
+	std::uint16_t selectedNvid = 0;
+};
+
 export struct EditorComponents {
     EditorComponents(flecs::world& world) {
         world.component<EditorOrdering>();
@@ -38,6 +42,7 @@ export struct EditorComponents {
 		world.component<ObjectPrototype>();
 		world.component<Path>();
 		world.component<Armies>();
+    	world.component<GlobalEditorState>();
 	}
 };
 
@@ -250,6 +255,17 @@ private:
         world.import<EditorComponents>();
 
         world.emplace<GameResources>(std::move(resources));
+    	world.emplace<GlobalEditorState>();
+
+    	world.observer<GlobalEditorState>()
+			.event(flecs::OnSet)
+			.each([world](flecs::entity _, const GlobalEditorState& state) {
+				if (world.target<ObjectPrototype>().is_valid())
+					world.target<ObjectPrototype>().destruct();
+
+				auto prototype = world.entity().emplace<VidComponent>(*world.get<const GameResources>(), static_cast<std::uint16_t>(state.selectedNvid));
+				world.add<ObjectPrototype>(prototype);
+			});
 
         return world;
     }

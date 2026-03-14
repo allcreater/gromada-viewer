@@ -203,7 +203,10 @@ export class MapViewModel {
                 viewport.camPos = {transform.x, transform.y};
             }
             ImGui::SameLine( );
-            ImGui::Text("[nvid: %d]", vidComponent.nvid());
+            if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
+                m_world.get_mut<GlobalEditorState>()->selectedNvid = vidComponent.nvid();
+                m_world.modified<GlobalEditorState>();
+            }
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
@@ -243,11 +246,7 @@ export class MapViewModel {
                 } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                 if (ImGui::Button("+")) {
-                    auto prototype = m_world.target<ObjectPrototype>();
-                    if (!prototype.is_valid())
-                        return;
-
-                    payload.items.push_back( prototype.get<VidComponent>()->nvid());
+                    payload.items.push_back( m_world.get<GlobalEditorState>()->selectedNvid);
                 }
                 ImGui::SameLine();
 
