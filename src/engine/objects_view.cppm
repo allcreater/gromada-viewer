@@ -42,26 +42,6 @@ struct PhysicalBoundsFn {
 	}
 };
 
-class VidComponent {
-private:
-    const Vid* m_vid;
-    const GameResources* m_parent;
-
-public:
-    VidComponent() { throw std::runtime_error{"VidComponent must be constructed with a valid GameResources and nvid"}; }
-    VidComponent(const GameResources& resources, int nvid)
-        : m_vid{&resources.getVid(nvid)}, m_parent{&resources} {}
-
-    operator const Vid&() const { return *m_vid; }
-    const Vid* operator->() const { return m_vid; }
-    const GameResources& parent() const { return *m_parent; }
-    std::uint16_t nvid() const noexcept {
-        auto distance = std::distance(parent().vids().data(), m_vid);
-        assert(distance < std::numeric_limits<std::uint16_t>::max());
-        return static_cast<std::uint16_t>(distance);
-    }
-};
-
 class ObjectsView {
 public:
 	struct VisualBounds {};
@@ -69,7 +49,7 @@ public:
 	constexpr static inline VisualBounds visualBounds{};
 	constexpr static inline PhysicalBounds physicalBounds{};
 
-	ObjectsView(flecs::world& world) { m_query = world.query_builder<const VidComponent, const Transform>().term_at(1).second<World>().cached().build(); }
+	ObjectsView(flecs::world& world) { m_query = world.query_builder<const VidRef, const Transform>().term_at(1).second<World>().cached().build(); }
 
     inline void queryObjectsInRegion([[maybe_unused]] VisualBounds, BoundingBox region, const auto& callback) const {
 	    queryObjectsInRegionImpl(VisualBoundsFn{}, region, callback);
@@ -89,7 +69,7 @@ private:
     }
 
 private:
-	flecs::query<const VidComponent, const Transform> m_query;
+	flecs::query<const VidRef, const Transform> m_query;
 };
 
 }

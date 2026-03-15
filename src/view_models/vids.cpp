@@ -62,8 +62,6 @@ public:
 
 		const auto prevSelectedSection = selectedSection();
 
-		const auto getVid = [resources = m_model.get<const GameResources>()](std::uint16_t nvid) -> const auto& { return resources->getVid(nvid); };
-
 	    ImGui::Checkbox("Show details", &m_showDetails);
 		if (ImGui::BeginTable(
 				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
@@ -75,18 +73,17 @@ public:
 			ImGui::TableHeadersRow();
 
 			if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty) {
-				std::ranges::sort(m_sortedVids, makeComparator(*specs), getVid);
+				std::ranges::sort(m_sortedVids, makeComparator(*specs));
 				specs->SpecsDirty = false;
 			}
 
-			for (auto nvid : m_sortedVids) {
-				const Vid& vid = getVid(nvid);
+			for (const auto& vid : m_sortedVids) {
 
 				ImGui::TableNextColumn();
-				bool isElementSelected = (selectedSection() == nvid);
+				bool isElementSelected = (selectedSection() == vid);
 
-				if (ImGui::Selectable(std::to_string(nvid).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
-					selectedSection(nvid);
+				if (ImGui::Selectable(std::to_string(vid.nvid()).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
+					selectedSection(vid);
 				}
 				if (isElementSelected) {
 					ImGui::SetItemDefaultFocus();
@@ -96,13 +93,13 @@ public:
 				}
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", vid.getName().c_str());
+				ImGui::Text("%s", vid->getName().c_str());
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%i", vid.behave);
+				ImGui::Text("%i", vid->behave);
 
 				ImGui::TableNextColumn();
-			    ImGui::Text("%i", vid.graphics().dataFormat);
+			    ImGui::Text("%i", vid->graphics().dataFormat);
 
 				ImGui::TableNextRow();
 			}
@@ -116,12 +113,11 @@ public:
 		    if (m_showDetails) {
 		        ImGui::SetNextWindowPos({320, 20}, ImGuiCond_FirstUseEver);
 		        if (ImGui::Begin("Vid details", &m_showDetails)) {
-		        	const auto& vid = getVid(selectedSection());
-					VidUI(vid);
+					VidUI(selectedSection());
 
 					ImGui::SetNextWindowPos({10, 530}, ImGuiCond_FirstUseEver);
 		            ImGui::SetNextWindowSize({300, 280}, ImGuiCond_FirstUseEver);
-		            ShowFramesWindow(vid);
+		            ShowFramesWindow(selectedSection());
 		        }
 		        ImGui::End();
 		    }
@@ -138,19 +134,19 @@ private:
 	
 	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
-	std::uint16_t selectedSection() {
+	VidRef selectedSection() {
 		return m_model.get<GlobalEditorState>()->selectedNvid;
 	}
 
-	void selectedSection(std::uint16_t nvid) {
-		m_model.get_mut<GlobalEditorState>()->selectedNvid = nvid;
+	void selectedSection(VidRef vid) {
+		m_model.get_mut<GlobalEditorState>()->selectedNvid = vid;
 		m_model.modified<GlobalEditorState>();
 	}
 
 private:
 	Model& m_model;
     bool m_showDetails = false;
-	std::vector<std::uint16_t> m_sortedVids{std::from_range, std::views::iota(std::uint16_t{0}, static_cast<std::uint16_t>(m_model.get<const GameResources>()->vids().size()))};
+	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vidRefs()};
     bool m_selecionInvalidated = true;
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
 		.min_filter = SG_FILTER_LINEAR,
@@ -182,13 +178,13 @@ namespace {
 
 
 void VidsWindowViewModel::VidUI(const Vid& self) {
-    auto linkToNvidControl = [&, vids = m_model.get<const GameResources>()->vids(), id = 0](int nvid) mutable {
+    auto linkToNvidControl = [&, resources = m_model.get<const GameResources>(), id = 0](int nvid) mutable {
         if (nvid) {
             std::array<char, 32> buffer {0};
             std::format_to_n(buffer.data(), buffer.size(), "{}", nvid);
             ImGui::PushID(id++);
-            if (int index = std::abs(nvid); ImGui::TextLink(buffer.data()) && index < vids.size() ) {
-                selectedSection(nvid);
+            if (int index = std::abs(nvid); ImGui::TextLink(buffer.data()) ) {
+                selectedSection(VidRef{*resources, index});
                 InvalidateSelection();
             }
             ImGui::PopID();
@@ -279,7 +275,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 	if (m_decodedFrames.empty()) {
-	    m_decodedFrames = DecodeVidFrames(m_model.get<const GameResources>()->getVid(selectedSection()).graphics(), m_guiImagesSampler);
+	    m_decodedFrames = DecodeVidFrames(selectedSection()->graphics(), m_guiImagesSampler);
 	    if (m_decodedFrames.empty())
 	        return;
 	}

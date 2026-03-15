@@ -15,13 +15,6 @@ export import Gromada.GameResources;
 
 export import engine.world_components;
 
-//TODO: move
-export struct ObjectToPlaceMessage {
-	std::uint16_t nvid;
-	std::uint8_t direction;
-};
-
-
 export struct EditorOrdering {
     std::uint32_t uid = 0;
     std::uint32_t index = 0;
@@ -32,7 +25,7 @@ export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
 
 export struct GlobalEditorState {
-	std::uint16_t selectedNvid = 0;
+	VidRef selectedNvid;
 };
 
 export struct EditorComponents {
@@ -49,22 +42,21 @@ export struct EditorComponents {
 export class Model : public flecs::world {
 public:
 	explicit Model(std::filesystem::path path)
-		: flecs::world{create_world(GameResources{path})} {}
+		: flecs::world{create_world(std::move(path))} {}
 
-    void newMap(int tileNvid, int width, int height) {
+    void newMap(VidRef vid, int width, int height) {
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
 
 	    if (width < 0 || height < 0)
             throw std::invalid_argument("Model::newMap: width and height must be non-negative");
 
-	    if (tileNvid > 0) {
-	        generateDefaultTerrain(tileNvid, width, height);
+	    if (vid) {
+	        generateDefaultTerrain(vid, width, height);
 	    }
 
-	    const Vid* vid = tileNvid > 0 ? &this->get<const GameResources>()->getVid(tileNvid) : nullptr;
 	    const auto fullWidth = (vid ? vid->sizeX : 1) * width;
-	    const auto fullHeight = ( vid ? vid->sizeY : 1) * height;
+	    const auto fullHeight = (vid ? vid->sizeY : 1) * height;
 	    if (fullWidth > std::numeric_limits<std::int16_t>::max() || fullHeight > std::numeric_limits<std::int16_t>::max()) {
 	        throw std::invalid_argument("Model::newMap: resulting map size is too large");
 	    }
@@ -92,7 +84,7 @@ public:
      //    }
 	}
 
-    void insertTile(int tileNvid, int x, int y) {
+    void insertTile(VidRef vid, int x, int y) {
 
 	}
 
@@ -105,7 +97,7 @@ public:
 
 	    for (const auto& obj : map.objects) {
 	        this->entity()
-                .emplace<VidComponent>(*gameResources, obj.nvid)
+                .emplace<VidRef>(*gameResources, obj.nvid)
 	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
 	            .set<GameObject::Payload>(obj.payload)
 	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})
@@ -117,7 +109,7 @@ public:
 	    activeLevel.set<Armies>(std::move(map.armies));
 	}
 
-    static GameObject makeGameObject(const VidComponent& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
+    static GameObject makeGameObject(const VidRef& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
 	    assert(transform.x > std::numeric_limits<std::int16_t>::min() && transform.y > std::numeric_limits<std::int16_t>::min() && transform.z > std::numeric_limits<std::int16_t>::min());
 	    assert(transform.x < std::numeric_limits<std::int16_t>::max() && transform.y < std::numeric_limits<std::int16_t>::max() && transform.z < std::numeric_limits<std::int16_t>::max());
 
@@ -136,7 +128,7 @@ public:
     // this function is so complex to reduce the binary differences between the original and saved map.
     // It tries to save original objects on the same position and with the same ID
     std::vector<flecs::entity> prepareObjectsToExport() {
-	    auto query = this->query_builder<const VidComponent, const Transform>()
+	    auto query = this->query_builder<const VidRef, const Transform>()
             .term_at(1).second<Local>() // Or world? Anyway, should be the same for top-level objects
             .with(flecs::ChildOf).second<ActiveLevel>()
             .build();
@@ -146,7 +138,7 @@ public:
 	    std::vector<flecs::entity> objects(query.count());
 
 	    // First step - collect all known objects and try to place them in the correct order
-	    query.each([&](flecs::entity entity, const VidComponent& vid, const Transform& transform) {
+	    query.each([&](flecs::entity entity, const VidRef& vid, const Transform& transform) {
 	        if (auto* existing_object_attribs = entity.get<EditorOrdering>()) {
 	            const auto [id, index] = *existing_object_attribs;
 	            if (index < objects.size()) {
@@ -199,7 +191,7 @@ public:
 	    return Map {
 	        .header = header,
 			.objects = entities | std::views::transform([i = 0](const flecs::entity& entity) mutable {
-				const auto& vid = *entity.get<VidComponent>();
+				const auto& vid = *entity.get<VidRef>();
 				const auto& transform = *entity.get<Transform, Local>();
 				const auto* payload = entity.get<GameObject::Payload>();
 				const auto& ordering = *entity.get<EditorOrdering>();
@@ -229,11 +221,10 @@ private:
         header.observerY -= map_bounds.top;
     }
 
-    void generateDefaultTerrain(int tileNvid, int width, int height) {
+    void generateDefaultTerrain(VidRef vid, int width, int height) {
         const auto activeLevel = this->component<ActiveLevel>();
-        const auto& vid = this->get<const GameResources>()->getVid(tileNvid);
 
-        assert(vid.unitType == UnitType::Terrain);
+        assert(vid->unitType == UnitType::Terrain);
 
         std::mt19937 rng{std::random_device{}()};
         std::uniform_int_distribution<int> directionsDistribution{0, 255};
@@ -241,20 +232,20 @@ private:
         for (int j = 0; j < height; ++j) {
             for (int i = 0; i < width; ++i) {
                 this->entity()
-                    .emplace<VidComponent>(*this->get<const GameResources>(), tileNvid)
-                    .set<Transform, Local>({.x = static_cast<std::int16_t>(i * vid.sizeX + vid.sizeX / 2), .y = static_cast<std::int16_t>(j * vid.sizeY + vid.sizeY / 2), .z = 0, .direction = static_cast<std::uint8_t>(directionsDistribution(rng))})
+                    .set<VidRef>(vid)
+                    .set<Transform, Local>({.x = static_cast<std::int16_t>(i * vid->sizeX + vid->sizeX / 2), .y = static_cast<std::int16_t>(j * vid->sizeY + vid->sizeY / 2), .z = 0, .direction = static_cast<std::uint8_t>(directionsDistribution(rng))})
                     .set<EditorOrdering>({.uid = 0, .index = static_cast<std::uint16_t>(j * width + i)})
                     .child_of(activeLevel);
             }
         }
     }
 
-	flecs::world create_world(GameResources&& resources) {
+	flecs::world create_world(std::filesystem::path resourcesPath) {
 		flecs::world world{};
         world.import<WorldModule>();
         world.import<EditorComponents>();
 
-        world.emplace<GameResources>(std::move(resources));
+        world.emplace<GameResources>(resourcesPath);
     	world.emplace<GlobalEditorState>();
 
     	world.observer<GlobalEditorState>()
@@ -263,8 +254,10 @@ private:
 				if (world.target<ObjectPrototype>().is_valid())
 					world.target<ObjectPrototype>().destruct();
 
-				auto prototype = world.entity().emplace<VidComponent>(*world.get<const GameResources>(), static_cast<std::uint16_t>(state.selectedNvid));
-				world.add<ObjectPrototype>(prototype);
+				if (state.selectedNvid) {
+					auto prototype = world.entity().emplace<VidRef>(state.selectedNvid);
+					world.add<ObjectPrototype>(prototype);
+				}
 			});
 
         return world;

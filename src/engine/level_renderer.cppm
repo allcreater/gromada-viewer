@@ -49,7 +49,7 @@ public:
 	        std::tuple<unsigned char, int> m_tuple;
 	    };
 	    world.component<RenderOrder>();
-	    world.system<const Transform, const VidComponent>()
+	    world.system<const Transform, const VidRef>()
 	        .term_at(0).second<World>()
             .kind(flecs::OnUpdate)
 	        .write<RenderOrder>()
@@ -65,7 +65,7 @@ public:
 
 	    // const auto time = std::chrono::high_resolution_clock::now();
 	    // const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
-	    world.system<Framebuffer, const Viewport, const Transform, const VidComponent, const AnimationComponent>()
+	    world.system<Framebuffer, const Viewport, const Transform, const VidRef, const AnimationComponent>()
             .term_at(0).singleton()
             .term_at(1).singleton()
 	        .term_at(2).second<World>()

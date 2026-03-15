@@ -118,46 +118,46 @@ export struct Vid {
     Vid() = default;
     explicit Vid (BinaryStreamReader reader);
 
-	std::array<char, 34> name; // In CP-866
-	UnitType unitType;
-	std::uint8_t behave;
-	ObjectFlags flags;
+	std::array<char, 34> name {0}; // In CP-866
+	UnitType unitType {};
+	std::uint8_t behave {};
+	ObjectFlags flags {};
 
-	std::uint8_t collisionMask;
-	std::uint16_t sizeX;
-	std::uint16_t sizeY;
-	std::uint16_t sizeZ;
-	std::uint8_t maxHP;
-	std::uint16_t gridRadius;
-	std::uint8_t unused1;
+	std::uint8_t collisionMask {};
+	std::uint16_t sizeX {};
+	std::uint16_t sizeY {};
+	std::uint16_t sizeZ {};
+	std::uint8_t maxHP {};
+	std::uint16_t gridRadius {};
+	std::uint8_t unused1 {};
 
-	std::uint16_t speedX;
-	std::uint16_t speedY;
-	std::uint16_t acceleration;
-	std::uint8_t rotationPeriod;
+	std::uint16_t speedX {};
+	std::uint16_t speedY {};
+	std::uint16_t acceleration {};
+	std::uint8_t rotationPeriod {};
 
-	std::uint8_t army;
-	std::uint8_t someWeaponIndex;
-	std::uint8_t unused2;
-	std::uint16_t deathDamageRadius;
-	std::uint8_t deathDamage;
+	std::uint8_t army {};
+	std::uint8_t someWeaponIndex {};
+	std::uint8_t unused2 {};
+	std::uint16_t deathDamageRadius {};
+	std::uint8_t deathDamage {};
 
-	std::int8_t linkX;
-	std::int8_t linkY;
-	std::int8_t linkZ;
-	std::uint16_t linkedObjectVid;
+	std::int8_t linkX {};
+	std::int8_t linkY {};
+	std::int8_t linkZ {};
+	std::uint16_t linkedObjectVid {};
 
-	std::uint16_t unused3;
-	std::uint8_t directionsCount;
-	std::uint8_t z_layer;
+	std::uint16_t unused3 {};
+	std::uint8_t directionsCount {};
+	std::uint8_t z_layer {};
 
-	std::array<std::uint8_t, 16> animationLengths;
-    std::array<std::uint16_t, 16> nsfx;
-    std::array<std::array<std::int16_t, 16>, 3> childrenOffsets;
-	std::array<std::int16_t, 16> childNvid;
-	std::array<std::uint8_t, 16> childrenCount;
+	std::array<std::uint8_t, 16> animationLengths {};
+    std::array<std::uint16_t, 16> nsfx {};
+    std::array<std::array<std::int16_t, 16>, 3> childrenOffsets {};
+	std::array<std::int16_t, 16> childNvid {};
+	std::array<std::uint8_t, 16> childrenCount {};
 
-	std::int32_t dataSizeOrNvid; // if < 0 then it's nvid
+	std::int32_t dataSizeOrNvid {}; // if < 0 then it's nvid
 
 	using Graphics = std::shared_ptr<VidGraphics>;
 	std::variant<std::int32_t, Graphics> graphicsData;

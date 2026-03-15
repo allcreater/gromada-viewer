@@ -23,7 +23,7 @@ public:
 	explicit ViewModel(Model& model)
 		: m_model{model} {
 
-	    m_model.newMap(0, 10, 10);
+	    m_model.newMap({}, 10, 10);
 	}
 
 	void updateUI() {
@@ -143,8 +143,8 @@ Controls:
 		    assert(gameResources);
 
 		    auto baseTiles = gameResources->baseTilesVids();
-		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](int nvid) {
-		        return nvid > 0 ? gameResources->getVid(nvid).getName() : std::string{"None [size in pixels]"};
+		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](const auto& vid) {
+		        return vid ? vid->getName() : "None [size in pixels]";
 		    });
 
 		    if (ImGui::Button("OK", ImVec2(120, 0))) {

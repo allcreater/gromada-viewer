@@ -59,7 +59,7 @@ export class MapViewModel {
                 viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
             });
 
-        m_selectionQuery = world.query_builder<const VidComponent, const Transform>("selectionQuery")
+        m_selectionQuery = world.query_builder<const VidRef, const Transform>("selectionQuery")
             .with<Selected>()
             .term_at(1).second<World>()
             .cached().build();
@@ -92,7 +92,7 @@ export class MapViewModel {
 		}
 
         if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
-            const auto step = 255 / static_cast<float>((*prototype.get<const VidComponent>())->directionsCount);
+            const auto step = 255 / static_cast<float>((*prototype.get<const VidRef>())->directionsCount);
             prototype_transform.direction += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
         }
     }
@@ -191,12 +191,12 @@ export class MapViewModel {
             ImGui::SetNextWindowSize(ImVec2{200, 300}, ImGuiCond_FirstUseEver);
             ImGui::Begin("Info");
             MyImUtils::ComboBox( "object" , &m_selectionUIState.selectedObject, std::span{m_selectionUIState.selectedObjects}, [&](flecs::entity obj) {
-                return (*obj.get<VidComponent>())->getName();
+                return (*obj.get<VidRef>())->getName();
             } );
 
             auto objectHandle = m_selectionUIState.selectedObjects[m_selectionUIState.selectedObject];
 
-            auto& vidComponent = *objectHandle.get<VidComponent>();
+            auto& vidComponent = *objectHandle.get<VidRef>();
             auto& transform = *objectHandle.get<Transform, World>();
 
             if (ImGui::Button("Center camera")) {
@@ -204,7 +204,7 @@ export class MapViewModel {
             }
             ImGui::SameLine( );
             if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
-                m_world.get_mut<GlobalEditorState>()->selectedNvid = vidComponent.nvid();
+                m_world.get_mut<GlobalEditorState>()->selectedNvid = vidComponent;
                 m_world.modified<GlobalEditorState>();
             }
 
@@ -246,7 +246,7 @@ export class MapViewModel {
                 } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                 if (ImGui::Button("+")) {
-                    payload.items.push_back( m_world.get<GlobalEditorState>()->selectedNvid);
+                    payload.items.push_back( m_world.get<GlobalEditorState>()->selectedNvid.nvid());
                 }
                 ImGui::SameLine();
 
@@ -302,7 +302,7 @@ export class MapViewModel {
                 m_world.remove_all<Selected>();
                 m_world.defer([&] {
                     m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
-                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying((*entity.get<const VidComponent>())->unitType) & m_selectionType) != 0) {
+                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying((*entity.get<const VidRef>())->unitType) & m_selectionType) != 0) {
                             entity.add<Selected>();
                         }
                     });
@@ -336,7 +336,7 @@ export class MapViewModel {
 
 
     flecs::world& m_world;
-    flecs::query<const VidComponent, const Transform> m_selectionQuery;
+    flecs::query<const VidRef, const Transform> m_selectionQuery;
     std::optional<SelectionRect> m_selectionFrame;
     std::underlying_type_t<UnitType> m_selectionType = 0b01111110; // Default selection type
 

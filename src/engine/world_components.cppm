@@ -4,7 +4,7 @@ module;
 export module engine.world_components;
 
 import std;
-import Gromada.GameResources;
+export import Gromada.GameResources;
 import Gromada.Map;
 import Gromada.VisualLogic;
 export import engine.objects_view;
@@ -24,7 +24,7 @@ export {
     public:
         WorldModule(flecs::world& world) {
             world.component<GameObject::Payload>();
-            world.component<VidComponent>();
+            world.component<VidRef>();
             world.component<MapHeaderRawData>();
             world.component<ObjectsView>();
             world.component<GameResources>();
@@ -40,9 +40,9 @@ export {
 
             world.add<ActiveLevel>();
 
-            world.observer<const VidComponent>()
+            world.observer<const VidRef>()
                 .event(flecs::OnSet)
-                .each([](flecs::entity entity, const VidComponent& vid) {
+                .each([](flecs::entity entity, const VidRef& vid) {
                 if (vid->linkedObjectVid > 0) {
                     entity.world()
                         .entity()
@@ -52,7 +52,7 @@ export {
                             .z = vid->linkZ,
                             .direction = 0,
                         })
-                        .emplace<VidComponent>(vid.parent(), vid->linkedObjectVid)
+                        .emplace<VidRef>(vid.parent(), vid->linkedObjectVid)
                         .child_of(entity);
                 }
 
@@ -63,7 +63,7 @@ export {
 
             world.system<DestroyAfterUpdate>().kind(flecs::PostFrame).each([](flecs::entity entity, DestroyAfterUpdate) { entity.destruct(); });
 
-            world.system<AnimationComponent, const VidComponent, const Transform>()
+            world.system<AnimationComponent, const VidRef, const Transform>()
                 .kind(flecs::OnUpdate)
                 .term_at(2).second<World>()
                 .each([](flecs::iter& it, size_t, AnimationComponent& animation, const Vid& vid, const Transform& wt) {
