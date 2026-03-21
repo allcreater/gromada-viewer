@@ -110,7 +110,7 @@ public:
 		        InvalidateSelection();
 		    }
 
-		    if (m_showDetails) {
+		    if (m_showDetails && selectedSection()) {
 		        ImGui::SetNextWindowPos({320, 20}, ImGuiCond_FirstUseEver);
 		        if (ImGui::Begin("Vid details", &m_showDetails)) {
 					VidUI(selectedSection());
@@ -202,7 +202,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     ImGui::Text("Collision mask: %x", self.collisionMask);
     ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);
     ImGui::Text("max HP: %i", self.maxHP);
-    ImGui::Text("grid radius: %i", self.gridRadius);
+    ImGui::Text("visibility radius: %i", self.visibilityRadius);
 
     ImGui::Text("Speed: %i %i", self.speedX, self.speedY);
     ImGui::Text("Acceleration: %i", self.acceleration);
@@ -282,7 +282,7 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 
 	const auto framesData = std::get_if<Vid::Graphics>(&self.graphicsData);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
-		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetWindowWidth() / ((*framesData)->width + 2.0f)));
+		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetContentRegionAvail().x / (*framesData)->width));
 		for (int index = 0; const auto& image : m_decodedFrames) {
 			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
 

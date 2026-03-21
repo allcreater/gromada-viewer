@@ -106,7 +106,7 @@ void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream) {
 		{"sizeY", MakePrintFunction<&Vid::sizeY>()},
 		{"sizeZ", MakePrintFunction<&Vid::sizeZ>()},
 		{"maxHP", MakePrintFunction<&Vid::maxHP>()},
-		{"gridRadius", MakePrintFunction<&Vid::gridRadius>()},
+		{"gridRadius", MakePrintFunction<&Vid::visibilityRadius>()},
 		{"unused1", MakePrintFunction<&Vid::unused1>()},
 		{"speedX", MakePrintFunction<&Vid::speedX>()},
 		{"speedY", MakePrintFunction<&Vid::speedY>()},

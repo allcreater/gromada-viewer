@@ -128,7 +128,7 @@ export struct Vid {
 	std::uint16_t sizeY {};
 	std::uint16_t sizeZ {};
 	std::uint8_t maxHP {};
-	std::uint16_t gridRadius {};
+	std::uint16_t visibilityRadius {};
 	std::uint8_t unused1 {};
 
 	std::uint16_t speedX {};
@@ -197,7 +197,7 @@ Vid::Vid(BinaryStreamReader reader)
 	reader.read_to(sizeY);
 	reader.read_to(sizeZ);
 	reader.read_to(maxHP);
-	reader.read_to(gridRadius);
+	reader.read_to(visibilityRadius);
 	reader.read_to(unused1);
 
 	reader.read_to(speedX);
