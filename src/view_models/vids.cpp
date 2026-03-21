@@ -146,6 +146,7 @@ private:
 private:
 	Model& m_model;
     bool m_showDetails = false;
+	bool m_showFrameNumbers = false;
 	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vidRefs()};
     bool m_selecionInvalidated = true;
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
@@ -282,12 +283,20 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 
 	const auto framesData = std::get_if<Vid::Graphics>(&self.graphicsData);
 	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
+		ImGui::Checkbox( "Show numbers", &m_showFrameNumbers);
 		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetContentRegionAvail().x / (*framesData)->width));
 		for (int index = 0; const auto& image : m_decodedFrames) {
+			auto pos = ImGui::GetCursorScreenPos();
 			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
-
-			if ((index+1) % imagesPerLine != 0)
+			if ((index+1) % imagesPerLine != 0) {
 				ImGui::SameLine();
+			}
+
+			if (m_showFrameNumbers) {
+				ImGui::SetCursorScreenPos(std::exchange( pos, ImGui::GetCursorScreenPos() ));
+				ImGui::Text("%d", index + 1);
+				ImGui::SetCursorScreenPos(pos);
+			}
 
 			index++;
 		}
