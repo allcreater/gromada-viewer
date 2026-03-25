@@ -2,13 +2,16 @@ module;
 
 export module Gromada.ResourceReader;
 import std;
+import utils;
 
 export {
 
-	class BinaryStreamReader {
+	class BinaryStreamReader : public StreamReaderMixin<BinaryStreamReader> {
 	public:
 		explicit BinaryStreamReader(std::istream& stream, std::size_t length) : m_stream{ stream }, m_dataLength{ length } {}
 		explicit BinaryStreamReader(std::istream& stream) : m_stream{ stream }, m_dataLength{ std::numeric_limits<std::size_t>::max() } {}
+
+		using StreamReaderMixin::read_to;
 
 		void read_to(std::span<std::byte> out) {
 			if (m_count + out.size() > m_dataLength)
@@ -19,20 +22,6 @@ export {
 			m_count += out.size();
 		}
 
-		template <typename T>
-	    requires std::is_trivially_copyable_v<T>
-		void read_to(T& out) {
-			read_to(std::span{ reinterpret_cast<std::byte*>(&out), sizeof (T) });
-		}
-
-		template <typename T>
-	    requires std::is_trivially_copyable_v<T>
-		T read() {
-			T result;
-			read_to(result);
-			return result;
-		}
-
 		void skip(std::size_t bytes) { 
 			if (m_count + bytes > m_dataLength)
 				throw std::overflow_error("");
@@ -41,14 +30,9 @@ export {
 			m_count += bytes;
 		}
 
-		std::vector<std::byte> readAll() && {
-			std::vector<std::byte> result(m_dataLength - m_count);
-			read_to(std::span{result});
-			return result;
-		}
-
-		std::size_t size() const noexcept { return m_dataLength; }
-		std::streampos tellg() const noexcept { return m_stream.tellg(); }
+		[[nodiscard]] std::size_t size() const noexcept { return m_dataLength; }
+		[[nodiscard]] std::size_t bytesRemaining() const noexcept { return m_dataLength - m_count; }
+		[[nodiscard]] std::streampos tellg() const noexcept { return m_stream.tellg(); }
 		//std::istream& stream() const&& noexcept { return m_stream; }
 
 	private:
