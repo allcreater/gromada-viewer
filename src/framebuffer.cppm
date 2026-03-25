@@ -28,7 +28,7 @@ public:
 		  m_dataDesc{m_data.data(), std::dextents<int, 2>{height, width}} {}
 
 	void resize(glm::ivec2 newSize) {
-		if (m_dataDesc.extent(0) == newSize.y || m_dataDesc.extent(1) == newSize.x)
+		if (m_dataDesc.extent(0) == newSize.y || m_dataDesc.extent(1) == newSize.x || newSize.x <= 0 || newSize.y <= 0)
 			return;
 
 		Framebuffer copy{newSize.x, newSize.y};

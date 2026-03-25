@@ -24,8 +24,12 @@ export struct ObjectPrototype {};
 export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
 
+export struct SelectionState {};
+export struct PlacementState {};
+
 export struct GlobalEditorState {
 	VidRef selectedNvid;
+	std::variant<SelectionState, PlacementState> state;
 };
 
 export struct EditorComponents {

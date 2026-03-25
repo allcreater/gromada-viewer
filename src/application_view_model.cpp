@@ -161,7 +161,27 @@ Controls:
 		    ImGui::EndPopup();
 		}
 
-	    {
+		{
+			ImGui::SameLine( 0, 50 );
+			ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, ImVec2(2, 2) );
+
+			auto& state = m_model.get_mut<GlobalEditorState>()->state;
+			MyImUtils::ToggleButton("Select", std::holds_alternative<SelectionState>(state), [&](){
+				state = SelectionState{};
+				m_model.modified<GlobalEditorState>();
+			});
+
+			ImGui::SameLine();
+
+			MyImUtils::ToggleButton("Place", std::holds_alternative<PlacementState>(state), [&](){
+				state = PlacementState{};
+				m_model.modified<GlobalEditorState>();
+			});
+
+			ImGui::PopStyleVar();
+		}
+
+		{
 		    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
 	        const auto* vp = m_model.get<const Viewport>();
 		    assert(vp != nullptr);

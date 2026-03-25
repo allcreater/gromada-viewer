@@ -141,9 +141,12 @@ export class MapViewModel {
         updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
 
         // TODO: remake to some king of state machine instead of this spagetthi logic
-        bool prototype_enabled = ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+        const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>()->state);
+        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>()->state);
+
+        bool prototype_enabled = is_placementMode && ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
         if (!ImGui::IsDragDropActive() && ImGui::IsWindowHovered()) {
-            if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+            if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || is_selectionMode) {
                 prototype_enabled = false;
                 updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
             } else {
@@ -158,19 +161,19 @@ export class MapViewModel {
         }
     }
 
-    auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& transform, auto&& boundsGetter) {
-        BoundingBox bb = std::invoke(boundsGetter, vid, transform);
+    auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& worldTransform, auto&& boundsGetter) {
+        BoundingBox bb = std::invoke(boundsGetter, vid, worldTransform);
         return std::make_tuple(to_imvec(viewport.worldToScreenPos({bb.left, bb.top})), to_imvec(viewport.worldToScreenPos({bb.right, bb.down})));
     };
 
     void displaySelection(ImDrawList* draw_list, const Viewport& viewport) {
         m_selectionUIState.selectedObjects.clear();
 
-        m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& transform) {
+        m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& worldTransform) {
             const auto  color = objectSelectionColor(vid.unitType);
             const float rounding = std::min(vid.sizeX, vid.sizeY) * 0.25f;
 
-            auto [min, max] = computeBBScreenSize(viewport, vid, transform, PhysicalBoundsFn{});
+            auto [min, max] = computeBBScreenSize(viewport, vid, worldTransform, PhysicalBoundsFn{});
             draw_list->AddRectFilled(min, max, color, rounding);
 
             if (id.has<GameObject::Payload>()) {

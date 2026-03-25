@@ -141,4 +141,17 @@ std::optional<std::pair<T, const ImGuiPayload*>> AcceptDragDropPayload(ImGuiDrag
 	return std::pair{std::move(object), payload};
 }
 
+export void ToggleButton (const char* label, bool active, auto&& onClick) {
+    if (active) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    }
+    if (ImGui::Button(label)) {
+        onClick();
+    }
+    if (active) {
+        ImGui::PopStyleColor(2);
+    }
+}
+
 }
