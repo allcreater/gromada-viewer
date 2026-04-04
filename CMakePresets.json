@@ -55,7 +55,7 @@
       "name": "base-gcc",
       "inherits": "base",
       "hidden": true,
-      "generator": "GCC",
+      "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build-clang/${presetName}",
       "installDir": "${sourceDir}/out/build-clang/install/${presetName}",
       "cacheVariables": {

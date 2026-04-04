@@ -64,7 +64,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       uses: aminya/setup-cpp@v1
       with:
-        compiler: llvm-21 gcc-15
+        compiler: ${{ case(contains(matrix.cmake_preset, 'clang'), 'llvm-21', 'gcc-15')}}
 
     - name: Configure CMake
       run: >
