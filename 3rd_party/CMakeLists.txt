@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.30)
 find_package(IMGUI REQUIRED CONFIG)
 
 add_library(third_party_libs)
+target_compile_features(third_party_libs PUBLIC cxx_std_23)
 target_include_directories(third_party_libs PUBLIC sokol)
 target_link_libraries(third_party_libs PUBLIC imgui::imgui)
 target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
@@ -31,6 +32,7 @@ endif()
 
 find_package(nlohmann_json CONFIG REQUIRED)
 add_library(nlohmann_json_adapter)
+target_compile_features(nlohmann_json_adapter PUBLIC cxx_std_23)
 target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
 target_sources(nlohmann_json_adapter PUBLIC
   FILE_SET CXX_MODULES
