@@ -18,7 +18,7 @@ jobs:
 
       matrix:
         os: [ubuntu-latest, windows-latest]
-        cmake_preset: [cl-x64-debug, cl-x64-release, clang-x64-release]
+        cmake_preset: [cl-x64-debug, cl-x64-release, clang-x64-release, gcc-x64-release]
         include:
           - os: windows-latest
             cmake_preset: cl-x64-debug
@@ -26,9 +26,13 @@ jobs:
             cmake_preset: cl-x64-release
           - os: ubuntu-latest
             cmake_preset: clang-x64-release
+          - os: ubuntu-latest
+            cmake_preset: gcc-x64-release
         exclude:
           - os: windows-latest
             cmake_preset: clang-x64-release
+          - os: windows-latest
+            cmake_preset: gcc-x64-release
           - os: ubuntu-latest
             cmake_preset: cl-x64-debug
           - os: ubuntu-latest
@@ -60,8 +64,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       uses: aminya/setup-cpp@v1
       with:
-        compiler: llvm
-        cmake: true
+        compiler: llvm-21 gcc-15
 
     - name: Configure CMake
       run: >
