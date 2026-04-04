@@ -54,7 +54,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev libxi-dev libxcursor-dev
+        sudo apt-get install -y cmake ninja-build libgl1-mesa-dev libxi-dev libxcursor-dev
 
     - name: Setup Cpp (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -62,8 +62,6 @@ jobs:
       with:
         compiler: llvm
         cmake: true
-        ninja: true
-        vcpkg: true
 
     - name: Configure CMake
       run: >
