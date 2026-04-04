@@ -4,7 +4,7 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "feature/*" ]
   pull_request:
     branches: [ "master" ]
 
@@ -55,7 +55,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libc++-dev libc++abi-dev libgl1-mesa-dev libxi-dev libxcursor-dev 
+        sudo apt-get install -y clang-18 libstdc++-13-dev libgl1-mesa-dev libxi-dev libxcursor-dev
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
 
     - name: Configure CMake
       run: >
