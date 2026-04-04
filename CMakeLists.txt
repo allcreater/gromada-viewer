@@ -7,6 +7,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_EXTENSIONS OFF) 
 else()
     set(CMAKE_CXX_EXTENSIONS ON) # probably need to support modules on clang
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        add_compile_options(-fmodules-ts)
+    endif()
 endif()
 
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.1.0")
