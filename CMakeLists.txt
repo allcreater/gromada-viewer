@@ -24,8 +24,6 @@ else()
     message("CMake version is too old to support C++ modules. Please update CMake to at least 3.30.0.")
 endif()
 
-set(CMAKE_CXX_MODULE_STD ON)
-
 message("Cmake version is ${CMAKE_VERSION}")
 
 # Enable Hot Reload for MSVC compilers if supported.
@@ -38,6 +36,8 @@ project(GromadaEditor
     VERSION 0.0.1
     LANGUAGES CXX
 )
+
+set(CMAKE_CXX_MODULE_STD ON)
 
 add_subdirectory(3rd_party/)
 add_subdirectory(src/)
