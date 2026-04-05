@@ -66,6 +66,7 @@ jobs:
       with:
         compiler: ${{ case(contains(matrix.cmake_preset, 'clang'), 'llvm-21', 'gcc-15')}}
         cmake: 4.2.0
+        ninja: 1.13.2
 
     - name: Configure CMake
       run: >
