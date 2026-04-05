@@ -68,6 +68,12 @@ jobs:
         cmake: 4.2.0
         ninja: 1.13.2
 
+    - name: Debug checks (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        g++ --version
+        g++ -v -x c++ -E - < /dev/null
+
     - name: Configure CMake
       run: >
         cmake --preset ${{ matrix.cmake_preset }} 
