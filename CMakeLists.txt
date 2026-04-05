@@ -1,9 +1,10 @@
 cmake_minimum_required (VERSION 3.30)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC|GNU")
     set(CMAKE_CXX_EXTENSIONS OFF) 
 else()
     set(CMAKE_CXX_EXTENSIONS ON) # probably need to support modules on clang
@@ -22,6 +23,8 @@ else()
 endif()
 
 set(CMAKE_CXX_MODULE_STD ON)
+
+message("Cmake version is ${CMAKE_VERSION}")
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
