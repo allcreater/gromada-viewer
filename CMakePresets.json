@@ -55,9 +55,9 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_CXX_FLAGS": "-fmodules",
-        "CMAKE_EXE_LINKER_FLAGS": "-fmodules",
-        "CMAKE_SHARED_LINKER_FLAGS": "-fmodules"
+        "CMAKE_CXX_FLAGS": "-fmodules -fmodules-ts",
+        "CMAKE_EXE_LINKER_FLAGS": "-fmodules -fmodules-ts",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fmodules -fmodules-ts"
       },
       "environment": {
         "CXXFLAGS": "",
