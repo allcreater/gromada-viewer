@@ -4,6 +4,9 @@
     {
       "name": "base",
       "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "FILEPATH",
@@ -16,9 +19,6 @@
       "name": "base-cl",
       "inherits": "base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe"
@@ -36,15 +36,28 @@
       "name": "base-clang",
       "inherits": "base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build-clang/${presetName}",
-      "installDir": "${sourceDir}/out/build-clang/install/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_CXX_FLAGS": "-stdlib=libc++",
         "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi",
         "CMAKE_SHARED_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi"
+      },
+      "environment": {
+        "CXXFLAGS": "",
+        "PATH": "/usr/bin:$penv{PATH}"
+      }
+    },
+    {
+      "name": "base-gcc",
+      "inherits": "base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": "-fmodules -fmodules-ts",
+        "CMAKE_EXE_LINKER_FLAGS": "-fmodules -fmodules-ts",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fmodules -fmodules-ts"
       },
       "environment": {
         "CXXFLAGS": "",
@@ -85,6 +98,18 @@
       "name": "clang-x64-release",
       "displayName": "Clang x64 Release",
       "inherits": "base-clang",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "gcc-x64-release",
+      "displayName": "GCC x64 Release",
+      "inherits": "base-gcc",
       "architecture": {
         "value": "x64",
         "strategy": "external"
