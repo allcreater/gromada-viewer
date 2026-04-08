@@ -2,17 +2,10 @@ module;
 #include <imgui.h>
 #include <argparse/argparse.hpp>
 
-#include <glm/glm.hpp>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
-
 export module application;
 
 import std;
-
+import imgui_sfml_adapter;
 import application.model;
 import application.view_model;
 
@@ -58,10 +51,6 @@ public:
         //ImGui::ShowDemoWindow();
 	}
 
-    void on_event(const sapp_event& event) {
-		simgui_handle_event(&event);
-    }
-
 	static void setupFont() {
 		const auto findFontInDirectory = [&](const std::filesystem::path& path) -> std::optional<std::filesystem::path> {
 			using namespace std::filesystem;
@@ -90,11 +79,8 @@ public:
 
 		io.FontGlobalScale = 1.0f;
 		io.Fonts->Clear();
-		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
+		auto r = io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
-
-		simgui_destroy_fonts_texture();
-		simgui_create_fonts_texture(simgui_font_tex_desc_t{});
 	}
 
 private:

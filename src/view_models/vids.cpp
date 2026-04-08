@@ -1,17 +1,13 @@
 module;
 #include <flecs.h>
 #include <imgui.h>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
+#include <SFML/Graphics.hpp>
 
 export module application.view_model:vids_window;
 
 import std;
-import sokol.helpers;
 import imgui_utils;
+import imgui_sfml_adapter;
 import framebuffer;
 import application.model;
 
@@ -132,7 +128,7 @@ private:
         m_selecionInvalidated = true;
     }
 	
-	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
+	static std::vector<sf::Texture> DecodeVidFrames(const VidGraphics& vid);
 
 	VidRef selectedSection() {
 		return m_model.get<GlobalEditorState>().selectedNvid;
@@ -149,15 +145,7 @@ private:
 	bool m_showFrameNumbers = false;
 	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>().vidRefs()};
     bool m_selecionInvalidated = true;
-	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
-		.min_filter = SG_FILTER_LINEAR,
-		.mag_filter = SG_FILTER_LINEAR,
-		.wrap_u = SG_WRAP_REPEAT,
-		.wrap_v = SG_WRAP_REPEAT,
-		.wrap_w = SG_WRAP_REPEAT,
-	}};
-
-	std::vector<SgUniqueImage> m_decodedFrames;
+	std::vector<sf::Texture> m_decodedFrames;
 };
 
 namespace {
@@ -276,7 +264,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 	if (m_decodedFrames.empty()) {
-	    m_decodedFrames = DecodeVidFrames(selectedSection()->graphics(), m_guiImagesSampler);
+	    m_decodedFrames = DecodeVidFrames(selectedSection()->graphics());
 	    if (m_decodedFrames.empty())
 	        return;
 	}
@@ -287,11 +275,10 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetContentRegionAvail().x / (*framesData)->width));
 		for (int index = 0; const auto& image : m_decodedFrames) {
 			auto pos = ImGui::GetCursorScreenPos();
-			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
+			ImGui::Image(ImGui::SFML::GetImguiTexture( image ), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
 			if ((index+1) % imagesPerLine != 0) {
 				ImGui::SameLine();
 			}
-
 			if (m_showFrameNumbers) {
 				ImGui::SetCursorScreenPos(std::exchange( pos, ImGui::GetCursorScreenPos() ));
 				ImGui::Text("%d", index + 1);
@@ -314,7 +301,7 @@ void FillWithCheckerboard(FramebufferRef framebuffer, RGBA8 color1, RGBA8 color2
     }
 }
 
-std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
+std::vector<sf::Texture> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid) {
     return vid.frames | std::views::transform([](const VidGraphics::Frame& frame) {
         Framebuffer vidFramebuffer{static_cast<int>(frame.width()), static_cast<int>(frame.height())};
         if (frame.parent->dataFormat == 3 || frame.parent->dataFormat == 4) {

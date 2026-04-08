@@ -1,17 +1,12 @@
 #include <argparse/argparse.hpp>
-#include <flecs.h>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
-
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
 #include <cassert>
 
 import application;
 import std;
+import imgui_sfml_adapter;
 
-static sg_pass_action pass_action;
 
 auto to_writtable_path = [](auto&& str) {
 	return std::filesystem::path{std::forward<decltype(str)>(str)}; 
@@ -31,7 +26,9 @@ auto to_readable_path = [](auto&& str) {
 class App {
 	std::unique_ptr<Application> app;
 	argparse::ArgumentParser arguments;
+	sf::RenderWindow window;
 
+public:
 	App(int argc, char* argv[])
 		: arguments{"Gromada viewer"}
 	{
@@ -52,34 +49,37 @@ class App {
 			.help("a path to a .map file");
 
 		arguments.parse_args(argc, argv);
+
+		window = sf::RenderWindow(sf::VideoMode({1280, 800}), "Gromada viewer");
+
+		ImGui::SFML::Init( window, true );
+		app = std::make_unique<Application>(arguments);
 	}
 
-	void init() {
-		// setup sokol-gfx, sokol-time and sokol-imgui
-		sg_desc desc = {
-			.image_pool_size = 1024,
-		};
-		desc.environment = sglue_environment();
-		desc.logger.func = slog_func;
-		sg_setup(&desc);
+	~App() {
+		ImGui::SFML::Shutdown();
+	}
 
-		// use sokol-imgui with all default-options (we're not doing
-		// multi-sampled rendering or using non-default pixel formats)
-		simgui_setup({
-			//.no_default_font = true,
-			.logger = {.func = slog_func},
-		});
-		
-		// initial clear color
-		pass_action.colors[0].load_action = SG_LOADACTION_CLEAR;
-		pass_action.colors[0].clear_value = {0.0f, 0.5f, 0.7f, 1.0f};
+	void run() {
+		sf::Clock deltaClock;
 
-		try {
-			app = std::make_unique<Application>(arguments);
-		}
-		catch (const std::exception& e) {
-			std::cerr << e.what() << std::endl;
-			sapp_quit();
+		while ( window.isOpen() )
+		{
+			while ( const std::optional event = window.pollEvent() )
+			{
+				if ( event->is<sf::Event::Closed>() )
+					window.close();
+
+				ImGui::SFML::ProcessEvent(window, *event);
+			}
+
+			ImGui::SFML::Update(window, deltaClock.restart());
+
+			frame();
+
+			window.clear(sf::Color{0x00, 0x80, 0xB3, 0xFF});
+			ImGui::SFML::Render(window);
+			window.display();
 		}
 	}
 
@@ -87,59 +87,18 @@ class App {
 		if (!app)
 			return;
 
-		const int width = sapp_width();
-		const int height = sapp_height();
-		simgui_new_frame({ width, height, sapp_frame_duration(), sapp_dpi_scale() });
-
 		app->on_frame();
 
-		// the sokol_gfx draw pass
-		sg_pass pass = {};
-		pass.action = pass_action;
-		pass.swapchain = sglue_swapchain();
-		sg_begin_pass(&pass);
-		simgui_render();
-		sg_end_pass();
-		sg_commit();
+		ImGui::SFML::Render(window);
 
 		using namespace std::chrono_literals;
 		std::this_thread::sleep_for(5ms);
 	}
 
-	void cleanup() {
-		app.reset();
 
-		simgui_shutdown();
-		sg_shutdown();
-
-		delete this;
-	}
-
-	void input(const sapp_event* event) {
-		assert(event);
-		app->on_event(*event);
-	}
-
-	template <auto MemberFn, typename... Args>
-	static void bind(Args... args, void* userdata) {
-		auto* self = static_cast<App*>(userdata);
-		std::invoke(MemberFn, self, args...);
-	};
-
-public:
-	static sapp_desc create(int argc, char* argv[]) {
-		return {
-			.user_data = new App{argc, argv},
-			.init_userdata_cb = bind<&App::init>,
-			.frame_userdata_cb = bind<&App::frame>,
-			.cleanup_userdata_cb = bind<&App::cleanup>,
-			.event_userdata_cb = bind<&App::input, const sapp_event*>,
-			.window_title = "Gromada viewer",
-			.enable_clipboard = true,
-		};
-	}
 };
 
-sapp_desc sokol_main(int argc, char* argv[]) {
-	return App::create(argc, argv);
+int main(int argc, char* argv[]) {
+	App app{argc, argv};
+	app.run();
 }

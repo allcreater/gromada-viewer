@@ -1,0 +1,14 @@
+{
+  "name": "gromada-editor",
+  "version-string": "0.0.1",
+  "dependencies": [
+    "argparse",
+    "flecs",
+    "glm",
+    "imgui",
+    "nlohmann-json",
+    "sfml",
+    "imgui-sfml"
+  ],
+  "supports": "static"
+}

@@ -1,26 +1,16 @@
 cmake_minimum_required (VERSION 3.30)
 
-include(FetchLibraries.cmake)
+find_package(IMGUI REQUIRED CONFIG)
+find_package(SFML COMPONENTS Graphics Window Audio System CONFIG REQUIRED)
+find_package(ImGui-SFML CONFIG REQUIRED)
 
-add_library(imgui STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-)
-target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
-
-add_library(third_party_libs)
-target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR})
-target_link_libraries(third_party_libs PUBLIC imgui glm::glm)
-target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
+add_library(third_party_libs STATIC)
+target_link_libraries(third_party_libs PUBLIC SFML::Graphics SFML::Window SFML::System ImGui-SFML::ImGui-SFML)
 target_sources( third_party_libs PUBLIC
-    "sokol_impl.cpp"
-    PUBLIC FILE_SET CXX_MODULES
-    BASE_DIRS
-    FILES
-    "sokol_helpers.cppm"
+        FILE_SET CXX_MODULES
+        BASE_DIRS
+        FILES
+        "imgui_sfml_adapter.cppm"
 )
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -38,6 +28,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 endif()
 
 
+find_package(nlohmann_json CONFIG REQUIRED)
 add_library(nlohmann_json_adapter)
 target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
 target_sources(nlohmann_json_adapter PUBLIC
