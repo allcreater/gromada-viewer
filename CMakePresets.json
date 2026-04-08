@@ -63,21 +63,6 @@
       }
     },
     {
-      "name": "cl-x64-rel-debug",
-      "displayName": "MSVC x64 Release with Debug info",
-      "inherits": "base-cl",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      },
-      "environment": {
-        "CXXFLAGS": "$penv{CXXFLAGS}"
-      }
-    },
-    {
       "name": "cl-x64-release",
       "displayName": "MSVC x64 Release",
       "inherits": "base-cl",

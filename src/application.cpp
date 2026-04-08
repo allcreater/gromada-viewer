@@ -79,7 +79,7 @@ public:
 
 		io.FontGlobalScale = 1.0f;
 		io.Fonts->Clear();
-		auto r = io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
+		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
 	}
 
