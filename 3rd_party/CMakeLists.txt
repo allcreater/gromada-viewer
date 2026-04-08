@@ -13,21 +13,6 @@ target_sources( third_party_libs PUBLIC
         "imgui_sfml_adapter.cppm"
 )
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    set(THREADS_PREFER_PTHREAD_FLAG ON)
-    find_package(Threads REQUIRED)
-
-    find_library(LIB_X11 X11 REQUIRED)
-    find_library(LIB_Xi Xi REQUIRED)
-    find_library(LIB_Xcursor Xcursor REQUIRED)
-    find_library(LIB_EGL EGL REQUIRED)
-    find_library(LIB_GL GL REQUIRED)
-    find_library(LIB_dl dl REQUIRED)
-    find_library(LIB_m m REQUIRED)
-    target_link_libraries(third_party_libs PRIVATE ${LIB_X11} ${LIB_Xi} ${LIB_Xcursor} ${LIB_EGL} ${LIB_GL} ${LIB_dl} ${LIB_m} Threads::Threads)
-endif()
-
-
 find_package(nlohmann_json CONFIG REQUIRED)
 add_library(nlohmann_json_adapter)
 target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
