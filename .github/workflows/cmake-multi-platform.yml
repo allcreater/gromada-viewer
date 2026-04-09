@@ -4,7 +4,7 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "master", "feature/*" ]
+    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
 
@@ -55,7 +55,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libc++-dev libc++abi-dev libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxi-dev libudev-dev libgl1-mesa-dev
+        sudo apt-get install -y ninja-build libc++-dev libc++abi-dev libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxi-dev libudev-dev libgl1-mesa-dev
 
     - name: Configure CMake
       run: >

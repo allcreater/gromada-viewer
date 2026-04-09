@@ -40,16 +40,13 @@
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_CXX_FLAGS": "-stdlib=libc++",
         "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi",
-        "CMAKE_SHARED_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi"
+        "CMAKE_SHARED_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi",
+        "VCPKG_OVERLAY_TRIPLETS" : "${sourceDir}/vcpkg-triplets",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-libcxx"
       },
       "environment": {
         "CXXFLAGS": "",
-        "PATH": "/usr/bin:$penv{PATH}",
-        "VCPKG_CXX": "clang++",
-        "VCPKG_CXX_FLAGS": "-stdlib=libc++",
-        "VCPKG_CXX_FLAGS_RELEASE": "-stdlib=libc++",
-        "VCPKG_CXX_FLAGS_DEBUG": "-stdlib=libc++",
-        "VCPKG_CXX_LINK_FLAGS": "-lc++ -lc++abi"
+        "PATH": "/usr/bin:$penv{PATH}"
       }
     },
     {
