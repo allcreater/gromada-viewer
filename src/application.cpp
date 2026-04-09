@@ -1,6 +1,8 @@
 module;
 #include <imgui.h>
 #include <argparse/argparse.hpp>
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
 
 export module application;
 
@@ -25,30 +27,92 @@ export {
 
 export class Application {
 public:
-    Application(const argparse::ArgumentParser& arguments)
-        : m_model{ arguments.get<std::filesystem::path>("res_path")}
-		, m_viewModel{ m_model }
-    {
-		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
-			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
+	explicit Application(int argc, char* argv[])
+		: m_arguments{"Gromada viewer"},
+		  m_window{sf::RenderWindow( sf::VideoMode( {1280, 800} ), "Gromada viewer" )},
+		  m_model{(parseArguments( argc, argv ), m_arguments.get<std::filesystem::path>( "res_path" ))},
+		  m_viewModel{m_model }
+	{
+		ImGui::SFML::Init(m_window, true);
+
+		if (auto arg = m_arguments.present<std::filesystem::path>("--export_csv")) {
+			std::ofstream stream{*arg, std::ios_base::out};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
 			const auto vids = m_model.get<const GameResources>().vids();
 			ExportVidsToCsv(vids, stream);
 		}
 
-		if (auto arg = arguments.present<std::filesystem::path>("--map")) {
+		if (auto arg = m_arguments.present<std::filesystem::path>("--map")) {
 			m_model.loadMap(*arg);
 		}
 
 		setupFont();
-    }
+	}
 
-	void on_frame() {
+	void run() {
+		sf::Clock deltaClock;
+
+		while (m_window.isOpen()) {
+			while (const std::optional event = m_window.pollEvent()) {
+				if (event->is<sf::Event::Closed>())
+					m_window.close();
+
+				ImGui::SFML::ProcessEvent(m_window, *event);
+			}
+			ImGui::SFML::Update(m_window, deltaClock.restart());
+
+			onFrame();
+		}
+	}
+
+	~Application() {
+		ImGui::SFML::Shutdown();
+	}
+
+private:
+	void onFrame() {
 		m_model.progress();
 		m_viewModel.updateUI();
 
-        //ImGui::ShowDemoWindow();
+		m_window.clear(sf::Color{0x00, 0x80, 0xB3, 0xFF});
+		ImGui::SFML::Render(m_window);
+		m_window.display();
+
+		using namespace std::chrono_literals;
+		std::this_thread::sleep_for(5ms);
+	}
+
+	void parseArguments(int argc, char* argv[]) {
+		auto to_writtable_path = [](auto&& str) {
+			return std::filesystem::path{std::forward<decltype(str)>(str)};
+		};
+
+		auto to_readable_path = [](auto&& str) {
+			std::filesystem::path result{std::forward<decltype(str)>(str)};
+
+			if (!exists(result)) {
+				throw std::runtime_error("Path does not exist: " + result.string());
+			}
+
+			return result;
+		};
+
+		m_arguments.add_argument("res_path")
+			.default_value(std::filesystem::current_path() / "fw.res")
+			.action(to_readable_path)
+			.implicit_value(true)
+			.remaining();
+
+		m_arguments.add_argument("--export_csv")
+			.action(to_writtable_path)
+			.help("Export CSV file with vids data");
+
+		m_arguments.add_argument("--map")
+			.action(to_readable_path)
+			.help("a path to a .map file");
+
+		m_arguments.parse_args(argc, argv);
 	}
 
 	static void setupFont() {
@@ -84,6 +148,8 @@ public:
 	}
 
 private:
-    Model m_model;
-	ViewModel m_viewModel;
+	argparse::ArgumentParser m_arguments;
+	sf::RenderWindow         m_window;
+	Model                    m_model;
+	ViewModel                m_viewModel;
 };
