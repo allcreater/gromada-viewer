@@ -44,7 +44,12 @@
       },
       "environment": {
         "CXXFLAGS": "",
-        "PATH": "/usr/bin:$penv{PATH}"
+        "PATH": "/usr/bin:$penv{PATH}",
+        "VCPKG_CXX": "clang++",
+        "VCPKG_CXX_FLAGS": "-stdlib=libc++",
+        "VCPKG_CXX_FLAGS_RELEASE": "-stdlib=libc++",
+        "VCPKG_CXX_FLAGS_DEBUG": "-stdlib=libc++",
+        "VCPKG_CXX_LINK_FLAGS": "-lc++ -lc++abi"
       }
     },
     {
