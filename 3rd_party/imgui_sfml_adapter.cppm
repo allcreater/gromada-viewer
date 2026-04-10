@@ -1,4 +1,6 @@
 module;
+#include <imgui.h>
+#include <SFML/Graphics.hpp>
 #include <imgui-SFML.h>
 
 export module imgui_sfml_adapter;
