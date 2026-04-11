@@ -18,6 +18,18 @@ import application.view_model;
 
 import Gromada.DataExporters;
 
+// Crutch ?
+export {
+	namespace argparse {
+		namespace details {
+			template <>
+			inline std::string repr<std::filesystem::path>(const std::filesystem::path& p) {
+				return p.string();
+			}
+		} // namespace details
+	} // namespace argparse
+}
+
 export class Application {
 public:
     Application(const argparse::ArgumentParser& arguments)
