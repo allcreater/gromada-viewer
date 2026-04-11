@@ -1,20 +1,29 @@
 cmake_minimum_required (VERSION 3.30)
 
-find_package(IMGUI REQUIRED CONFIG)
+include(FetchLibraries.cmake)
+
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
 
 add_library(third_party_libs)
-target_include_directories(third_party_libs PUBLIC sokol)
-target_link_libraries(third_party_libs PUBLIC imgui::imgui)
+target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR})
+target_link_libraries(third_party_libs PUBLIC imgui glm::glm)
 target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
 target_sources( third_party_libs PUBLIC
-	"sokol_impl.cpp"
-  PUBLIC FILE_SET CXX_MODULES
-  BASE_DIRS
-  FILES
-	"sokol_helpers.cppm"
+    "sokol_impl.cpp"
+    PUBLIC FILE_SET CXX_MODULES
+    BASE_DIRS
+    FILES
+    "sokol_helpers.cppm"
 )
- 
- if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
 
@@ -29,7 +38,6 @@ target_sources( third_party_libs PUBLIC
 endif()
 
 
-find_package(nlohmann_json CONFIG REQUIRED)
 add_library(nlohmann_json_adapter)
 target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
 target_sources(nlohmann_json_adapter PUBLIC

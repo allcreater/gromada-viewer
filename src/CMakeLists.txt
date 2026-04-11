@@ -39,14 +39,12 @@ add_executable (GromadaEditor
  )
 
 #find_package(SFML REQUIRED)
-find_package(argparse CONFIG REQUIRED)
-find_package(flecs CONFIG REQUIRED)
 
 target_link_libraries(GromadaEditor
 	PRIVATE
 		third_party_libs
 		argparse::argparse
-		$<IF:$<TARGET_EXISTS:flecs::flecs>,flecs::flecs,flecs::flecs_static>
+		flecs::flecs_static
 		nlohmann_json_adapter
 )
 

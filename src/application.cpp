@@ -28,7 +28,7 @@ public:
 			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-			const auto vids = m_model.get<const GameResources>()->vids();
+			const auto vids = m_model.get<const GameResources>().vids();
 			ExportVidsToCsv(vids, stream);
 		}
 
