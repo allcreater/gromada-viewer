@@ -2,7 +2,6 @@ module;
 #include <flecs.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
-#include <sokol_app.h>
 
 export module application.view_model;
 
@@ -81,7 +80,7 @@ Controls:
 		constexpr const char* NewMapPopup = "New map";
 		const char* openPopup = nullptr;
 
-	    const auto vids = m_model.get<const GameResources>()->vids();
+	    const auto vids = m_model.get<const GameResources>().vids();
 
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
@@ -92,7 +91,7 @@ Controls:
 			if (ImGui::MenuItem("Export map JSON")) {
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
-			    if (const auto* activeMapPath = m_model.component<ActiveLevel>().get<Path>()) {
+			    if (const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>()) {
 			        std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
 			    }
 			}
@@ -111,7 +110,7 @@ Controls:
 			}
 
 			if (ImGui::MenuItem("Exit")) {
-				sapp_request_quit();
+				throw std::runtime_error("Exit requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -139,10 +138,9 @@ Controls:
             ImGui::InputInt("Width", &m_newMapPopupState.width );
 		    ImGui::InputInt("Height", &m_newMapPopupState.height);
 
-		    auto gameResources = m_model.get<GameResources>();
-		    assert(gameResources);
+		    auto& gameResources = m_model.get<GameResources>();
 
-		    auto baseTiles = gameResources->baseTilesVids();
+		    auto baseTiles = gameResources.baseTilesVids();
 		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](const auto& vid) {
 		        return vid ? vid->getName() : "None [size in pixels]";
 		    });
@@ -165,7 +163,7 @@ Controls:
 			ImGui::SameLine( 0, 50 );
 			ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, ImVec2(2, 2) );
 
-			auto& state = m_model.get_mut<GlobalEditorState>()->state;
+			auto& state = m_model.get_mut<GlobalEditorState>().state;
 			MyImUtils::ToggleButton("Select", std::holds_alternative<SelectionState>(state), [&](){
 				state = SelectionState{};
 				m_model.modified<GlobalEditorState>();
@@ -183,10 +181,9 @@ Controls:
 
 		{
 		    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
-	        const auto* vp = m_model.get<const Viewport>();
-		    assert(vp != nullptr);
-		    const auto pos = vp->screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), vp->magnificationFactor);
+	        const auto& vp = m_model.get<const Viewport>();
+		    const auto pos = vp.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
+		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), vp.magnificationFactor);
 	    }
 
 		ImGui::EndMainMenuBar();

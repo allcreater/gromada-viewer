@@ -1,15 +1,10 @@
 module;
 #include <imgui.h>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
+
 
 export module application.view_model:map_selector;
 
 import std;
-import sokol.helpers;
 import imgui_utils;
 
 import application.model;
@@ -17,14 +12,14 @@ import application.model;
 export class MapsSelectorViewModel {
 public:
 	explicit MapsSelectorViewModel(Model& model)
-		: m_model{model}, m_mapsBaseDirectory{model.get<const GameResources>()->mapsPath()} {}
+		: m_model{model}, m_mapsBaseDirectory{model.get<const GameResources>().mapsPath()} {}
 
 	void updateUI() {
 	    const auto activeLevel = m_model.component<ActiveLevel>();
 
 		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span<const MapEntry>{m_maps}, MyImUtils::MakeSelectableCallback<const MapEntry&>(&MapEntry::name))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
-			if (auto* currentPath = activeLevel.get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
+			if (auto* currentPath = activeLevel.try_get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
 				m_model.loadMap(selectedMap.path);
 			}
 		}

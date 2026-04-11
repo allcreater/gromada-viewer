@@ -42,8 +42,6 @@ export class MapViewModel {
         world.import<LevelRenderer>();
 
         world.system<Framebuffer, const Viewport>()
-            .term_at(0).singleton()
-            .term_at(1).singleton()
             .kind(flecs::PreUpdate)
             .each([](Framebuffer& framebuffer, const Viewport& viewport) {
                 framebuffer.resize(viewport.viewportSize);
@@ -53,7 +51,6 @@ export class MapViewModel {
 
         // TODO: is this coordinates are even used by original game?
         world.observer<const MapHeaderRawData, Viewport>()
-            .term_at(1).singleton().filter()
             .event(flecs::OnSet)
             .each([](flecs::entity, const MapHeaderRawData& mapHeader, Viewport& viewport) {
                 viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
@@ -92,7 +89,7 @@ export class MapViewModel {
 		}
 
         if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
-            const auto step = 255 / static_cast<float>((*prototype.get<const VidRef>())->directionsCount);
+            const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
             prototype_transform.direction += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
         }
     }
@@ -114,16 +111,16 @@ export class MapViewModel {
 	}
 
 	void updateUI() {
-        auto levelInfo = m_world.component<ActiveLevel>().get<MapHeaderRawData>();
-        auto viewport = m_world.get_mut<Viewport>();
+        auto* levelInfo = m_world.component<ActiveLevel>().try_get<MapHeaderRawData>();
+        auto& viewport = m_world.get_mut<Viewport>();
 
         if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
-            viewport->magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
+            viewport.magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
         }
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
-            Framebuffer& framebuffer = *(m_world.get_mut<Framebuffer>());
+            Framebuffer& framebuffer = m_world.get_mut<Framebuffer>();
             framebuffer.commitToGpu();
 
             draw_list->AddImage(
@@ -132,29 +129,29 @@ export class MapViewModel {
                 ImVec2{0, 0},
                 ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));
 
-            displaySelection(draw_list, *viewport);
-            updateSelectedObjectsPropertiesWindow(draw_list, *viewport);
+            displaySelection(draw_list, viewport);
+            updateSelectedObjectsPropertiesWindow(draw_list, viewport);
 
-            displayMapBounds(draw_list, *viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+            displayMapBounds(draw_list, viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
         }
 
-        updateViewport(*viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+        updateViewport(viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
 
         // TODO: remake to some king of state machine instead of this spagetthi logic
-        const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>()->state);
-        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>()->state);
+        const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>().state);
+        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>().state);
 
         bool prototype_enabled = is_placementMode && ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
         if (!ImGui::IsDragDropActive() && ImGui::IsWindowHovered()) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || is_selectionMode) {
                 prototype_enabled = false;
-                updateSelection(viewport->screenToWorldPos(from_imvec(ImGui::GetMousePos())));
+                updateSelection(viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos())));
             } else {
-                moveSelectedObjects(*viewport);
+                moveSelectedObjects(viewport);
             }
         }
 
-        updatePrototype(*viewport, prototype_enabled);
+        updatePrototype(viewport, prototype_enabled);
 
         if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
             deleteSelectedObjects();
@@ -194,26 +191,26 @@ export class MapViewModel {
             ImGui::SetNextWindowSize(ImVec2{200, 300}, ImGuiCond_FirstUseEver);
             ImGui::Begin("Info");
             MyImUtils::ComboBox( "object" , &m_selectionUIState.selectedObject, std::span{m_selectionUIState.selectedObjects}, [&](flecs::entity obj) {
-                return (*obj.get<VidRef>())->getName();
+                return obj.get<VidRef>()->getName();
             } );
 
             auto objectHandle = m_selectionUIState.selectedObjects[m_selectionUIState.selectedObject];
 
-            auto& vidComponent = *objectHandle.get<VidRef>();
-            auto& transform = *objectHandle.get<Transform, World>();
+            auto& vidComponent = objectHandle.get<VidRef>();
+            auto& transform = objectHandle.get<Transform, World>();
 
             if (ImGui::Button("Center camera")) {
                 viewport.camPos = {transform.x, transform.y};
             }
             ImGui::SameLine( );
             if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
-                m_world.get_mut<GlobalEditorState>()->selectedNvid = vidComponent;
+                m_world.get_mut<GlobalEditorState>().selectedNvid = vidComponent;
                 m_world.modified<GlobalEditorState>();
             }
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
-            showObjectPayloadWindow(*objectHandle.get_mut<GameObject::Payload>());
+            showObjectPayloadWindow(objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
         }
 
@@ -244,12 +241,12 @@ export class MapViewModel {
             }
 
             if (ImGui::BeginTabItem("Items")) {
-                MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [gr = m_world.get<const GameResources>()](std::int16_t nvid) {
-                    return std::format("[{:3}] {}", nvid, gr->getVid(nvid).getName());
+                MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [&gr = m_world.get<const GameResources>()](std::int16_t nvid) {
+                    return std::format("[{:3}] {}", nvid, gr.getVid(nvid).getName());
                 } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                 if (ImGui::Button("+")) {
-                    payload.items.push_back( m_world.get<GlobalEditorState>()->selectedNvid.nvid());
+                    payload.items.push_back( m_world.get<GlobalEditorState>().selectedNvid.nvid());
                 }
                 ImGui::SameLine();
 
@@ -304,8 +301,8 @@ export class MapViewModel {
                 m_selectionFrame->max = mouseWorldPos;
                 m_world.remove_all<Selected>();
                 m_world.defer([&] {
-                    m_world.get<ObjectsView>()->queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
-                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying((*entity.get<const VidRef>())->unitType) & m_selectionType) != 0) {
+                    m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
+                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->unitType) & m_selectionType) != 0) {
                             entity.add<Selected>();
                         }
                     });
@@ -321,10 +318,9 @@ export class MapViewModel {
         const auto delta_ws = viewport.screenToWorldMat * glm::vec3{from_imvec(ImGui::GetMouseDragDelta(0)), 0.0f};
         m_selectionQuery.each([delta_ws](flecs::entity id, const Vid& vid, const Transform& _) {
             auto transform_ls = id.get_mut<Transform, Local>();
-            assert(transform_ls);
 
-            transform_ls->x += static_cast<int>(delta_ws.x);
-            transform_ls->y += static_cast<int>(delta_ws.y);
+            transform_ls.x += static_cast<int>(delta_ws.x);
+            transform_ls.y += static_cast<int>(delta_ws.y);
         });
         ImGui::ResetMouseDragDelta();
     }

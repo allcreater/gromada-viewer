@@ -18,6 +18,18 @@ import application.view_model;
 
 import Gromada.DataExporters;
 
+// Crutch ?
+export {
+	namespace argparse {
+		namespace details {
+			template <>
+			inline std::string repr<std::filesystem::path>(const std::filesystem::path& p) {
+				return p.string();
+			}
+		} // namespace details
+	} // namespace argparse
+}
+
 export class Application {
 public:
     Application(const argparse::ArgumentParser& arguments)
@@ -28,7 +40,7 @@ public:
 			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-			const auto vids = m_model.get<const GameResources>()->vids();
+			const auto vids = m_model.get<const GameResources>().vids();
 			ExportVidsToCsv(vids, stream);
 		}
 

@@ -14,9 +14,8 @@ Just put the binaries to the root game directory and run the program.
 
 # Dependencies
 * sokol-gfx
-* vcpkg:
-	* Dear IMGUI
-	* argparse
-	* nlohmann-json
-	* glm
-    * flecs
+* Dear IMGUI
+* argparse
+* nlohmann-json
+* glm
+* flecs
