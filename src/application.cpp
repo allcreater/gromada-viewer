@@ -33,7 +33,7 @@ public:
 		  m_model{(parseArguments( argc, argv ), m_arguments.get<std::filesystem::path>( "res_path" ))},
 		  m_viewModel{m_model }
 	{
-		ImGui::SFML::Init(m_window, true);
+		ImGui::SFML::Init(m_window, false);
 
 		if (auto arg = m_arguments.present<std::filesystem::path>("--export_csv")) {
 			std::ofstream stream{*arg, std::ios_base::out};
@@ -145,6 +145,8 @@ private:
 		io.Fonts->Clear();
 		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
+
+		ImGui::SFML::UpdateFontTexture();
 	}
 
 private:
