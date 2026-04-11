@@ -19,11 +19,11 @@ public:
 	Framebuffer(int width, int height)
 		: m_image{sg_image_desc{
 			  .type = SG_IMAGETYPE_2D,
+			  .usage = {.immutable = false, .stream_update = true},
 			  .width = width,
 			  .height = height,
-			  .usage = SG_USAGE_STREAM,
 			  .pixel_format = SG_PIXELFORMAT_RGBA8,
-		  }},
+		  }, {}, {}},
 		  m_data{static_cast<size_t>(width * height), RGBA8{0, 0, 0, 0}},
 		  m_dataDesc{m_data.data(), std::dextents<int, 2>{height, width}} {}
 
@@ -37,15 +37,15 @@ public:
 
 	void clear(RGBA8 color) { std::ranges::fill(m_data, color); }
 
-	void commitToGpu() { sg_update_image(m_image, sg_image_data{{{{.ptr = m_data.data(), .size = m_data.size() * sizeof(RGBA8)}}}}); }
+	void commitToGpu() { sg_update_image(m_image, sg_image_data{{{.ptr = m_data.data(), .size = m_data.size() * sizeof(RGBA8)}}}); }
 
-    [[nodiscard]] sg_image getImage() const & { return m_image; }
-    [[nodiscard]] SgUniqueImage getImage() && { return std::move(m_image); }
+    [[nodiscard]] const SgUniqueImageWithView& getImage() const & { return m_image; }
+    [[nodiscard]] SgUniqueImageWithView getImage() && { return std::move(m_image); }
 
 	operator FramebufferRef() { return m_dataDesc; }
 
 private:
-	SgUniqueImage m_image;
+	SgUniqueImageWithView m_image;
 	std::vector<RGBA8> m_data;
 	FramebufferRef m_dataDesc;
 };
