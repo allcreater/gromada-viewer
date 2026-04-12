@@ -13,16 +13,9 @@ import application.view_model;
 
 import Gromada.DataExporters;
 
-// Crutch ?
-export {
-	namespace argparse {
-		namespace details {
-			template <>
-			inline std::string repr<std::filesystem::path>(const std::filesystem::path& p) {
-				return p.string();
-			}
-		} // namespace details
-	} // namespace argparse
+template <>
+inline std::string argparse::details::repr<std::filesystem::path>(const std::filesystem::path& p) {
+	return p.string();
 }
 
 export class Application {
