@@ -10,9 +10,15 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
-        sokol
-        GIT_REPOSITORY https://github.com/floooh/sokol.git
-        GIT_TAG 4018189c9a564bf1cc219f6918af557395df4401 # from 31.03.2025, TODO: update
+        sfml
+        GIT_REPOSITORY https://github.com/SFML/SFML.git
+        GIT_TAG 3.0.2
+)
+
+FetchContent_Declare(
+        imgui-sfml
+        GIT_REPOSITORY https://github.com/SFML/imgui-sfml.git
+        GIT_TAG v3.0
 )
 
 FetchContent_Declare(
@@ -40,8 +46,18 @@ FetchContent_Declare(
 )
 
 # Configure them
+FetchContent_MakeAvailable(imgui)
+
+set(SFML_BUILD_AUDIO OFF CACHE BOOL "SFML: Build audio" FORCE)
+set(SFML_BUILD_NETWORK OFF CACHE BOOL "SFML: Build network" FORCE)
+FetchContent_MakeAvailable(sfml)
+
+set(IMGUI_DIR ${imgui_SOURCE_DIR} CACHE PATH "" FORCE)
+set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "IMGUI-SFML: Use find_package to find SFML" FORCE)
+set(IMGUI_SFML_IMGUI_DEMO OFF CACHE BOOL "IMGUI-SFML: Build imgui_demo.cpp" FORCE)
+FetchContent_MakeAvailable(imgui-sfml)
+
 set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(glm)
 
 # Make the rest dependencies available
-FetchContent_MakeAvailable(imgui sokol nlohmann_json argparse flecs)
+FetchContent_MakeAvailable(nlohmann_json argparse flecs glm)

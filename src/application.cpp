@@ -1,18 +1,13 @@
 module;
 #include <imgui.h>
 #include <argparse/argparse.hpp>
-
-#include <glm/glm.hpp>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
 
 export module application;
 
 import std;
-
+import imgui_sfml_adapter;
 import application.model;
 import application.view_model;
 
@@ -25,13 +20,16 @@ inline std::string argparse::details::repr<std::filesystem::path>(const std::fil
 
 export class Application {
 public:
-    Application(const std::vector<std::string>& args)
-	    : m_arguments{"Gromada viewer"}
-        , m_model{ (parseArguments( args ), m_arguments.get<std::filesystem::path>( "res_path" ))}
-		, m_viewModel{ (setupSokol(), m_model) }
-    {
+	explicit Application(int argc, char* argv[])
+		: m_arguments{"Gromada viewer"},
+		  m_window{sf::RenderWindow( sf::VideoMode( {1280, 800} ), "Gromada viewer" )},
+		  m_model{(parseArguments( argc, argv ), m_arguments.get<std::filesystem::path>( "res_path" ))},
+		  m_viewModel{m_model }
+	{
+		ImGui::SFML::Init(m_window, false);
+
 		if (auto arg = m_arguments.present<std::filesystem::path>("--export_csv")) {
-			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
+			std::ofstream stream{*arg, std::ios_base::out};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
 			const auto vids = m_model.get<const GameResources>().vids();
@@ -43,87 +41,72 @@ public:
 		}
 
 		setupFont();
-    }
+	}
 
-	void on_frame() {
+	void run() {
+		sf::Clock deltaClock;
+
+		while (m_window.isOpen()) {
+			while (const std::optional event = m_window.pollEvent()) {
+				if (event->is<sf::Event::Closed>())
+					m_window.close();
+
+				ImGui::SFML::ProcessEvent(m_window, *event);
+			}
+			ImGui::SFML::Update(m_window, deltaClock.restart());
+
+			onFrame();
+		}
+	}
+
+	~Application() {
+		ImGui::SFML::Shutdown();
+	}
+
+private:
+	void onFrame() {
 		m_model.progress();
 		m_viewModel.updateUI();
 
-        //ImGui::ShowDemoWindow();
+		m_window.clear(sf::Color{0x00, 0x80, 0xB3, 0xFF});
+		ImGui::SFML::Render(m_window);
+		m_window.display();
 
-    	// the sokol_gfx draw pass
-    	sg_pass pass = {};
-    	pass.action = {
-    		.colors = {
-				{.load_action = SG_LOADACTION_CLEAR, .clear_value = {0.0f, 0.5f, 0.7f, 1.0f}},
-			},
-    	};
-    	pass.swapchain = sglue_swapchain();
-    	sg_begin_pass(&pass);
-    	simgui_render();
-    	sg_end_pass();
-    	sg_commit();
-
-    	using namespace std::chrono_literals;
-    	std::this_thread::sleep_for(5ms);
+		using namespace std::chrono_literals;
+		std::this_thread::sleep_for(5ms);
 	}
 
-    void on_event(const sapp_event& event) {
-		simgui_handle_event(&event);
-    }
+	void parseArguments(int argc, char* argv[]) {
+		auto to_writtable_path = [](auto&& str) {
+			return std::filesystem::path{std::forward<decltype(str)>(str)};
+		};
 
-	~Application() {
-    	simgui_shutdown();
-    	sg_shutdown();
-    }
+		auto to_readable_path = [](auto&& str) {
+			std::filesystem::path result{std::forward<decltype(str)>(str)};
 
-private:
-	static void setupSokol() {
-		sg_setup({
-			.image_pool_size = 1024,
-			.logger = {.func = slog_func},
-			.environment = sglue_environment(),
-		});
+			if (!exists(result)) {
+				throw std::runtime_error("Path does not exist: " + result.string());
+			}
 
-		// use sokol-imgui with all default-options (we're not doing
-		// multi-sampled rendering or using non-default pixel formats)
-		simgui_setup({
-			//.no_default_font = true,
-			.logger = {.func = slog_func},
-		});
-	}
+			return result;
+		};
 
-	void parseArguments(const std::vector<std::string>& args) {
-    	auto to_writtable_path = [](auto&& str) {
-    		return std::filesystem::path{std::forward<decltype(str)>(str)};
-    	};
-
-    	auto to_readable_path = [](auto&& str) {
-    		std::filesystem::path result{std::forward<decltype(str)>(str)};
-
-    		if (!exists(result)) {
-    			throw std::runtime_error("Path does not exist: " + result.string());
-    		}
-
-    		return result;
-    	};
-
-    	m_arguments.add_argument("res_path")
+		m_arguments.add_argument("res_path")
 			.default_value(std::filesystem::current_path() / "fw.res")
 			.action(to_readable_path)
 			.implicit_value(true)
 			.remaining();
 
-    	m_arguments.add_argument("--export_csv")
+		m_arguments.add_argument("--export_csv")
 			.action(to_writtable_path)
 			.help("Export CSV file with vids data");
 
-    	m_arguments.add_argument("--map")
+		m_arguments.add_argument("--map")
 			.action(to_readable_path)
 			.help("a path to a .map file");
 
-    	m_arguments.parse_args(args);
-    }
+		m_arguments.parse_args(argc, argv);
+	}
 
 	static void setupFont() {
 		const auto findFontInDirectory = [&](const std::filesystem::path& path) -> std::optional<std::filesystem::path> {
@@ -156,13 +139,12 @@ private:
 		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
 
-		simgui_destroy_fonts_texture();
-		simgui_create_fonts_texture(simgui_font_tex_desc_t{});
+		ImGui::SFML::UpdateFontTexture();
 	}
-
 
 private:
 	argparse::ArgumentParser m_arguments;
+	sf::RenderWindow         m_window;
 	Model                    m_model;
 	ViewModel                m_viewModel;
 };

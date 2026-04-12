@@ -3,17 +3,13 @@ module;
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <sokol_gfx.h>
-#include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
-#include <util/sokol_imgui.h>
 
 export module application.view_model : map;
 
 import std;
 import framebuffer;
 import imgui_utils;
+import imgui_sfml_adapter;
 import utils;
 
 import application.model;
@@ -124,7 +120,7 @@ export class MapViewModel {
             framebuffer.commitToGpu();
 
             draw_list->AddImage(
-                simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0},
+            ImGui::SFML::GetImguiTexture(framebuffer.getImage()), ImVec2{0, 0},
                 ImGui::GetMainViewport()->Size,
                 ImVec2{0, 0},
                 ImVec2{1, 1}, IM_COL32(255, 255, 255, 255));

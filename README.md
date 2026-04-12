@@ -13,8 +13,9 @@ Just put the binaries to the root game directory and run the program.
 * Basic editor features: object selection, placing, and deleting
 
 # Dependencies
-* sokol-gfx
+* SFML
 * Dear IMGUI
+* IMGUI-SFML
 * argparse
 * nlohmann-json
 * glm
