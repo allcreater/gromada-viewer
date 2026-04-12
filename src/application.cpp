@@ -155,9 +155,6 @@ private:
 		io.Fonts->Clear();
 		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
-
-		simgui_destroy_fonts_texture();
-		simgui_create_fonts_texture(simgui_font_tex_desc_t{});
 	}
 
 

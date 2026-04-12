@@ -53,7 +53,7 @@ template <> struct UniqueResourceTraits<sg_image> {
 	static Type invalid() { return {SG_INVALID_ID}; }
 	static bool is_valid(Type handle){return handle.id != SG_INVALID_ID; }
 	static Type make(Desc desc) { return sg_make_image(desc); }
-	static void destroy(Type image) { sg_destroy_image(image); }
+	static void destroy(Type handle) { sg_destroy_image(handle); }
 };
 
 template <> struct UniqueResourceTraits<sg_sampler> {
@@ -63,8 +63,30 @@ template <> struct UniqueResourceTraits<sg_sampler> {
 	static Type invalid() { return {SG_INVALID_ID}; }
 	static bool is_valid(Type handle){return handle.id != SG_INVALID_ID; }
 	static Type make(Desc desc) { return sg_make_sampler(desc); }
-	static void destroy(Type image) { sg_destroy_sampler(image); }
+	static void destroy(Type handle) { sg_destroy_sampler(handle); }
+};
+
+template <> struct UniqueResourceTraits<sg_view> {
+	using Type = sg_view;
+	using Desc = sg_view_desc;
+
+	static Type invalid() { return { SG_INVALID_ID }; }
+	static bool is_valid(Type handle) { return handle.id != SG_INVALID_ID; }
+	static Type make(Desc desc) { return sg_make_view(desc); }
+	static void destroy(Type handle) { sg_destroy_view(handle); }
 };
 
 export using SgUniqueImage = SgUniqueResource<sg_image>;
 export using SgUniqueSampler = SgUniqueResource<sg_sampler>;
+export using SgUniqueView = SgUniqueResource<sg_view>;
+
+export class SgUniqueImageWithView : public SgUniqueImage, SgUniqueView{
+public:
+	SgUniqueImageWithView() = default;
+	SgUniqueImageWithView(sg_image_desc desc, sg_texture_view_range mip_levels, sg_texture_view_range slices)
+		: SgUniqueImage{desc}
+		, SgUniqueView{{.texture = {.image = *this, .mip_levels = mip_levels, .slices = slices}}}
+		{}
+
+	using SgUniqueView::operator sg_view;
+};

@@ -132,7 +132,7 @@ private:
         m_selecionInvalidated = true;
     }
 	
-	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
+	static std::vector<SgUniqueImageWithView> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
 	VidRef selectedSection() {
 		return m_model.get<GlobalEditorState>().selectedNvid;
@@ -157,7 +157,7 @@ private:
 		.wrap_w = SG_WRAP_REPEAT,
 	}};
 
-	std::vector<SgUniqueImage> m_decodedFrames;
+	std::vector<SgUniqueImageWithView> m_decodedFrames;
 };
 
 namespace {
@@ -314,7 +314,7 @@ void FillWithCheckerboard(FramebufferRef framebuffer, RGBA8 color1, RGBA8 color2
     }
 }
 
-std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
+std::vector<SgUniqueImageWithView> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
     return vid.frames | std::views::transform([](const VidGraphics::Frame& frame) {
         Framebuffer vidFramebuffer{static_cast<int>(frame.width()), static_cast<int>(frame.height())};
         if (frame.parent->dataFormat == 3 || frame.parent->dataFormat == 4) {

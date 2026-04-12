@@ -6,13 +6,13 @@ include(FetchContent)
 FetchContent_Declare(
         imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.91.9b #v1.92.7
+        GIT_TAG v1.92.7
 )
 
 FetchContent_Declare(
         sokol
         GIT_REPOSITORY https://github.com/floooh/sokol.git
-        GIT_TAG 4018189c9a564bf1cc219f6918af557395df4401 # from 31.03.2025, TODO: update
+        GIT_TAG d1bd35fbbec70ef91f91fe041d68731da8a15586 # from 08.04.2026
 )
 
 FetchContent_Declare(
