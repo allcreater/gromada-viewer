@@ -50,15 +50,19 @@ jobs:
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1.13.0
 
+    - name: Setup C++ environment
+      if: matrix.os == 'ubuntu-latest'
+      uses: aminya/setup-cpp@v1
+      with:
+        llvm: 19
+        cmake: true
+        ninja: true
 
     - name: Install dependencies (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 19
         sudo apt-get update
-        sudo apt-get install -y libc++-19-dev libc++abi-19-dev libgl1-mesa-dev libxi-dev libxcursor-dev
+        sudo apt-get install -y libgl1-mesa-dev libxi-dev libxcursor-dev
 
     - name: Configure CMake
       run: >
