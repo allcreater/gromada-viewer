@@ -99,8 +99,8 @@
         "strategy": "external"
       },
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang-20",
-        "CMAKE_CXX_COMPILER": "clang++-20",
+        "CMAKE_C_COMPILER": "clang-21",
+        "CMAKE_CXX_COMPILER": "clang++-21",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
