@@ -54,7 +54,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       uses: aminya/setup-cpp@v1
       with:
-        llvm: 19
+        compiler: llvm-19
         cmake: true
         ninja: true
 
@@ -63,6 +63,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libgl1-mesa-dev libxi-dev libxcursor-dev
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
     - name: Configure CMake
       run: >
