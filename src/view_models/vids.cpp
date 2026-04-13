@@ -17,6 +17,7 @@ import application.model;
 
 import Gromada.SoftwareRenderer;
 import framebuffer;
+import engine.audio;
 
 import utils;
 
@@ -132,14 +133,14 @@ private:
         m_selecionInvalidated = true;
     }
 	
-	static std::vector<SgUniqueImage> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
+	static std::vector<SgUniqueImageWithView> DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler);
 
 	VidRef selectedSection() {
-		return m_model.get<GlobalEditorState>()->selectedNvid;
+		return m_model.get<GlobalEditorState>().selectedNvid;
 	}
 
 	void selectedSection(VidRef vid) {
-		m_model.get_mut<GlobalEditorState>()->selectedNvid = vid;
+		m_model.get_mut<GlobalEditorState>().selectedNvid = vid;
 		m_model.modified<GlobalEditorState>();
 	}
 
@@ -147,7 +148,7 @@ private:
 	Model& m_model;
     bool m_showDetails = false;
 	bool m_showFrameNumbers = false;
-	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>()->vidRefs()};
+	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>().vidRefs()};
     bool m_selecionInvalidated = true;
 	SgUniqueSampler m_guiImagesSampler{sg_sampler_desc{
 		.min_filter = SG_FILTER_LINEAR,
@@ -157,7 +158,7 @@ private:
 		.wrap_w = SG_WRAP_REPEAT,
 	}};
 
-	std::vector<SgUniqueImage> m_decodedFrames;
+	std::vector<SgUniqueImageWithView> m_decodedFrames;
 };
 
 namespace {
@@ -179,14 +180,14 @@ namespace {
 
 
 void VidsWindowViewModel::VidUI(const Vid& self) {
-    auto linkToNvidControl = [&, resources = m_model.get<const GameResources>(), id = 0](int nvid) mutable {
-        if (nvid) {
+    auto linkToId = [&, guiId = 0](int id, auto&& onClick) mutable {
+        if (id) {
             std::array<char, 32> buffer {0};
-            std::format_to_n(buffer.data(), buffer.size(), "{}", nvid);
-            ImGui::PushID(id++);
-            if (int index = std::abs(nvid); ImGui::TextLink(buffer.data()) ) {
-                selectedSection(VidRef{*resources, index});
-                InvalidateSelection();
+            std::format_to_n(buffer.data(), buffer.size(), "{}", id);
+            ImGui::PushID(guiId++);
+            if (ImGui::TextLink(buffer.data()) ) {
+				std::invoke(onClick, id);
+
             }
             ImGui::PopID();
         }
@@ -195,6 +196,14 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
         }
     };
 
+	auto linkToNvidControl = std::bind_back(linkToId, [this, &resources = m_model.get<const GameResources>()](int nvid) {
+		selectedSection(VidRef{ resources, std::abs(nvid) });
+		InvalidateSelection();
+	});
+
+	auto linkToSound = std::bind_back(linkToId, [&resources = m_model.get<GameResources>(), &soundEngine = m_model.get_mut<AudioEngine>()](int nsfx) {
+		soundEngine.playSound(resources.sounds()[nsfx]);
+	});
 
     ImGui::Text("%s", self.getName().c_str());
     ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
@@ -242,7 +251,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
         ImGui::Text("%i", self.animationLengths[i]);
 
         ImGui::TableNextColumn();
-        ImGui::Text("%i", self.nsfx[i]);
+		linkToSound(self.nsfx[i]);
 
         ImGui::TableNextColumn();
         linkToNvidControl(self.childNvid[i]);
@@ -314,7 +323,7 @@ void FillWithCheckerboard(FramebufferRef framebuffer, RGBA8 color1, RGBA8 color2
     }
 }
 
-std::vector<SgUniqueImage> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
+std::vector<SgUniqueImageWithView> VidsWindowViewModel::DecodeVidFrames(const VidGraphics& vid, sg_sampler sampler) {
     return vid.frames | std::views::transform([](const VidGraphics::Frame& frame) {
         Framebuffer vidFramebuffer{static_cast<int>(frame.width()), static_cast<int>(frame.height())};
         if (frame.parent->dataFormat == 3 || frame.parent->dataFormat == 4) {

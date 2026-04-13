@@ -1,9 +1,6 @@
-#include <argparse/argparse.hpp>
-#include <flecs.h>
+
 #include <sokol_gfx.h>
 #include <sokol_app.h>
-#include <sokol_log.h>
-#include <sokol_glue.h>
 #include <util/sokol_imgui.h>
 
 #include <cassert>
@@ -11,71 +8,17 @@
 import application;
 import std;
 
-static sg_pass_action pass_action;
-
-auto to_writtable_path = [](auto&& str) {
-	return std::filesystem::path{std::forward<decltype(str)>(str)}; 
-};
-
-auto to_readable_path = [](auto&& str) {
-	std::filesystem::path result{std::forward<decltype(str)>(str)};
-
-	if (!exists(result)) {
-		throw std::runtime_error("Path does not exist: " + result.string());
-	}
-
-	return result;
-};
-
-
-class App {
+class SappWrapper {
 	std::unique_ptr<Application> app;
-	argparse::ArgumentParser arguments;
+	std::vector<std::string> args;
 
-	App(int argc, char* argv[])
-		: arguments{"Gromada viewer"}
-	{
-		arguments.add_argument("res_path")
-			.default_value(std::filesystem::current_path() / "fw.res")
-			.action(to_readable_path)
-			.implicit_value(true)
-			.remaining();
-
-		arguments.add_argument("--export_csv")
-			.action(to_writtable_path)
-			//.default_value(std::filesystem::current_path() / "vids.csv")
-			//.implicit_value(true)
-			.help("Export CSV file with vids data");
-
-		arguments.add_argument("--map")
-			.action(to_readable_path)
-			.help("a path to a .map file");
-
-		arguments.parse_args(argc, argv);
+	SappWrapper(int argc, char* argv[]) {
+		std::copy(argv, argv + argc, std::back_inserter(args));
 	}
 
 	void init() {
-		// setup sokol-gfx, sokol-time and sokol-imgui
-		sg_desc desc = {
-			.image_pool_size = 1024,
-		};
-		desc.environment = sglue_environment();
-		desc.logger.func = slog_func;
-		sg_setup(&desc);
-
-		// use sokol-imgui with all default-options (we're not doing
-		// multi-sampled rendering or using non-default pixel formats)
-		simgui_setup({
-			//.no_default_font = true,
-			.logger = {.func = slog_func},
-		});
-		
-		// initial clear color
-		pass_action.colors[0].load_action = SG_LOADACTION_CLEAR;
-		pass_action.colors[0].clear_value = {0.0f, 0.5f, 0.7f, 1.0f};
-
 		try {
-			app = std::make_unique<Application>(arguments);
+			app = std::make_unique<Application>(args);
 		}
 		catch (const std::exception& e) {
 			std::cerr << e.what() << std::endl;
@@ -93,25 +36,9 @@ class App {
 
 		app->on_frame();
 
-		// the sokol_gfx draw pass
-		sg_pass pass = {};
-		pass.action = pass_action;
-		pass.swapchain = sglue_swapchain();
-		sg_begin_pass(&pass);
-		simgui_render();
-		sg_end_pass();
-		sg_commit();
-
-		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(5ms);
 	}
 
 	void cleanup() {
-		app.reset();
-
-		simgui_shutdown();
-		sg_shutdown();
-
 		delete this;
 	}
 
@@ -122,18 +49,18 @@ class App {
 
 	template <auto MemberFn, typename... Args>
 	static void bind(Args... args, void* userdata) {
-		auto* self = static_cast<App*>(userdata);
+		auto* self = static_cast<SappWrapper*>(userdata);
 		std::invoke(MemberFn, self, args...);
 	};
 
 public:
 	static sapp_desc create(int argc, char* argv[]) {
 		return {
-			.user_data = new App{argc, argv},
-			.init_userdata_cb = bind<&App::init>,
-			.frame_userdata_cb = bind<&App::frame>,
-			.cleanup_userdata_cb = bind<&App::cleanup>,
-			.event_userdata_cb = bind<&App::input, const sapp_event*>,
+			.user_data = new SappWrapper{argc, argv},
+			.init_userdata_cb = bind<&SappWrapper::init>,
+			.frame_userdata_cb = bind<&SappWrapper::frame>,
+			.cleanup_userdata_cb = bind<&SappWrapper::cleanup>,
+			.event_userdata_cb = bind<&SappWrapper::input, const sapp_event*>,
 			.window_title = "Gromada viewer",
 			.enable_clipboard = true,
 		};
@@ -141,5 +68,5 @@ public:
 };
 
 sapp_desc sokol_main(int argc, char* argv[]) {
-	return App::create(argc, argv);
+	return SappWrapper::create(argc, argv);
 }

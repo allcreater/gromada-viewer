@@ -57,18 +57,16 @@ public:
                 entity.ensure<RenderOrder>() = {world_transform, vid};
         });
 
-	    world.component<Viewport>();
+	    world.component<Viewport>().add(flecs::Singleton);
 	    world.set<Viewport>({.viewportSize = {1024, 768}});
 
-	    world.component<Framebuffer>();
+	    world.component<Framebuffer>().add(flecs::Singleton);
 	    world.set<Framebuffer>({1024, 768});
 
 	    // const auto time = std::chrono::high_resolution_clock::now();
 	    // const auto renderDuration = std::chrono::high_resolution_clock::now() - time;
 	    world.system<Framebuffer, const Viewport, const Transform, const VidRef, const AnimationComponent>()
-            .term_at(0).singleton()
-            .term_at(1).singleton()
-	        .term_at(2).second<World>()
+            .term_at(2).second<World>()
             .kind(flecs::PreStore)
             .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return ordering_to_int(*a <=> *b);})
             .each([](Framebuffer& framebuffer, const Viewport& viewport, const Transform& transform, const Vid& vid, const AnimationComponent& animation) {

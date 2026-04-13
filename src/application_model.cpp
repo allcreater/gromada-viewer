@@ -10,6 +10,7 @@ import Gromada.ResourceReader;
 import Gromada.Map;
 import engine.bounding_box;
 import engine.level_renderer;
+import engine.audio;
 
 export import Gromada.GameResources;
 
@@ -40,6 +41,7 @@ export struct EditorComponents {
 		world.component<Path>();
 		world.component<Armies>();
     	world.component<GlobalEditorState>();
+		world.component<AudioEngine>().set(flecs::Singleton);
 	}
 };
 
@@ -94,14 +96,14 @@ public:
 
     // TODO: "this->" leaved to remember that it will be a free function soon
 	void loadMap(std::filesystem::path path) {
-		const auto* gameResources = this->get<const GameResources>();
-		const auto map = ::loadMap(gameResources->vids(), path);
+		const auto& gameResources = this->get<const GameResources>();
+		const auto map = ::loadMap(gameResources.vids(), path);
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
 
 	    for (const auto& obj : map.objects) {
 	        this->entity()
-                .emplace<VidRef>(*gameResources, obj.nvid)
+                .emplace<VidRef>(gameResources, obj.nvid)
 	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
 	            .set<GameObject::Payload>(obj.payload)
 	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})
@@ -143,7 +145,7 @@ public:
 
 	    // First step - collect all known objects and try to place them in the correct order
 	    query.each([&](flecs::entity entity, const VidRef& vid, const Transform& transform) {
-	        if (auto* existing_object_attribs = entity.get<EditorOrdering>()) {
+	        if (auto* existing_object_attribs = entity.try_get<EditorOrdering>()) {
 	            const auto [id, index] = *existing_object_attribs;
 	            if (index < objects.size()) {
 	                assert(objects[index].id() == 0);
@@ -195,10 +197,10 @@ public:
 	    return Map {
 	        .header = header,
 			.objects = entities | std::views::transform([i = 0](const flecs::entity& entity) mutable {
-				const auto& vid = *entity.get<VidRef>();
-				const auto& transform = *entity.get<Transform, Local>();
-				const auto* payload = entity.get<GameObject::Payload>();
-				const auto& ordering = *entity.get<EditorOrdering>();
+				const auto& vid = entity.get<VidRef>();
+				const auto& transform = entity.get<Transform, Local>();
+				const auto* payload = entity.try_get<GameObject::Payload>();
+				const auto& ordering = entity.get<EditorOrdering>();
 				assert(ordering.index == i++);
 				return makeGameObject(vid, transform, payload, ordering.uid);
 			}) | std::ranges::to<std::vector<GameObject>>(),
@@ -209,14 +211,14 @@ public:
 private:
     void updateMapBounds(std::ranges::range auto&& entities, MapHeaderRawData& header) {
         const auto map_bounds = std::reduce(entities.begin(), entities.end(), BoundingBox{}, [](BoundingBox bb, flecs::entity obj) {
-            auto transform = obj.get<Transform, Local>();
-            return bb.extend(transform->x, transform->y);
+            const auto& transform = obj.get<Transform, Local>();
+            return bb.extend(transform.x, transform.y);
         });
 
         std::ranges::for_each(entities, [&map_bounds](flecs::entity obj) {
-            auto transform = obj.get_mut<Transform, Local>();
-            transform->x -= map_bounds.left;
-            transform->y -= map_bounds.top;
+        	auto& transform = obj.get_mut<Transform, Local>();
+            transform.x -= map_bounds.left;
+            transform.y -= map_bounds.top;
         });
 
         header.height = map_bounds.height();
@@ -250,6 +252,7 @@ private:
         world.import<EditorComponents>();
 
         world.emplace<GameResources>(resourcesPath);
+        world.emplace<AudioEngine>();
     	world.emplace<GlobalEditorState>();
 
     	world.observer<GlobalEditorState>()

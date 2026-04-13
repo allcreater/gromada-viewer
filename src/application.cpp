@@ -18,21 +18,27 @@ import application.view_model;
 
 import Gromada.DataExporters;
 
+template <>
+inline std::string argparse::details::repr<std::filesystem::path>(const std::filesystem::path& p) {
+	return p.string();
+}
+
 export class Application {
 public:
-    Application(const argparse::ArgumentParser& arguments)
-        : m_model{ arguments.get<std::filesystem::path>("res_path")}
-		, m_viewModel{ m_model }
+    Application(const std::vector<std::string>& args)
+	    : m_arguments{"Gromada viewer"}
+        , m_model{ (parseArguments( args ), m_arguments.get<std::filesystem::path>( "res_path" ))}
+		, m_viewModel{ (setupSokol(), m_model) }
     {
-		if (auto arg = arguments.present<std::filesystem::path>("--export_csv")) {
+		if (auto arg = m_arguments.present<std::filesystem::path>("--export_csv")) {
 			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
 			stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-			const auto vids = m_model.get<const GameResources>()->vids();
+			const auto vids = m_model.get<const GameResources>().vids();
 			ExportVidsToCsv(vids, stream);
 		}
 
-		if (auto arg = arguments.present<std::filesystem::path>("--map")) {
+		if (auto arg = m_arguments.present<std::filesystem::path>("--map")) {
 			m_model.loadMap(*arg);
 		}
 
@@ -44,10 +50,80 @@ public:
 		m_viewModel.updateUI();
 
         //ImGui::ShowDemoWindow();
+
+    	// the sokol_gfx draw pass
+    	sg_pass pass = {};
+    	pass.action = {
+    		.colors = {
+				{.load_action = SG_LOADACTION_CLEAR, .clear_value = {0.0f, 0.5f, 0.7f, 1.0f}},
+			},
+    	};
+    	pass.swapchain = sglue_swapchain();
+    	sg_begin_pass(&pass);
+    	simgui_render();
+    	sg_end_pass();
+    	sg_commit();
+
+    	using namespace std::chrono_literals;
+    	std::this_thread::sleep_for(5ms);
 	}
 
     void on_event(const sapp_event& event) {
 		simgui_handle_event(&event);
+    }
+
+	~Application() {
+    	simgui_shutdown();
+    	sg_shutdown();
+    }
+
+private:
+	static void setupSokol() {
+		sg_setup({
+			.image_pool_size = 1024,
+			.view_pool_size = 1024,
+			.logger = {.func = slog_func},
+			.environment = sglue_environment(),
+		});
+
+		// use sokol-imgui with all default-options (we're not doing
+		// multi-sampled rendering or using non-default pixel formats)
+		simgui_setup({
+			//.no_default_font = true,
+			.logger = {.func = slog_func},
+		});
+	}
+
+	void parseArguments(const std::vector<std::string>& args) {
+    	auto to_writtable_path = [](auto&& str) {
+    		return std::filesystem::path{std::forward<decltype(str)>(str)};
+    	};
+
+    	auto to_readable_path = [](auto&& str) {
+    		std::filesystem::path result{std::forward<decltype(str)>(str)};
+
+    		if (!exists(result)) {
+    			throw std::runtime_error("Path does not exist: " + result.string());
+    		}
+
+    		return result;
+    	};
+
+    	m_arguments.add_argument("res_path")
+			.default_value(std::filesystem::current_path() / "fw.res")
+			.action(to_readable_path)
+			.implicit_value(true)
+			.remaining();
+
+    	m_arguments.add_argument("--export_csv")
+			.action(to_writtable_path)
+			.help("Export CSV file with vids data");
+
+    	m_arguments.add_argument("--map")
+			.action(to_readable_path)
+			.help("a path to a .map file");
+
+    	m_arguments.parse_args(args);
     }
 
 	static void setupFont() {
@@ -80,12 +156,11 @@ public:
 		io.Fonts->Clear();
 		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
-
-		simgui_destroy_fonts_texture();
-		simgui_create_fonts_texture(simgui_font_tex_desc_t{});
 	}
 
+
 private:
-    Model m_model;
-	ViewModel m_viewModel;
+	argparse::ArgumentParser m_arguments;
+	Model                    m_model;
+	ViewModel                m_viewModel;
 };

@@ -8,6 +8,7 @@ import std;
 import Gromada.ResourceReader;
 
 export import Gromada.Resources;
+export import Gromada.Resources.Sound;
 
 export {
 	class GameResources;
@@ -60,6 +61,8 @@ export {
 	    auto adjacencyData() const { return m_adjacencyData.matrix(); }
 		std::span<const VidRef> baseTilesVids() const { return m_baseTilesVids; }
 
+		std::span<const SoundData> sounds() const noexcept { return m_sounds; }
+
 	private:
 	    std::filesystem::path m_gamePath;
 	    GromadaResourceNavigator m_navigator;
@@ -69,6 +72,8 @@ export {
 
 	    std::vector<Vid> m_vids;
 		std::vector<VidRef> m_vidRefs;
+
+		std::vector<SoundData> m_sounds;
 	};
 }
 // Implementation
@@ -101,13 +106,10 @@ GameResources::GameResources(std::filesystem::path path)
 		| std::ranges::to<std::vector>();
 	});
 
-	m_navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) { getSounds(section, reader); });
+	m_navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
+		m_sounds = getSounds(section, reader);
+	});
 
-	// for (const auto& [i,sound] : sounds | std::views::enumerate) {
-	// 	auto data = m_reader.beginRead(sound).readAll();
-	// 	std::ofstream stream{std::string("out/sound") + std::to_string(i) + ".wav", std::ios_base::out | std::ios_base::binary};
-	// 	stream.write(reinterpret_cast<const char*>(data.data()), data.size());
-	// }
 }
 
 VidRef::VidRef( const GameResources &resources, int nvid )

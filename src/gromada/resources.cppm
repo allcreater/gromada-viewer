@@ -181,7 +181,6 @@ export struct AdjacencyData {
     }
 };
 
-export std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader);
 export AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader);
 
 // Implementation
@@ -263,25 +262,6 @@ VidGraphics::VidGraphics(BinaryStreamReader& reader) {
 	        frames[i] = frames.at(referenceFrameNumber);
 	    }
 	}
-}
-
-std::vector<StreamSpan> getSounds( const Section& soundSection, BinaryStreamReader soundReader) {
-	if(soundSection.header().type != SectionType::Sound)
-	    throw std::logic_error("Trying to get sounds with invalid section");
-
-	std::vector<StreamSpan> result;
-	result.reserve(soundSection.header().elementCount);
-
-	for (int i = 0; i < soundSection.header().elementCount; ++i) {
-		const auto _ = soundReader.read<std::uint8_t>();
-		const auto offset = soundReader.read<std::uint32_t>();
-
-		result.emplace_back(soundReader.tellg(), static_cast<std::streamoff>(offset));
-
-		soundReader.skip(offset);
-	}
-
-	return result;
 }
 
 AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader) {

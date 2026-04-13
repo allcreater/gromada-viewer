@@ -7,7 +7,7 @@ add_executable (GromadaEditor
 )
 
 
- target_sources(GromadaEditor PRIVATE 
+ target_sources(GromadaEditor PRIVATE
 	FILE_SET modules
 	TYPE CXX_MODULES
 	FILES
@@ -15,19 +15,22 @@ add_executable (GromadaEditor
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"engine/world_components.cppm"
+		"engine/audio_engine.cppm"
 	 	"gromada/actions.ixx"
 		"gromada/data_exporters.cppm"
 		"gromada/game_resources.cppm"
 		"gromada/graphics_decoder.cppm"
 		"gromada/map.cppm"
 		"gromada/resource_reader.cppm"
-		"gromada/resources.cpp"
+		"gromada/resources.cppm"
+		"gromada/resources_sound.cppm"
 		"gromada/software_renderer.cppm"
 		"gromada/visual_logic.cppm"
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"
 		"view_models/map_properties.cpp"
+		"view_models/sounds.cpp"
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"
@@ -38,14 +41,12 @@ add_executable (GromadaEditor
  )
 
 #find_package(SFML REQUIRED)
-find_package(argparse CONFIG REQUIRED)
-find_package(flecs CONFIG REQUIRED)
 
 target_link_libraries(GromadaEditor
 	PRIVATE
 		third_party_libs
 		argparse::argparse
-		$<IF:$<TARGET_EXISTS:flecs::flecs>,flecs::flecs,flecs::flecs_static>
+		flecs::flecs_static
 		nlohmann_json_adapter
 )
 
