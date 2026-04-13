@@ -58,7 +58,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       uses: aminya/setup-cpp@v1
       with:
-        compiler: ${{ case(contains(matrix.cmake_preset, 'clang'), 'llvm-21', 'gcc-16')}}
+        compiler: ${{ case(contains(matrix.cmake_preset, 'clang'), 'llvm-20', 'gcc-16')}}
         cmake: 4.2.0
         ninja: 1.13.2
 
