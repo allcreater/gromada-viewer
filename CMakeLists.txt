@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.30)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+set(CMAKE_CXX_MODULE_STD ON)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC|GNU")
     set(CMAKE_CXX_EXTENSIONS OFF) 
@@ -24,7 +25,7 @@ else()
     message("CMake version is too old to support C++ modules. Please update CMake to at least 3.30.0.")
 endif()
 
-set(CMAKE_CXX_MODULE_STD ON)
+message("Cmake version is ${CMAKE_VERSION}")
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
