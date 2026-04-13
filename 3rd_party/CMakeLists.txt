@@ -12,11 +12,12 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
 
 add_library(third_party_libs)
-target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR})
+target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR} ${miniaudio_SOURCE_DIR})
 target_link_libraries(third_party_libs PUBLIC imgui glm::glm)
 target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
 target_sources( third_party_libs PUBLIC
     "sokol_impl.cpp"
+    "miniaudio_impl.cpp"
     PUBLIC FILE_SET CXX_MODULES
     BASE_DIRS
     FILES

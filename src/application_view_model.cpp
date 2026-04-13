@@ -16,6 +16,7 @@ import :map;
 import :map_selector;
 import :vids_window;
 import :map_properties;
+import :sounds_window;
 
 export class ViewModel {
 public:
@@ -51,6 +52,11 @@ public:
 
 			if (ImGui::BeginTabItem("Map properties")) {
 				m_mapPropertiesViewModel.updateUI();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("Sounds")) {
+				m_soundsViewModel.updateUI();
 				ImGui::EndTabItem();
 			}
 
@@ -204,4 +210,5 @@ private:
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
     MapPropertiesViewModel m_mapPropertiesViewModel{m_model};
+    SoundsWindowViewModel m_soundsViewModel{m_model};
 };

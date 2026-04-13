@@ -10,6 +10,7 @@ import Gromada.ResourceReader;
 import Gromada.Map;
 import engine.bounding_box;
 import engine.level_renderer;
+import engine.audio;
 
 export import Gromada.GameResources;
 
@@ -40,6 +41,7 @@ export struct EditorComponents {
 		world.component<Path>();
 		world.component<Armies>();
     	world.component<GlobalEditorState>();
+		world.component<AudioEngine>().set(flecs::Singleton);
 	}
 };
 
@@ -250,6 +252,7 @@ private:
         world.import<EditorComponents>();
 
         world.emplace<GameResources>(resourcesPath);
+        world.emplace<AudioEngine>();
     	world.emplace<GlobalEditorState>();
 
     	world.observer<GlobalEditorState>()

@@ -81,6 +81,7 @@ private:
 	static void setupSokol() {
 		sg_setup({
 			.image_pool_size = 1024,
+			.view_pool_size = 1024,
 			.logger = {.func = slog_func},
 			.environment = sglue_environment(),
 		});

@@ -7,7 +7,7 @@ add_executable (GromadaEditor
 )
 
 
- target_sources(GromadaEditor PRIVATE 
+ target_sources(GromadaEditor PRIVATE
 	FILE_SET modules
 	TYPE CXX_MODULES
 	FILES
@@ -15,6 +15,7 @@ add_executable (GromadaEditor
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"engine/world_components.cppm"
+		"engine/audio_engine.cppm"
 	 	"gromada/actions.ixx"
 		"gromada/data_exporters.cppm"
 		"gromada/game_resources.cppm"
@@ -29,6 +30,7 @@ add_executable (GromadaEditor
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"
 		"view_models/map_properties.cpp"
+		"view_models/sounds.cpp"
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"

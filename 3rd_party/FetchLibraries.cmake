@@ -43,5 +43,11 @@ FetchContent_Declare(
 set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glm)
 
+FetchContent_Declare(
+        miniaudio
+        GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+        GIT_TAG 0.11.25
+)
+
 # Make the rest dependencies available
-FetchContent_MakeAvailable(imgui sokol nlohmann_json argparse flecs)
+FetchContent_MakeAvailable(imgui sokol nlohmann_json argparse flecs miniaudio)
