@@ -82,9 +82,11 @@
         "value": "x64",
         "strategy": "external"
       },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+        "cacheVariables": {
+            "CMAKE_C_COMPILER": "clang-20",
+            "CMAKE_CXX_COMPILER": "clang++-20",
+            "CMAKE_BUILD_TYPE": "Release"
+        }
     }
   ]
 }
