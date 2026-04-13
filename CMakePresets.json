@@ -2,19 +2,19 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "base",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
-      }
+        "name": "base",
+        "hidden": true,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/out/build/${presetName}",
+        "installDir": "${sourceDir}/out/install/${presetName}",
+        "cacheVariables": {
+            "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+        }
     },
     {
       "name": "base-cl",
       "inherits": "base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe"
@@ -32,9 +32,6 @@
       "name": "base-clang",
       "inherits": "base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build-clang/${presetName}",
-      "installDir": "${sourceDir}/out/build-clang/install/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
@@ -85,9 +82,11 @@
         "value": "x64",
         "strategy": "external"
       },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+        "cacheVariables": {
+            "CMAKE_C_COMPILER": "clang-20",
+            "CMAKE_CXX_COMPILER": "clang++-20",
+            "CMAKE_BUILD_TYPE": "Release"
+        }
     }
   ]
 }

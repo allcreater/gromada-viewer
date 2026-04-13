@@ -44,7 +44,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        echo "build-output-dir=${{ github.workspace }}/out/build/${{ matrix.cmake_preset }}" >> "$GITHUB_OUTPUT"
 
     - name: Enable Developer Command Prompt (Windows)
       if: matrix.os == 'windows-latest'
@@ -54,7 +54,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       uses: aminya/setup-cpp@v1
       with:
-        llvm: 19
+        compiler: llvm-20
         cmake: true
         ninja: true
 
