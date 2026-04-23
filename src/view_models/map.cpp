@@ -317,7 +317,7 @@ export class MapViewModel {
     void moveSelectedObjects(const Viewport& viewport) {
         const auto delta_ws = viewport.screenToWorldMat * glm::vec3{from_imvec(ImGui::GetMouseDragDelta(0)), 0.0f};
         m_selectionQuery.each([delta_ws](flecs::entity id, const Vid& vid, const Transform& _) {
-            auto transform_ls = id.get_mut<Transform, Local>();
+            auto& transform_ls = id.get_mut<Transform, Local>();
 
             transform_ls.x += static_cast<int>(delta_ws.x);
             transform_ls.y += static_cast<int>(delta_ws.y);

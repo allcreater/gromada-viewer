@@ -18,6 +18,7 @@ target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
 target_sources( third_party_libs PUBLIC
     "sokol_impl.cpp"
     "miniaudio_impl.cpp"
+    "${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp"
     PUBLIC FILE_SET CXX_MODULES
     BASE_DIRS
     FILES

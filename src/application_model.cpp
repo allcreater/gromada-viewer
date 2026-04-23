@@ -39,8 +39,8 @@ export struct EditorComponents {
         world.component<Selected>();
 		world.component<ObjectPrototype>();
 		world.component<Path>();
-		world.component<Armies>();
-    	world.component<GlobalEditorState>();
+		world.component<Armies>().set(flecs::Singleton);
+    	world.component<GlobalEditorState>().set(flecs::Singleton);
 		world.component<AudioEngine>().set(flecs::Singleton);
 	}
 };

@@ -32,7 +32,7 @@ ACTION(act_path_block     , 31,   ((int, dx), (int, dy))            ) /*path is 
 ACTION(act_additem        , 32,   ((int, nvid))                     ) /*var1=nvid*/                                                                             \
 ACTION(act_deleteitem     , 33,   ((int, nvid))                     ) /*var1=nvid*/                                                                             \
 ACTION(act_askitem        , 34,   ((int, nvid))                     ) /*var1=nvid*/                                                                             \
-ACTION(act_changeweapon   , 35,   ((int, nweapon))                  ) /*var1=nweapon*/                                                                          \
+ACTION(act_changeweapon   , 35,   ((int, nvid))                     ) /*var1=nweapon*/                                                                          \
 ACTION(act_deleteallitem  , 36,   ()                                ) /**/                                                                                      \
 ACTION(act_changeaction   , 37,   ((Action, action), (int, dir))    ) /*var1=action var2=direct*/                                                               \
 ACTION(act_path_limit     , 38,   ((int, x), (int, y))              ) /*path is limited of field*/                                                              \
@@ -44,7 +44,7 @@ ACTION(act_damage         , 43,   ((int, damage))                   ) /*@ нан
 ACTION(act_select         , 44,   ()                                ) /*вызывает на самом деле act_salut*/                                                      \
 ACTION(act_nextcommand    , 45,   ()                                ) /**/                                                                                      \
 ACTION(act_init           , 46,   ()                                ) /*вызывается из createunit для инициализации нач. значений*/                              \
-ACTION(act_uncom          , 47,   ()                                ) /*запрещает выполнение дальнейших команд com для building*/                               \
+ACTION(act_uncom          , 47,   (/*(p1, p2)*/)                    ) /*запрещает выполнение дальнейших команд com для building*/                               \
 ACTION(act_deletetarget   , 48,   ((int, target_id))                ) /*if target ==var1 then target=NULL*/                                                     \
 ACTION(act_calltact       , 49,   ()                                ) /**/                                                                                      \
 ACTION(act_save           , 51,   ((StreamHandle, stream_id))       ) /*записать информацию относящуюся к данному спрайту в var1*/                              \
@@ -56,7 +56,7 @@ ACTION(act_saveframe      , 58,   ((StreamHandle, stream_id))       ) /*запи
 ACTION(act_fullsave       , 59,   ((StreamHandle, stream_id))       ) /*записать всю информацию относящуюся к данному sprite, кроме записанной в act_save*/     \
 ACTION(act_gettarget      , 60,   ()                                ) /**/                                                                                      \
 ACTION(act_cyclecommand   , 61,   ((int, command_index))            ) /*зацикливание стэка комманд*/                                                            \
-ACTION(act_changevid      , 62,   ()                                ) /*изменить текущий curvid для спрайта, var2 - new action, if var1==-1 action not changed*/\
+ACTION(act_changevid      , 62,   ((int, nvid), (Action, action))   ) /*изменить текущий curvid для спрайта, var2 - new action, if var1==-1 action not changed*/\
 ACTION(act_addammo        , 63,   ((int, increment), (int, nweapon))) /*var1-число добавляемых снарядов, var2 - номер оружия*/                                  \
 ACTION(act_getammo        , 64,   ((int, nweapon))                  ) /*var1 - номер оружия*/                                                                   \
 ACTION(act_gethp          , 65,   ()                                ) /**/                                                                                      \
