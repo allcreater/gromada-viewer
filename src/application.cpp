@@ -28,7 +28,7 @@ public:
     Application(const std::vector<std::string>& args)
 	    : m_arguments{"Gromada viewer"}
         , m_model{ (parseArguments( args ), m_arguments.get<std::filesystem::path>( "res_path" ))}
-		, m_viewModel{ (setupSokol(), m_model) }
+		, m_viewModel{ m_model }
     {
 		if (auto arg = m_arguments.present<std::filesystem::path>("--export_csv")) {
 			std::ofstream stream{*arg, std::ios_base::out /*|| std::ios_base::binary*/};
@@ -72,27 +72,32 @@ public:
 		simgui_handle_event(&event);
     }
 
-	~Application() {
-    	simgui_shutdown();
-    	sg_shutdown();
-    }
-
 private:
-	static void setupSokol() {
-		sg_setup({
-			.image_pool_size = 1024,
-			.view_pool_size = 1024,
-			.logger = {.func = slog_func},
-			.environment = sglue_environment(),
-		});
+	struct SokolHolder {
+		SokolHolder() {
+			sg_setup({
+				.image_pool_size = 1024,
+				.view_pool_size = 1024,
+				.logger = {.func = slog_func},
+				.environment = sglue_environment(),
+			});
 
-		// use sokol-imgui with all default-options (we're not doing
-		// multi-sampled rendering or using non-default pixel formats)
-		simgui_setup({
-			//.no_default_font = true,
-			.logger = {.func = slog_func},
-		});
-	}
+			// use sokol-imgui with all default-options (we're not doing
+			// multi-sampled rendering or using non-default pixel formats)
+			simgui_setup({
+				//.no_default_font = true,
+				.logger = {.func = slog_func},
+			});
+		}
+
+		SokolHolder(const SokolHolder&) = delete;
+		SokolHolder& operator=(const SokolHolder&) = delete;
+
+		~SokolHolder() {
+			simgui_shutdown();
+			sg_shutdown();
+		}
+	};
 
 	void parseArguments(const std::vector<std::string>& args) {
     	auto to_writtable_path = [](auto&& str) {
@@ -158,9 +163,9 @@ private:
 		io.Fonts->Build();
 	}
 
-
 private:
 	argparse::ArgumentParser m_arguments;
 	Model                    m_model;
+	SokolHolder			     m_sokolHolder;
 	ViewModel                m_viewModel;
 };
