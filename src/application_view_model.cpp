@@ -2,6 +2,7 @@ module;
 #include <flecs.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
 
 export module application.view_model;
 
@@ -98,7 +99,7 @@ Controls:
 				openPopup = ExportPopup;
 				m_savePopupfilenameBuffer.emplace();
 			    if (const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>()) {
-			        std::sprintf(m_savePopupfilenameBuffer->data(), "%s.json", activeMapPath->stem().u8string().c_str());
+			    	std::format_to(m_savePopupfilenameBuffer->data(), "{}.json", activeMapPath->stem().generic_string().c_str());
 			    }
 			}
 
@@ -131,14 +132,18 @@ Controls:
 		}
 
 		if (ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
-			assert(m_savePopupfilenameBuffer.has_value());
-			ImGui::InputText("Exporting map to", m_savePopupfilenameBuffer->data(), m_savePopupfilenameBuffer->size());
+			ImGui::InputText("Exporting map to", &m_savePopupfilenameBuffer.value());
 			if (ImGui::Button("OK", ImVec2(120, 0))) {
 				ImGui::CloseCurrentPopup();
 
-				std::ofstream stream{m_savePopupfilenameBuffer->data(), std::ios_base::out};
+				std::ofstream stream{*m_savePopupfilenameBuffer, std::ios_base::out};
 				ExportMapToJson(vids, m_model.saveMap(), stream);
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+
 			ImGui::EndPopup();
 		} else if (ImGui::BeginPopupModal(NewMapPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
             ImGui::InputInt("Width", &m_newMapPopupState.width );
@@ -198,7 +203,7 @@ Controls:
 private:
 	Model& m_model;
 
-	std::optional<std::array<char, 256>> m_savePopupfilenameBuffer;
+	std::optional<std::string> m_savePopupfilenameBuffer;
 
     struct NewMapPopupState {
         int width = 10;

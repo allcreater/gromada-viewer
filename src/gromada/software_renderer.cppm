@@ -65,7 +65,7 @@ struct SoftwareRendererVisitor {
     }
 
     void draw_pixels_indexed(std::span<const IndexedColor> colors_data) noexcept {
-        for_clipped_pixels(colors_data.size(), [&](int x, int i) {
+        for_clipped_pixels(colors_data.size(), [=](int x, int i) {
             const auto color_index = std::to_underlying(colors_data[i]);
             framebuffer[y, x] = RGBA8{palette[color_index], 255};
         });
@@ -112,7 +112,8 @@ private:
             return; // Out of bounds
         }
 
-        for (int destination_x = std::max(x, 0); destination_x < std::min(x + count, framebuffer.extent(1)); ++destination_x) {
+        int end_x = std::min(x + count, framebuffer.extent(1));
+        for (int destination_x = std::max(x, 0); destination_x <  end_x; ++destination_x) {
             callback(destination_x, destination_x - x);
         }
 
