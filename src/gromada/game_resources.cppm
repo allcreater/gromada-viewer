@@ -65,7 +65,6 @@ export {
 
 	private:
 	    std::filesystem::path m_gamePath;
-	    GromadaResourceNavigator m_navigator;
 
 	    AdjacencyData m_adjacencyData;
 	    std::vector<VidRef> m_baseTilesVids;
@@ -80,10 +79,10 @@ export {
 
 
 GameResources::GameResources(std::filesystem::path path)
-	: m_gamePath(path.parent_path())
-	, m_navigator{GromadaResourceReader{std::move(path)}} {
+	: m_gamePath(path.parent_path()) {
 
-	m_navigator.visitSectionsOfType(SectionType::Vid, [this](const Section& _, BinaryStreamReader reader) { m_vids.emplace_back(reader); });
+	GromadaResourceNavigator navigator {GromadaResourceReader{std::move(path)}};
+	navigator.visitSectionsOfType(SectionType::Vid, [this](const Section& _, BinaryStreamReader reader) { m_vids.emplace_back(reader); });
 
 	std::ranges::for_each(m_vids, [this](Vid& vid) {
 		if (const auto referenceNvid = std::get_if<std::int32_t>(&vid.graphicsData)) {
@@ -96,7 +95,7 @@ GameResources::GameResources(std::filesystem::path path)
 
 	m_vidRefs = m_vids | std::views::transform([this](const Vid& vid) { return VidRef{*this, &vid}; }) | std::ranges::to<std::vector>();
 
-	m_navigator.visitSectionsOfType(SectionType::TilesTable, [&](const Section& section, BinaryStreamReader reader) {
+	navigator.visitSectionsOfType(SectionType::TilesTable, [&](const Section& section, BinaryStreamReader reader) {
 		m_adjacencyData = getAdjacencyData(section, reader);
 		m_baseTilesVids = std::views::iota(0, std::min<int>(adjacencyData().extent(0), adjacencyData().extent(1)))
 		| std::views::transform([this](int i) {
@@ -106,7 +105,7 @@ GameResources::GameResources(std::filesystem::path path)
 		| std::ranges::to<std::vector>();
 	});
 
-	m_navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
+	navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
 		m_sounds = getSounds(section, reader);
 	});
 
