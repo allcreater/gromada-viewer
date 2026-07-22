@@ -50,10 +50,6 @@ target_link_libraries(GromadaEditor
 		nlohmann_json_adapter
 )
 
-
-#add_subdirectory("data/shaders")
-#add_dependencies(VulkanViewer app_shaders)
-
 target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
 
 target_compile_features(GromadaEditor PRIVATE cxx_std_23 )
