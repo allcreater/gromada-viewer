@@ -55,8 +55,8 @@ jobs:
       uses: aminya/setup-cpp@v1
       with:
         compiler: llvm-20
-        cmake: 4.2
-        ninja: true
+        cmake: 4.2.0
+        ninja: 1.13.2
 
     - name: Install dependencies (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
