@@ -18,7 +18,7 @@
       "cacheVariables": {
       },
       "environment": {
-        "CXXFLAGS": "$penv{CXXFLAGS} /W4 /Wall /external:W2 /external:anglebrackets"
+        "CXXFLAGS": "/W4 /Wall /external:W2 /external:anglebrackets"
       },
       "condition": {
         "type": "equals",
