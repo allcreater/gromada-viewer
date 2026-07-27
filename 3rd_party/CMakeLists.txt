@@ -10,6 +10,12 @@ add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
 )
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
+set_target_properties(imgui PROPERTIES
+        CXX_STANDARD 23
+        CXX_STANDARD_REQUIRED ΟΝ
+        CXX_MODULE_STD OFF
+        CXX_EXTENSIONS OFF
+)
 
 add_library(third_party_libs)
 target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR} ${miniaudio_SOURCE_DIR})

@@ -44,6 +44,12 @@ jobs:
         ninja: 1.13.2
         vcvarsall: ${{ contains(inputs.os, 'windows') }}
 
+    - name: Install dependencies (Ubuntu)
+      if: inputs.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev libxi-dev libxcursor-dev
+
     - name: Configure CMake (Emscripten)
       if: inputs.use_emcmake == true
       run: >
