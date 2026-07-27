@@ -4,7 +4,7 @@ export module Gromada.DataExporters;
 
 import std;
 import utils;
-import nlohmann_json_adapter; //TODO: try Glaze instead
+import nlohmann.json; //TODO: try Glaze instead
 import Gromada.Resources;
 import Gromada.Map;
 

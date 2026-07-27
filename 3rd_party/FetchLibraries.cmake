@@ -18,7 +18,7 @@ FetchContent_Declare(
 FetchContent_Declare(
         nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.12.0
+        GIT_TAG 06ac77f4fdbb4a78a590bccf29ce9c6bebeee7b2
 )
 
 FetchContent_Declare(
@@ -43,6 +43,9 @@ FetchContent_Declare(
 set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glm)
 
+set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
 FetchContent_Declare(
         miniaudio
         GIT_REPOSITORY https://github.com/mackron/miniaudio.git
@@ -50,4 +53,4 @@ FetchContent_Declare(
 )
 
 # Make the rest dependencies available
-FetchContent_MakeAvailable(imgui sokol nlohmann_json argparse flecs miniaudio)
+FetchContent_MakeAvailable(imgui sokol argparse flecs miniaudio)

@@ -53,19 +53,3 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     find_library(LIB_m m REQUIRED)
     target_link_libraries(third_party_libs PRIVATE ${LIB_X11} ${LIB_Xi} ${LIB_Xcursor} ${LIB_EGL} ${LIB_GL} ${LIB_dl} ${LIB_m} Threads::Threads)
 endif()
-
-
-add_library(nlohmann_json_adapter)
-target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
-set_target_properties(nlohmann_json_adapter PROPERTIES
-        CXX_STANDARD 23
-        CXX_STANDARD_REQUIRED ΟΝ
-        CXX_MODULE_STD ON
-        CXX_EXTENSIONS OFF
-)
-target_sources(nlohmann_json_adapter PUBLIC
-  FILE_SET CXX_MODULES
-  BASE_DIRS
-  FILES
-    "nlohmann_json_adapter.cppm"
-)

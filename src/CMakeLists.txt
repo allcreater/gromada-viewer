@@ -46,7 +46,7 @@ target_link_libraries(GromadaEditor
 		third_party_libs
 		argparse::argparse
 		flecs::flecs_static
-		nlohmann_json_adapter
+		nlohmann_json_modules
 )
 
 target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
