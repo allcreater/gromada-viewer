@@ -15,7 +15,12 @@ add_library(third_party_libs)
 target_include_directories(third_party_libs PUBLIC ${sokol_SOURCE_DIR} ${miniaudio_SOURCE_DIR})
 target_link_libraries(third_party_libs PUBLIC imgui glm::glm)
 target_compile_definitions(third_party_libs PUBLIC SOKOL_GLCORE)
-target_compile_features(third_party_libs PUBLIC cxx_std_23)
+set_target_properties(third_party_libs PROPERTIES
+        CXX_STANDARD 23
+        CXX_STANDARD_REQUIRED ΟΝ
+        CXX_MODULE_STD ON
+        CXX_EXTENSIONS OFF
+)
 target_sources( third_party_libs PUBLIC
     "sokol_impl.cpp"
     "miniaudio_impl.cpp"
@@ -43,7 +48,12 @@ endif()
 
 add_library(nlohmann_json_adapter)
 target_link_libraries(nlohmann_json_adapter PUBLIC nlohmann_json::nlohmann_json)
-target_compile_features(nlohmann_json_adapter PUBLIC cxx_std_23)
+set_target_properties(nlohmann_json_adapter PROPERTIES
+        CXX_STANDARD 23
+        CXX_STANDARD_REQUIRED ΟΝ
+        CXX_MODULE_STD ON
+        CXX_EXTENSIONS OFF
+)
 target_sources(nlohmann_json_adapter PUBLIC
   FILE_SET CXX_MODULES
   BASE_DIRS

@@ -1,5 +1,3 @@
-# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
 name: CMake on multiple platforms
 
 on:
@@ -7,88 +5,37 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-
+  build-native:
     strategy:
-      # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
       fail-fast: false
-
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        cmake_preset: [cl-x64-debug, cl-x64-release, clang-x64-release]
         include:
           - os: windows-latest
             cmake_preset: cl-x64-debug
+            compiler: cl
           - os: windows-latest
             cmake_preset: cl-x64-release
+            compiler: cl
           - os: ubuntu-latest
             cmake_preset: clang-x64-release
-        exclude:
-          - os: windows-latest
-            cmake_preset: clang-x64-release
+            compiler: llvm-22.0.0
           - os: ubuntu-latest
-            cmake_preset: cl-x64-debug
-          - os: ubuntu-latest
-            cmake_preset: cl-x64-release
+            cmake_preset: gcc-x64-release
+            compiler: gcc-16
 
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-        
-    - name: Set reusable strings
-      # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
-      id: strings
-      shell: bash
-      run: |
-        echo "build-output-dir=${{ github.workspace }}/out/build/${{ matrix.cmake_preset }}" >> "$GITHUB_OUTPUT"
+    uses: ./.github/workflows/cmake-build.yml
+    with:
+      os: ${{ matrix.os }}
+      cmake_preset: ${{ matrix.cmake_preset }}
+      compiler: ${{ matrix.compiler }}
 
-    - name: Setup C++ environment (Windows)
-      if: matrix.os == 'windows-latest'
-      uses: aminya/setup-cpp@v1
-      with:
-        compiler: cl
-        cmake: 4.4.0
-        ninja: 1.13.2
-        vcvarsall: ${{ contains(matrix.os, 'windows' )}}
-
-    - name: Setup C++ environment
-      if: matrix.os == 'ubuntu-latest'
-      uses: aminya/setup-cpp@v1
-      with:
-        compiler: llvm-20
-        cmake: 4.2.0
-        ninja: 1.13.2
-
-    - name: Install dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev libxi-dev libxcursor-dev
-
-    - name: Configure CMake
-      run: >
-        cmake --preset ${{ matrix.cmake_preset }} 
-        -B ${{ steps.strings.outputs.build-output-dir }}
-        -S ${{ github.workspace }}
-
-    - name: Build
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }}
-
-    - name: Test
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      # Execute tests defined by the CMake configuration. --build-config may be needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest
-
-    - name: Upload artifacts (Windows)
-      if : matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-binaries-${{ matrix.cmake_preset }}
-        path: |
-            ${{ steps.strings.outputs.build-output-dir }}/src
-            !${{ steps.strings.outputs.build-output-dir }}/src/cmake*
+  build-emscripten:
+    uses: ./.github/workflows/cmake-build.yml
+    with:
+      os: ubuntu-latest
+      cmake_preset: emscripten-wasm-release
+      use_emcmake: true
+      build_container: emscripten/emsdk:latest

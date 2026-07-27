@@ -6,7 +6,6 @@ add_executable (GromadaEditor
 		"main.cpp"
 )
 
-
  target_sources(GromadaEditor PRIVATE
 	FILE_SET modules
 	TYPE CXX_MODULES
@@ -52,4 +51,9 @@ target_link_libraries(GromadaEditor
 
 target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
 
-target_compile_features(GromadaEditor PRIVATE cxx_std_23 )
+set_target_properties(GromadaEditor PROPERTIES
+		CXX_STANDARD 23
+		CXX_STANDARD_REQUIRED ΟΝ
+		CXX_MODULE_STD ON
+		CXX_EXTENSIONS OFF
+)
