@@ -99,6 +99,9 @@
         "CMAKE_BUILD_TYPE": "Release",
         "EMSCRIPTEN": "ON",
         "GVIEWER_RENDER_BACKEND" : "GLES3"
+      },
+      "environment": {
+        "LDFLAGS" : "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s SINGLE_FILE=1"
       }
     }
   ]
