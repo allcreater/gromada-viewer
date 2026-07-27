@@ -20,5 +20,8 @@ project(GromadaEditor
 
 message("Cmake version is ${CMAKE_VERSION}, standard library is ${CMAKE_CXX_STANDARD_LIBRARY}")
 
+set(GVIEWER_RENDER_BACKEND "GLCORE" CACHE STRING "Rendering backend")
+set_property(CACHE GVIEWER_RENDER_BACKEND PROPERTY STRINGS GLCORE GLES3 D3D11 METAL WGPU VULKAN)
+
 add_subdirectory(3rd_party/)
 add_subdirectory(src/)

@@ -97,7 +97,8 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "EMSCRIPTEN": "ON"
+        "EMSCRIPTEN": "ON",
+        "GVIEWER_RENDER_BACKEND" : "GLES3"
       }
     }
   ]
