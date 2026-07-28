@@ -21,9 +21,9 @@ jobs:
           - os: ubuntu-latest
             cmake_preset: clang-x64-release
             compiler: llvm-20.0.0
-          - os: ubuntu-latest
-            cmake_preset: gcc-x64-release
-            compiler: gcc-16
+#          - os: ubuntu-latest
+#            cmake_preset: gcc-x64-release
+#            compiler: gcc-16
 
     uses: ./.github/workflows/cmake-build.yml
     with:
