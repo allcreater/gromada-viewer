@@ -52,7 +52,7 @@ export {
 				throw std::out_of_range("Not enough data to read");
 			}
 
-			std::memcpy(out.data(), data.data(), out.size_bytes());
+			std::copy(data.data(), data.data() + out.size_bytes(), out.data());
 			data = data.subspan(out.size_bytes());
 		}
 
