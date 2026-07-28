@@ -80,13 +80,11 @@ export using SgUniqueImage = SgUniqueResource<sg_image>;
 export using SgUniqueSampler = SgUniqueResource<sg_sampler>;
 export using SgUniqueView = SgUniqueResource<sg_view>;
 
-export class SgUniqueImageWithView : public SgUniqueImage, SgUniqueView{
+export class SgUniqueImageWithView : public SgUniqueImage, public SgUniqueView{
 public:
 	SgUniqueImageWithView() = default;
 	SgUniqueImageWithView(sg_image_desc desc, sg_texture_view_range mip_levels, sg_texture_view_range slices)
 		: SgUniqueImage{desc}
 		, SgUniqueView{{.texture = {.image = *this, .mip_levels = mip_levels, .slices = slices}}}
 		{}
-
-	using SgUniqueView::operator sg_view;
 };
