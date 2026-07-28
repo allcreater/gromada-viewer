@@ -20,7 +20,7 @@ jobs:
             compiler: cl
           - os: ubuntu-latest
             cmake_preset: clang-x64-release
-            compiler: llvm-22.0.0
+            compiler: llvm-20.0.0
           - os: ubuntu-latest
             cmake_preset: gcc-x64-release
             compiler: gcc-16
