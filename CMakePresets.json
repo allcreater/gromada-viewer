@@ -53,6 +53,9 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "environment": {
+        "CXXFLAGS": "$penv{CXXFLAGS}"
       }
     },
     {
@@ -65,6 +68,9 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      },
+      "environment": {
+        "CXXFLAGS": "$penv{CXXFLAGS}"
       }
     },
     {
