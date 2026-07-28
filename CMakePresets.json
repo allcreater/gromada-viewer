@@ -2,22 +2,20 @@
   "version": 3,
   "configurePresets": [
     {
-        "name": "base",
-        "hidden": true,
-        "generator": "Ninja",
-        "binaryDir": "${sourceDir}/out/build/${presetName}",
-        "installDir": "${sourceDir}/out/install/${presetName}",
-        "cacheVariables": {
-            "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
-        }
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_POLICY_VERSION_MINIMUM": "4.2"
+      }
     },
     {
       "name": "base-cl",
       "inherits": "base",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "cl.exe",
-        "CMAKE_CXX_COMPILER": "cl.exe"
       },
       "environment": {
         "CXXFLAGS": "/W4 /Wall /external:W2 /external:anglebrackets"
@@ -33,15 +31,16 @@
       "inherits": "base",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_CXX_FLAGS": "-stdlib=libc++",
         "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi",
         "CMAKE_SHARED_LINKER_FLAGS": "-stdlib=libc++ -lc++ -lc++abi"
-      },
-      "environment": {
-        "CXXFLAGS": "",
-        "PATH": "/usr/bin:$penv{PATH}"
+      }
+    },
+    {
+      "name": "base-gcc",
+      "inherits": "base",
+      "hidden": true,
+      "cacheVariables": {
       }
     },
     {
@@ -82,11 +81,34 @@
         "value": "x64",
         "strategy": "external"
       },
-        "cacheVariables": {
-            "CMAKE_C_COMPILER": "clang-20",
-            "CMAKE_CXX_COMPILER": "clang++-20",
-            "CMAKE_BUILD_TYPE": "Release"
-        }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "gcc-x64-release",
+      "displayName": "GCC x64 Release",
+      "inherits": "base-gcc",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "emscripten-wasm-release",
+      "displayName": "Emscripten WebAssembly Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "EMSCRIPTEN": "ON",
+        "GVIEWER_RENDER_BACKEND" : "GLES3"
+      },
+      "environment": {
+        "LDFLAGS" : "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s SINGLE_FILE=1"
+      }
     }
   ]
 }

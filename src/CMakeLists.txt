@@ -1,11 +1,10 @@
-cmake_minimum_required (VERSION 3.30)
+cmake_minimum_required (VERSION 4.2)
 
 add_executable (GromadaEditor
 		"gromada/map_loader.cpp"
 		"gromada/map_saver.cpp"
 		"main.cpp"
 )
-
 
  target_sources(GromadaEditor PRIVATE
 	FILE_SET modules
@@ -47,13 +46,14 @@ target_link_libraries(GromadaEditor
 		third_party_libs
 		argparse::argparse
 		flecs::flecs_static
-		nlohmann_json_adapter
+		nlohmann_json_modules
 )
-
-
-#add_subdirectory("data/shaders")
-#add_dependencies(VulkanViewer app_shaders)
 
 target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
 
-target_compile_features(GromadaEditor PRIVATE cxx_std_23 )
+set_target_properties(GromadaEditor PROPERTIES
+		CXX_STANDARD 23
+		CXX_STANDARD_REQUIRED ΟΝ
+		CXX_MODULE_STD ON
+		CXX_EXTENSIONS OFF
+)
