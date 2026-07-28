@@ -18,6 +18,9 @@ project(GromadaEditor
     LANGUAGES CXX
 )
 
+# Seems that some compilers wants to have CMAKE_CXX_MODULE_STD enabled before the project declaration, let's disable it back
+set(CMAKE_CXX_MODULE_STD OFF)
+
 message("Cmake version is ${CMAKE_VERSION}, standard library is ${CMAKE_CXX_STANDARD_LIBRARY}")
 
 set(GVIEWER_RENDER_BACKEND "GLCORE" CACHE STRING "Rendering backend")
