@@ -80,12 +80,9 @@ export {
 
 GameResources::GameResources(std::filesystem::path path)
 	: m_gamePath(path.parent_path()) {
-	std::println("Initializing GameResources...");
 
 	GromadaResourceNavigator navigator {GromadaResourceReader{std::move(path)}};
 	navigator.visitSectionsOfType(SectionType::Vid, [this](const Section& _, BinaryStreamReader reader) { m_vids.emplace_back(reader); });
-
-	std::println("Res file opened");
 
 	std::ranges::for_each(m_vids, [this](Vid& vid) {
 		if (const auto referenceNvid = std::get_if<std::int32_t>(&vid.graphicsData)) {
@@ -95,8 +92,6 @@ GameResources::GameResources(std::filesystem::path path)
 			}
 		}
 	});
-
-	std::println("Vids readed...");
 
 	m_vidRefs = m_vids | std::views::transform([this](const Vid& vid) { return VidRef{*this, &vid}; }) | std::ranges::to<std::vector>();
 
@@ -113,8 +108,6 @@ GameResources::GameResources(std::filesystem::path path)
 	navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
 		m_sounds = getSounds(section, reader);
 	});
-
-	std::println("GameResources initialized from {}", m_gamePath.string());
 }
 
 VidRef::VidRef( const GameResources &resources, int nvid )

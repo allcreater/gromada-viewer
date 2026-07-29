@@ -247,8 +247,6 @@ private:
     }
 
 	flecs::world create_world(std::filesystem::path resourcesPath) {
-    	std::println("Creating world...");
-
 		flecs::world world{};
         world.import<WorldModule>();
         world.import<EditorComponents>();
@@ -268,8 +266,6 @@ private:
 					world.add<ObjectPrototype>(prototype);
 				}
 			});
-
-    	std::println("Ok");
 
         return world;
     }
