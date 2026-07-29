@@ -108,7 +108,6 @@ GameResources::GameResources(std::filesystem::path path)
 	navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
 		m_sounds = getSounds(section, reader);
 	});
-
 }
 
 VidRef::VidRef( const GameResources &resources, int nvid )
