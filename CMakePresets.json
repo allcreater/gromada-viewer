@@ -105,7 +105,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "EMSCRIPTEN": "ON",
         "GVIEWER_RENDER_BACKEND" : "GLES3",
-        "CMAKE_EXE_LINKER_FLAGS": "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s SINGLE_FILE=1 -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=\"['callMain', 'FS']\" -s DISABLE_EXCEPTION_CATCHING=0 -s ASSERTIONS=1 --profiling-funcs --shell-file ${sourceDir}/src/web/shell.html"
+        "CMAKE_EXE_LINKER_FLAGS": "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=1MB -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s SINGLE_FILE=1 -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=\"['callMain', 'FS']\" -s DISABLE_EXCEPTION_CATCHING=0 -s ASSERTIONS=1 --profiling-funcs --shell-file ${sourceDir}/src/web/shell.html"
       }
     }
   ]
