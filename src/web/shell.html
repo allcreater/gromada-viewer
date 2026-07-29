@@ -101,7 +101,7 @@
 
                     // 3. Сохраняем файл в виртуальную файловую систему Emscripten
                     var vfsPath = '/' + file.name;
-                    FS.writeFile(vfsPath, data);
+                    Module.FS.writeFile(vfsPath, data);
 
                     console.log('Файл успешно загружен в VFS по пути: ' + vfsPath);
 
