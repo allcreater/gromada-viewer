@@ -42,7 +42,10 @@ public:
 			m_model.loadMap(*arg);
 		}
 
+    	std::println("Setup fonts...");
 		setupFont();
+
+    	std::println("Application initialized successfully");
     }
 
 	void on_frame() {

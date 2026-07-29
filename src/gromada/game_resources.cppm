@@ -109,6 +109,7 @@ GameResources::GameResources(std::filesystem::path path)
 		m_sounds = getSounds(section, reader);
 	});
 
+	std::println("GameResources initialized from {}", m_gamePath.string());
 }
 
 VidRef::VidRef( const GameResources &resources, int nvid )
