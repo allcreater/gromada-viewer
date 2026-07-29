@@ -57,3 +57,7 @@ set_target_properties(GromadaEditor PROPERTIES
 		CXX_MODULE_STD ON
 		CXX_EXTENSIONS OFF
 )
+
+if(EMSCRIPTEN)
+	set_target_properties(GromadaEditor PROPERTIES SUFFIX ".html")
+endif()
