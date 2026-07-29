@@ -137,7 +137,7 @@
             // Файлы, ожидающие монтирования: { path: 'relative/path.ext' (без ведущего '/'), file: File }
             var pendingFiles = [];
             // Относительные пути верхнеуровневых перетащенных элементов (файлов или папок) —
-            // именно они передаются в качестве argv в main(), как имена смонтированных VFS-путей.
+            // используются только для отображения списка в UI.
             var topLevelPaths = [];
 
             // Требования к набору файлов:
@@ -296,9 +296,8 @@
                     // Прячем интерфейс
                     ui.style.display = 'none';
 
-                    // 4. Вручную запускаем C++ main(), передавая пути верхнеуровневых
-                    // перетащенных элементов. Это эквивалентно запуску: ./my_game /res /extra.map ...
-                    Module.callMain(topLevelPaths.map(function(p) { return '/' + p; }));
+                    // 4. Вручную запускаем C++ main() без аргументов: достаточно наличия в рабочей директории fw.res
+                    Module.callMain([]);
                 }).catch(function(err) {
                     console.error('Failed to mount files into VFS:', err);
                     btn.disabled = false;
