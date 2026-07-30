@@ -100,6 +100,7 @@
     <div id="status">
         <div id="status-res" class="status-item">fw.res: —</div>
         <div id="status-maps" class="status-item">maps: —</div>
+        <div id="status-font" class="status-item">font: —</div>
     </div>
     <ul id="file-list"></ul>
     <button id="start-btn" disabled>Launch viewer</button>
@@ -129,7 +130,15 @@
             var fileListEl = document.getElementById('file-list');
             var statusResEl = document.getElementById('status-res');
             var statusMapsEl = document.getElementById('status-maps');
+            var statusFontEl = document.getElementById('status-font');
             var btn = document.getElementById('start-btn');
+
+            // Приложению нужен хотя бы один .ttf в корне VFS (см. Application::setupFont,
+            // который сканирует current_path() без рекурсии). Если пользователь не
+            // перетащил свой шрифт — при запуске скачиваем свободный шрифт с кириллицей
+            // (PT Sans, OFL) из репозитория Google Fonts и монтируем его в корень.
+            var FALLBACK_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Regular.ttf';
+            var FALLBACK_FONT_VFS_NAME = 'PTSans-Regular.ttf';
 
             // Показываем UI
             ui.style.display = 'flex';
@@ -183,11 +192,35 @@
                     statusMapsEl.className = 'status-item error';
                 }
 
+                var hasCustomFont = pendingFiles.some(function(f) {
+                    return f.path.indexOf('/') === -1 && /\.ttf$/i.test(f.path);
+                });
+                if (hasCustomFont) {
+                    statusFontEl.textContent = 'font: custom .ttf provided';
+                    statusFontEl.className = 'status-item ok';
+                } else {
+                    statusFontEl.textContent = 'font: none provided — a free Cyrillic font will be downloaded automatically';
+                    statusFontEl.className = 'status-item warn';
+                }
+
                 btn.disabled = !v.ok;
             }
 
             function stripLeadingSlash(path) {
                 return path.replace(/^\/+/, '');
+            }
+
+            // Расширение файла — техническая деталь, а не часть "имени, за которое отвечает
+            // пользователь", поэтому регистр расширения нормализуем к нижнему (fw.RES, .TTF,
+            // .Map и т.п. из разных ОС/файловых систем не должны ломать сопоставление ниже).
+            // Остальная часть пути (каталоги, имя файла до расширения) остаётся как есть.
+            function normalizeExtensionCase(path) {
+                var slashIdx = path.lastIndexOf('/');
+                var basename = slashIdx === -1 ? path : path.substring(slashIdx + 1);
+                var dotIdx = basename.lastIndexOf('.');
+                if (dotIdx <= 0) return path;
+                var dir = slashIdx === -1 ? '' : path.substring(0, slashIdx + 1);
+                return dir + basename.substring(0, dotIdx) + basename.substring(dotIdx).toLowerCase();
             }
 
             function readEntryAsFile(entry) {
@@ -220,7 +253,7 @@
             function collectEntry(entry) {
                 if (entry.isFile) {
                     return readEntryAsFile(entry).then(function(file) {
-                        pendingFiles.push({ path: stripLeadingSlash(entry.fullPath), file: file });
+                        pendingFiles.push({ path: normalizeExtensionCase(stripLeadingSlash(entry.fullPath)), file: file });
                     });
                 } else if (entry.isDirectory) {
                     var reader = entry.createReader();
@@ -286,13 +319,39 @@
                 });
             }
 
+            // Если пользователь не подложил свой .ttf — скачивает шрифт с кириллицей
+            // с CDN и монтирует его в корень VFS. Ошибка скачивания не блокирует запуск —
+            // приложение в этом случае просто останется без кастомного шрифта.
+            function ensureFallbackFont() {
+                var hasCustomFont = pendingFiles.some(function(f) {
+                    return f.path.indexOf('/') === -1 && /\.ttf$/i.test(f.path);
+                });
+                if (hasCustomFont) {
+                    return Promise.resolve();
+                }
+
+                return fetch(FALLBACK_FONT_URL).then(function(resp) {
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    return resp.arrayBuffer();
+                }).then(function(buf) {
+                    Module.FS.writeFile('/' + FALLBACK_FONT_VFS_NAME, new Uint8Array(buf));
+                    console.log('Fallback Cyrillic font loaded into VFS at /' + FALLBACK_FONT_VFS_NAME);
+                }).catch(function(err) {
+                    console.warn('Could not download fallback font, continuing without it:', err);
+                });
+            }
+
             // Обрабатываем нажатие на старт
             btn.addEventListener('click', function() {
                 if (!validate().ok) return;
                 btn.disabled = true;
 
-                // 3. Монтируем все перетащенные файлы в VFS до запуска wasm
-                Promise.all(pendingFiles.map(writeFileToVFS)).then(function() {
+                // 3. Монтируем все перетащенные файлы в VFS и, при необходимости,
+                // докачиваем фолбэк-шрифт — всё это должно завершиться до запуска wasm.
+                Promise.all([
+                    Promise.all(pendingFiles.map(writeFileToVFS)),
+                    ensureFallbackFont()
+                ]).then(function() {
                     // Прячем интерфейс
                     ui.style.display = 'none';
 
