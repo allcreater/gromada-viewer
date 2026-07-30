@@ -64,8 +64,10 @@ public:
     	sg_end_pass();
     	sg_commit();
 
+#ifndef __EMSCRIPTEN__
     	using namespace std::chrono_literals;
     	std::this_thread::sleep_for(5ms);
+#endif
 	}
 
     void on_event(const sapp_event& event) {

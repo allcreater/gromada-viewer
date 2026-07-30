@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gromada viewer (Web edition)</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        canvas.emscripten {
+            border: 0px none;
+            background-color: #000;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Стили для стартового окна выбора файлов */
+        #startup-ui {
+            position: absolute;
+            background: rgba(40, 40, 40, 0.95);
+            padding: 30px;
+            border-radius: 8px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none; /* Скрыто до полной инициализации Wasm */
+            flex-direction: column;
+            gap: 15px;
+            width: 420px;
+            max-width: 90vw;
+        }
+
+        #dropzone {
+            border: 2px dashed #777;
+            border-radius: 6px;
+            padding: 30px 15px;
+            color: #ccc;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        #dropzone.dragover {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        #file-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 150px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 13px;
+            color: #ddd;
+        }
+        #file-list li {
+            padding: 2px 6px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        #status {
+            text-align: left;
+            font-size: 13px;
+        }
+        .status-item.ok { color: #4CAF50; }
+        .status-item.error { color: #e05252; }
+        .status-item.warn { color: #e0a252; }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button:disabled { background: #555; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+<!-- Оверлей для загрузки файлов -->
+<div id="startup-ui">
+    <h2>Preparing for launch</h2>
+    <p>Provide game resources (fw.res and, optionally, a "maps" folder)</p>
+    <div id="dropzone">Drop files or folders here</div>
+    <div id="status">
+        <div id="status-res" class="status-item">fw.res: —</div>
+        <div id="status-maps" class="status-item">maps: —</div>
+    </div>
+    <ul id="file-list"></ul>
+    <button id="start-btn" disabled>Launch viewer</button>
+</div>
+
+<script type="text/javascript">
+    var Module = {
+        // 1. ЗАПРЕЩАЕМ автозапуск main()
+        noInitialRun: true,
+
+        canvas: (function() {
+            var canvas = document.getElementById('canvas');
+            canvas.addEventListener("webglcontextlost", function(e) {
+                alert('WebGL context lost.'); e.preventDefault();
+            }, false);
+            return canvas;
+        })(),
+
+        print: function(text) { console.log(text); },
+        printErr: function(text) { console.error(text); },
+
+        // 2. Эта функция вызовется, когда WebAssembly будет готов к работе,
+        // а виртуальная файловая система (FS) инициализирована.
+        onRuntimeInitialized: function() {
+            var ui = document.getElementById('startup-ui');
+            var dropzone = document.getElementById('dropzone');
+            var fileListEl = document.getElementById('file-list');
+            var statusResEl = document.getElementById('status-res');
+            var statusMapsEl = document.getElementById('status-maps');
+            var btn = document.getElementById('start-btn');
+
+            // Показываем UI
+            ui.style.display = 'flex';
+
+            // Файлы, ожидающие монтирования: { path: 'relative/path.ext' (без ведущего '/'), file: File }
+            var pendingFiles = [];
+            // Относительные пути верхнеуровневых перетащенных элементов (файлов или папок) —
+            // используются только для отображения списка в UI.
+            var topLevelPaths = [];
+
+            // Требования к набору файлов:
+            // - "fw.res" должен лежать прямо в корне VFS;
+            // - папка "maps" опциональна, но если она есть — в ней (или подпапках)
+            //   должен быть хотя бы один файл с расширением .map.
+            function validate() {
+                var hasFwRes = pendingFiles.some(function(f) { return f.path === 'fw.res'; });
+                var mapsFiles = pendingFiles.filter(function(f) { return f.path.indexOf('maps/') === 0; });
+                var mapsPresent = mapsFiles.length > 0;
+                var mapsHasMapFile = mapsFiles.some(function(f) { return /\.map$/i.test(f.path); });
+                var mapsValid = !mapsPresent || mapsHasMapFile;
+
+                return {
+                    hasFwRes: hasFwRes,
+                    mapsPresent: mapsPresent,
+                    mapsValid: mapsValid,
+                    ok: hasFwRes && mapsValid
+                };
+            }
+
+            function renderList() {
+                fileListEl.innerHTML = '';
+                topLevelPaths.forEach(function(p) {
+                    var li = document.createElement('li');
+                    li.textContent = p;
+                    fileListEl.appendChild(li);
+                });
+
+                var v = validate();
+
+                statusResEl.textContent = v.hasFwRes ? 'fw.res: found' : 'fw.res: not found (required)';
+                statusResEl.className = 'status-item ' + (v.hasFwRes ? 'ok' : 'error');
+
+                if (!v.mapsPresent) {
+                    statusMapsEl.textContent = 'maps: not provided (optional)';
+                    statusMapsEl.className = 'status-item warn';
+                } else if (v.mapsValid) {
+                    statusMapsEl.textContent = 'maps: found, contains .map file(s)';
+                    statusMapsEl.className = 'status-item ok';
+                } else {
+                    statusMapsEl.textContent = 'maps: found, but contains no .map file';
+                    statusMapsEl.className = 'status-item error';
+                }
+
+                btn.disabled = !v.ok;
+            }
+
+            function stripLeadingSlash(path) {
+                return path.replace(/^\/+/, '');
+            }
+
+            function readEntryAsFile(entry) {
+                return new Promise(function(resolve, reject) {
+                    entry.file(resolve, reject);
+                });
+            }
+
+            // FileSystemDirectoryReader.readEntries нужно вызывать в цикле,
+            // пока не вернётся пустой массив — за один вызов отдаются не все файлы.
+            function readAllDirectoryEntries(reader) {
+                return new Promise(function(resolve, reject) {
+                    var allEntries = [];
+                    function readBatch() {
+                        reader.readEntries(function(entries) {
+                            if (entries.length === 0) {
+                                resolve(allEntries);
+                            } else {
+                                allEntries = allEntries.concat(entries);
+                                readBatch();
+                            }
+                        }, reject);
+                    }
+                    readBatch();
+                });
+            }
+
+            // Рекурсивно обходит FileSystemEntry (файл или папку) и складывает
+            // найденные файлы в pendingFiles с относительным путём (entry.fullPath).
+            function collectEntry(entry) {
+                if (entry.isFile) {
+                    return readEntryAsFile(entry).then(function(file) {
+                        pendingFiles.push({ path: stripLeadingSlash(entry.fullPath), file: file });
+                    });
+                } else if (entry.isDirectory) {
+                    var reader = entry.createReader();
+                    return readAllDirectoryEntries(reader).then(function(entries) {
+                        return Promise.all(entries.map(collectEntry));
+                    });
+                }
+                return Promise.resolve();
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+
+                var items = e.dataTransfer.items;
+                if (!items) return;
+
+                var topEntries = [];
+                for (var i = 0; i < items.length; i++) {
+                    var getEntry = items[i].webkitGetAsEntry || items[i].getAsEntry;
+                    var entry = getEntry && getEntry.call(items[i]);
+                    if (entry) topEntries.push(entry);
+                }
+
+                Promise.all(topEntries.map(function(entry) {
+                    topLevelPaths.push(stripLeadingSlash(entry.fullPath));
+                    return collectEntry(entry);
+                })).then(renderList).catch(function(err) {
+                    console.error('Error reading dropped files:', err);
+                });
+            }
+
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+            dropzone.addEventListener('dragleave', function() {
+                dropzone.classList.remove('dragover');
+            });
+            dropzone.addEventListener('drop', handleDrop);
+
+            function mkdirTreeForFile(path) {
+                var idx = path.lastIndexOf('/');
+                if (idx > 0) {
+                    Module.FS.mkdirTree('/' + path.substring(0, idx));
+                }
+            }
+
+            // Читает File и монтирует его в виртуальную ФС Emscripten по относительному пути,
+            // создавая при необходимости промежуточные директории.
+            function writeFileToVFS(entryInfo) {
+                return new Promise(function(resolve, reject) {
+                    var reader = new FileReader();
+                    reader.onload = function(event) {
+                        var data = new Uint8Array(event.target.result);
+                        mkdirTreeForFile(entryInfo.path);
+                        Module.FS.writeFile('/' + entryInfo.path, data);
+                        console.log('File successfully loaded into VFS at path: /' + entryInfo.path);
+                        resolve();
+                    };
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(entryInfo.file);
+                });
+            }
+
+            // Обрабатываем нажатие на старт
+            btn.addEventListener('click', function() {
+                if (!validate().ok) return;
+                btn.disabled = true;
+
+                // 3. Монтируем все перетащенные файлы в VFS до запуска wasm
+                Promise.all(pendingFiles.map(writeFileToVFS)).then(function() {
+                    // Прячем интерфейс
+                    ui.style.display = 'none';
+
+                    // 4. Вручную запускаем C++ main() без аргументов: достаточно наличия в рабочей директории fw.res
+                    Module.callMain([]);
+                }).catch(function(err) {
+                    console.error('Failed to mount files into VFS:', err);
+                    btn.disabled = false;
+                });
+            });
+        }
+    };
+</script>
+
+{{{ SCRIPT }}}
+
+</body>
+</html>
