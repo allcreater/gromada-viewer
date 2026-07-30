@@ -71,11 +71,28 @@
 
         #status {
             text-align: left;
-            font-size: 13px;
+            font-size: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
-        .status-item.ok { color: #4CAF50; }
-        .status-item.error { color: #e05252; }
-        .status-item.warn { color: #e0a252; }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ddd;
+        }
+        .status-item::before {
+            content: '';
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #777;
+            flex: 0 0 auto;
+        }
+        .status-item.ok::before { background: #4CAF50; box-shadow: 0 0 6px rgba(76, 175, 80, 0.8); }
+        .status-item.error::before { background: #e05252; box-shadow: 0 0 6px rgba(224, 82, 82, 0.8); }
+        .status-item.warn::before { background: #e0a252; box-shadow: 0 0 6px rgba(224, 162, 82, 0.8); }
 
         button {
             padding: 10px 20px;
