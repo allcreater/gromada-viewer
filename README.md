@@ -1,16 +1,18 @@
 # gromada-viewer
-A small program written in C++ 23 to view most game resources from the old good game "Gromada" developed by Buka Entertainment (1999)
+Cross-platform asset viewer of the classic game "Gromada" developed by Buka Entertainment (1999)
 
 # Usage
-Just put the binaries to the root game directory and run the program.
+* Native: Just put the binaries to the root game directory and run the program.
+* Web version: https://allcreater.github.io/gromada-viewer-page/ — just drop game resources to the browser. Only fw.res is required, maps directory is optional
+
 
 # Features
 * Interactive view of "Vids" database (game object properties and graphics) with all corresponding graphics frames
 * Map loading and animated rendering
 * Cross-platform
-* Export Vids to CSV table
-* Maps export as a JSON or save back to the in-game format
-* Basic editor features: object selection, placing, and deleting
+* C++ 23 with modules
+* Rough map editor features: object manipulation and map saving
+* Exporters: Vid params to CSV table, Map to JSON
 
 # Dependencies
 * sokol-gfx
