@@ -111,7 +111,7 @@ export {
 
 	class GromadaResourceReader {
 	public:
-		explicit GromadaResourceReader(std::filesystem::path path) try
+		explicit GromadaResourceReader(const std::filesystem::path& path) try
 		: m_stream{ path, std::ios_base::in | std::ios_base::binary } {
 			m_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 

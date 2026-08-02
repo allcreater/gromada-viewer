@@ -52,7 +52,7 @@ export {
                             .z = vid->linkZ,
                             .direction = 0,
                         })
-                        .emplace<VidRef>(vid.parent(), vid->linkedObjectVid)
+                        .emplace<VidRef>(vid.parent().getVid(vid->linkedObjectVid))
                         .child_of(entity);
                 }
 

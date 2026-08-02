@@ -242,7 +242,7 @@ export class MapViewModel {
 
             if (ImGui::BeginTabItem("Items")) {
                 MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [&gr = m_world.get<const GameResources>()](std::int16_t nvid) {
-                    return std::format("[{:3}] {}", nvid, gr.getVid(nvid).getName());
+                    return std::format("[{:3}] {}", nvid, gr.getVid(nvid)->getName());
                 } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                 if (ImGui::Button("+")) {

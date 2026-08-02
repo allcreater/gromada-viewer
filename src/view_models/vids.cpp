@@ -197,7 +197,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     };
 
 	auto linkToNvidControl = std::bind_back(linkToId, [this, &resources = m_model.get<const GameResources>()](int nvid) {
-		selectedSection(VidRef{ resources, std::abs(nvid) });
+		selectedSection(resources.getVid(std::abs(nvid)));
 		InvalidateSelection();
 	});
 

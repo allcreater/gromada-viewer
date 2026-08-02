@@ -103,7 +103,7 @@ public:
 
 	    for (const auto& obj : map.objects) {
 	        this->entity()
-                .emplace<VidRef>(gameResources, obj.nvid)
+                .emplace<VidRef>(gameResources.getVid(obj.nvid))
 	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
 	            .set<GameObject::Payload>(obj.payload)
 	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})

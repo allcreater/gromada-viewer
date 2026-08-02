@@ -15,16 +15,10 @@ export {
 
 	// NOTE: in current implementation VidRefs are bound to the GameResources lifetime!
 	class VidRef {
-	private:
-		const Vid* m_vid = &nullVid;
-		const GameResources* m_parent = nullptr;
-
-		static inline const Vid nullVid;
-
 	public:
-		VidRef() = default;
-		VidRef(const GameResources& resources, int nvid);
-		VidRef(const GameResources& resources, const Vid* vid);
+		VidRef() noexcept = default;
+		VidRef(const VidRef&) noexcept = default;
+		VidRef& operator=(const VidRef&) noexcept = default;
 
 		const GameResources&	parent() const;
 
@@ -36,6 +30,16 @@ export {
 		const Vid* operator->() const noexcept { return m_vid; }
 
 		auto operator<=>(const VidRef &) const = default;
+
+	private:
+		friend class GameResources;
+		VidRef(const GameResources& resources, const Vid* vid);
+
+	private:
+		const Vid* m_vid = &nullVid;
+		const GameResources* m_parent = nullptr;
+
+		static inline const Vid nullVid;
 	};
 
 	class GameResources {
@@ -47,12 +51,12 @@ export {
 		std::span<const Vid> vids() const noexcept { return m_vids; }
 		std::span<const VidRef> vidRefs() const noexcept { return m_vidRefs; }
 	    // unfortunately std::span yet do not have .at method
-	    const Vid& getVid(int nvid) const {
+	    VidRef getVid(int nvid) const {
 	        if (nvid < 0 || nvid >= static_cast<int>(m_vids.size())) {
 	            throw std::out_of_range("GameResources: nvid out of range");
 	        }
 
-	        return m_vids[nvid];
+	        return m_vidRefs[nvid];
 	    }
 
 	    const std::filesystem::path& gamePath() const noexcept { return m_gamePath; }
@@ -100,7 +104,7 @@ GameResources::GameResources(std::filesystem::path path)
 		m_baseTilesVids = std::views::iota(0, std::min<int>(adjacencyData().extent(0), adjacencyData().extent(1)))
 		| std::views::transform([this](int i) {
 			auto nvid = std::abs(adjacencyData()[i, i]);
-			return nvid ? vidRefs()[nvid] : VidRef{};
+			return nvid ? getVid(nvid) : VidRef{};
 		})
 		| std::ranges::to<std::vector>();
 	});
@@ -110,18 +114,11 @@ GameResources::GameResources(std::filesystem::path path)
 	});
 }
 
-VidRef::VidRef( const GameResources &resources, int nvid )
-: m_vid{&resources.getVid(nvid)}
-, m_parent{&resources}
-{}
-
 VidRef::VidRef(const GameResources& resources, const Vid* vid)
 : m_vid{vid}
 , m_parent{&resources}
 {
-	if (std::less<>{}(vid, resources.vids().data()) || std::greater_equal<>{}(vid, resources.vids().data() + resources.vids().size())) {
-		throw std::out_of_range("VidRef must be constructed from a Vid pointer that belongs to the GameResources");
-	}
+	assert(std::greater_equal<>{}(vid, resources.vids().data()) && std::less<>{}(vid, resources.vids().data() + resources.vids().size()));
 }
 
 const GameResources & VidRef::parent() const {
