@@ -16,6 +16,7 @@ import framebuffer;
 import application.model;
 
 import Gromada.SoftwareRenderer;
+import Gromada.VisualLogic;
 import framebuffer;
 import engine.audio;
 
@@ -176,6 +177,9 @@ namespace {
 				return "???";
 		}
 	}
+
+	constexpr static std::array<const char*, 16> actionNames = {"Stand", "Build", "Go", "Start move", "L Rotate", "R Rotate", "Open", "Close", "Fight", "Salut",
+	"Stand open", "Load", "Unload", "Wound", "Birth", "Death"};
 }
 
 
@@ -231,8 +235,6 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
 
     ImGui::Spacing();
-    constexpr std::array<const char*, 16> actionNames = {"Stand", "Build", "Go", "Start move", "L Rotate", "R Rotate", "Open", "Close", "Fight", "Salut",
-        "Stand open", "Load", "Unload", "Wound", "Birth", "Death"};
 
     ImGui::BeginTable("Actions", 6);
     ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 70.0f);
@@ -291,25 +293,67 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 	}
 
 	const auto framesData = std::get_if<Vid::Graphics>(&self.graphicsData);
-	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing)) {
-		ImGui::Checkbox( "Show numbers", &m_showFrameNumbers);
-		std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetContentRegionAvail().x / (*framesData)->width));
-		for (int index = 0; const auto& image : m_decodedFrames) {
-			auto pos = ImGui::GetCursorScreenPos();
-			ImGui::Image(simgui_imtextureid(image), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
-			if ((index+1) % imagesPerLine != 0) {
-				ImGui::SameLine();
+	const auto ShowFrame = [&](size_t index) {
+		ImGui::Image(simgui_imtextureid(m_decodedFrames[index]), {static_cast<float>((*framesData)->width), static_cast<float>((*framesData)->height)});
+	};
+
+
+	if (ImGui::Begin("Decompressed images", nullptr, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_HorizontalScrollbar)) {
+		ImGui::BeginTabBar( "FramesTabBar", ImGuiTabBarFlags_None);
+		if (ImGui::BeginTabItem( "All frames" )) {
+			ImGui::Checkbox( "Show numbers", &m_showFrameNumbers);
+			std::size_t imagesPerLine = std::max(1.0f, std::floor(ImGui::GetContentRegionAvail().x / (*framesData)->width));
+			for (int index = 0; index < m_decodedFrames.size(); ++index) {
+				auto pos = ImGui::GetCursorScreenPos();
+				ShowFrame(index);
+				if ((index+1) % imagesPerLine != 0) {
+					ImGui::SameLine();
+				}
+
+				if (m_showFrameNumbers) {
+					ImGui::SetCursorScreenPos(std::exchange( pos, ImGui::GetCursorScreenPos() ));
+					ImGui::Text("%d", index + 1);
+					ImGui::SetCursorScreenPos(pos);
+				}
+
+				index++;
 			}
 
-			if (m_showFrameNumbers) {
-				ImGui::SetCursorScreenPos(std::exchange( pos, ImGui::GetCursorScreenPos() ));
-				ImGui::Text("%d", index + 1);
-				ImGui::SetCursorScreenPos(pos);
-			}
-
-			index++;
+			ImGui::EndTabItem();
 		}
+
+		if (ImGui::BeginTabItem( "By action" )) {
+			static int direction = 0;
+			static bool showAnimation = false;
+
+			if (self.directionsCount > 1) {
+				ImGui::SliderInt("Direction", &direction, 0, self.directionsCount-1);
+			}
+			ImGui::Checkbox("Show animation", &showAnimation);
+
+			for (std::size_t i = 0; i < 16; ++i) {
+				const auto frameRange = getAnimationFrameRangeDirIndex(self, static_cast<Action>(i), direction);
+				if (!frameRange)
+					continue;
+
+				ImGui::Text("%s", actionNames[i]);
+				ImGui::NewLine();
+				if (showAnimation) {
+					ShowFrame(frameRange->first);
+				} else {
+					for (int index = frameRange->first; index <= frameRange->second; ++index) {
+						ImGui::SameLine();
+						ShowFrame(index);
+					}
+				}
+			}
+
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
 	}
+	ImGui::Dummy({});
 	ImGui::End();
 
 }

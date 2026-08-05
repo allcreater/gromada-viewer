@@ -70,6 +70,7 @@ public:
             .kind(flecs::PreStore)
             .with<const RenderOrder>().order_by<const RenderOrder>([](flecs::entity_t, const RenderOrder* a, flecs::entity_t, const RenderOrder* b) -> int { return ordering_to_int(*a <=> *b);})
             .each([](Framebuffer& framebuffer, const Viewport& viewport, const Transform& transform, const Vid& vid, const AnimationComponent& animation) {
+            	assert(animation.current_frame < vid.graphics().frames.size());
                 const glm::ivec2 pos = glm::ivec2{transform.x - vid.graphics().width / 2, transform.y - vid.graphics().height / 2 - transform.z} - viewport.viewportPos;
                 DrawSprite(vid.graphics().frames[animation.current_frame], pos.x, pos.y, framebuffer);
         });
