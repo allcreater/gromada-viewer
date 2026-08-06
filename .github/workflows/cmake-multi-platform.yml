@@ -37,4 +37,4 @@ jobs:
       os: ubuntu-latest
       cmake_preset: emscripten-wasm-release
       use_emcmake: true
-      build_container: emscripten/emsdk:latest
+      build_container: emscripten/emsdk:6.0.5
