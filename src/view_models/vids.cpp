@@ -131,6 +131,7 @@ private:
     void ShowFramesWindow(const Vid& self);
     void InvalidateSelection() {
         m_decodedFrames.clear();
+    	m_framesWindowState.reset();
         m_selecionInvalidated = true;
     }
 	
@@ -160,6 +161,13 @@ private:
 	}};
 
 	std::vector<SgUniqueImageWithView> m_decodedFrames;
+	struct FramesWindowState {
+		int direction = 0;
+		bool showAnimation = false;
+		Stopwatch stopwatch;
+		int frameNumber = 0;
+	};
+	std::optional<FramesWindowState> m_framesWindowState;
 };
 
 namespace {
@@ -323,23 +331,24 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 		}
 
 		if (ImGui::BeginTabItem( "By action" )) {
-			static int direction = 0;
-			static bool showAnimation = false;
+			if (!m_framesWindowState)
+				m_framesWindowState.emplace(FramesWindowState{});
 
 			if (self.directionsCount > 1) {
-				ImGui::SliderInt("Direction", &direction, 0, self.directionsCount-1);
+				ImGui::SliderInt("Direction", &m_framesWindowState->direction, 0, self.directionsCount-1);
 			}
-			ImGui::Checkbox("Show animation", &showAnimation);
+			ImGui::Checkbox("Show animation", &m_framesWindowState->showAnimation);
 
 			for (std::size_t i = 0; i < 16; ++i) {
-				const auto frameRange = getAnimationFrameRangeDirIndex(self, static_cast<Action>(i), direction);
+				const auto frameRange = getAnimationFrameRangeDirIndex(self, static_cast<Action>(i), m_framesWindowState->direction);
 				if (!frameRange)
 					continue;
 
 				ImGui::Text("%s", actionNames[i]);
 				ImGui::NewLine();
-				if (showAnimation) {
-					ShowFrame(frameRange->first);
+				if (m_framesWindowState->showAnimation) {
+					m_framesWindowState->frameNumber += m_framesWindowState->stopwatch.advance(ImGui::GetIO().DeltaTime, self.graphics().frameDuration * 0.001f);
+					ShowFrame(frameRange->first + m_framesWindowState->frameNumber % (frameRange->second - frameRange->first + 1));
 				} else {
 					for (int index = frameRange->first; index <= frameRange->second; ++index) {
 						ImGui::SameLine();

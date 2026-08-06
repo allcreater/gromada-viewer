@@ -10,13 +10,11 @@ import Gromada.VisualLogic;
 export import engine.objects_view;
 
 export {
-
     struct DestroyAfterUpdate {};
     struct ActiveLevel {};
     struct AnimationComponent {
+        Stopwatch stopwatch;
         Action action = Action::act_stand;
-        std::uint32_t frame_phase = 0;
-        float next_frame_delay = 0.0f;
         std::uint32_t current_frame = 0;
     };
 
@@ -56,7 +54,9 @@ export {
                         .child_of(entity);
                 }
 
-                entity.emplace<AnimationComponent>(AnimationComponent{.frame_phase = static_cast<std::uint32_t>(std::hash<std::uint64_t>{}(entity.id()))});
+                entity.emplace<AnimationComponent>(AnimationComponent{
+                    .current_frame = static_cast<std::uint32_t>(std::hash<std::uint64_t>{}(entity.id()))
+                });
                 entity.add<Transform, World>();
             });
 
@@ -67,16 +67,15 @@ export {
                 .kind(flecs::OnUpdate)
                 .term_at(2).second<World>()
                 .each([](flecs::iter& it, size_t, AnimationComponent& animation, const Vid& vid, const Transform& wt) {
-                    animation.next_frame_delay -= it.delta_time() * 1000.0f; // ms
-                    if (animation.next_frame_delay < 0.0f) {
-                        int increment = std::ceil(-animation.next_frame_delay / vid.graphics().frameDuration);
-                        animation.next_frame_delay += increment * vid.graphics().frameDuration;
-                        assert(animation.next_frame_delay >= 0.0f);
-                        animation.frame_phase += increment;
+                    animation.current_frame += animation.stopwatch.advance(it.delta_time(), vid.graphics().frameDuration * 0.001f);
+
+                    const auto frame_range = getAnimationFrameRange(vid, animation.action, wt.direction);
+                    if (frame_range) {
+                        animation.current_frame = animation.current_frame % (frame_range->second - frame_range->first + 1) + frame_range->first;
+                    } else {
+                        animation.current_frame = 0;
                     }
 
-                    auto [minIndex, maxIndex] = getAnimationFrameRange(vid, animation.action, wt.direction);
-                    animation.current_frame = animation.frame_phase % (maxIndex - minIndex + 1) + minIndex;
                     assert(animation.current_frame <= vid.graphics().numOfFrames);
                 });
 

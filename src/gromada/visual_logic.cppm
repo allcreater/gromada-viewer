@@ -8,6 +8,25 @@ import utils;
 import Gromada.Actions;
 import Gromada.Resources;
 
+export class Stopwatch {
+public:
+	Stopwatch(float tick_period_seconds = {}) : next_frame_delay{tick_period_seconds} {}
+	[[nodiscard]] int advance(float dt, float tick_period_seconds) noexcept {
+		next_frame_delay -= dt;
+		if (next_frame_delay < 0.0f) {
+			int increment = std::ceil(-next_frame_delay / tick_period_seconds);
+			next_frame_delay += increment * tick_period_seconds;
+
+			return increment;
+		}
+
+		return 0;
+	}
+
+private:
+	float next_frame_delay;
+};
+
 export int getDirectionIndex(std::uint8_t directionsCount, std::uint8_t direction) {
 	const std::uint8_t roundAddition = (256 / directionsCount) / 2;
 	return ((direction + roundAddition) & 0xFF) * directionsCount / 256;
@@ -29,9 +48,7 @@ export std::optional<std::pair<std::size_t, std::size_t>> getAnimationFrameRange
 	return std::pair{firstFrameIndex, lastFrameIndex};
 }
 
-export std::pair<std::size_t, std::size_t> getAnimationFrameRange(const Vid& vid, Action action, std::uint8_t direction) {
+export std::optional<std::pair<std::size_t, std::size_t>> getAnimationFrameRange(const Vid& vid, Action action, std::uint8_t direction) {
 	const auto directionIndex = getDirectionIndex(vid.directionsCount, direction);
-	return getAnimationFrameRangeDirIndex(vid, action, directionIndex)
-		.or_else( [&] { return getAnimationFrameRangeDirIndex(vid, Action::act_stand, directionIndex); })
-		.value_or(std::pair{0uz, 0uz} );
+	return getAnimationFrameRangeDirIndex(vid, action, directionIndex).or_else( [&] { return getAnimationFrameRangeDirIndex(vid, Action::act_stand, directionIndex); });
 }
