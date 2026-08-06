@@ -70,6 +70,13 @@ Controls:
 - Left mouse button - select object
 - Del - delete selected objects
 )");
+
+				ImGui::Separator();
+
+				ImGui::Text("Version: %s", BUILD_INFO_PROJECT_VERSION);
+				ImGui::Text("Build time: %s", BUILD_INFO_TIMESTAMP);
+				ImGui::Text("Commit: %s", BUILD_INFO_COMMIT_HASH);
+
 				ImGui::EndTabItem();
 			}
 

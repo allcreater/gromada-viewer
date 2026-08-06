@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 4.2)
 
+include(BuildInfo)
+
 add_executable (GromadaEditor
 		"gromada/map_loader.cpp"
 		"gromada/map_saver.cpp"
@@ -57,6 +59,8 @@ set_target_properties(GromadaEditor PROPERTIES
 		CXX_MODULE_STD ON
 		CXX_EXTENSIONS OFF
 )
+
+setup_build_info(GromadaEditor)
 
 if(EMSCRIPTEN)
 	set_target_properties(GromadaEditor PROPERTIES SUFFIX ".html")
