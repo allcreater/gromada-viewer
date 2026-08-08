@@ -104,6 +104,28 @@
             font-size: 16px;
         }
         button:disabled { background: #555; cursor: not-allowed; }
+
+        /* Панель "есть несохранённые файлы", появляется после записи в VFS */
+        #save-panel {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: rgba(40, 40, 40, 0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        #save-panel.visible { display: flex; }
+        #save-panel button {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -121,6 +143,12 @@
     </div>
     <ul id="file-list"></ul>
     <button id="start-btn" disabled>Launch viewer</button>
+</div>
+
+<!-- Панель уведомления о несохранённых файлах, появившихся в VFS во время работы -->
+<div id="save-panel">
+    <span id="save-panel-text">0 files changed</span>
+    <button id="save-panel-btn">Download</button>
 </div>
 
 <script type="text/javascript">
@@ -372,12 +400,88 @@
                     // Прячем интерфейс
                     ui.style.display = 'none';
 
+                    installWriteTracking();
+
                     // 4. Вручную запускаем C++ main() без аргументов: достаточно наличия в рабочей директории fw.res
                     Module.callMain([]);
                 }).catch(function(err) {
                     console.error('Failed to mount files into VFS:', err);
                     btn.disabled = false;
                 });
+            });
+
+            // --- Отслеживание файлов, записанных приложением в VFS во время работы, ---
+            // --- и предложение пользователю скачать их
+            var savePanel = document.getElementById('save-panel');
+            var savePanelText = document.getElementById('save-panel-text');
+            var savePanelBtn = document.getElementById('save-panel-btn');
+            var dirtyFiles = new Set();
+
+            function updateSavePanel() {
+                if (dirtyFiles.size === 0) {
+                    savePanel.classList.remove('visible');
+                    return;
+                }
+                savePanelText.textContent = dirtyFiles.size + (dirtyFiles.size === 1 ? ' file changed' : ' files changed');
+                savePanel.classList.add('visible');
+            }
+
+            // Вызывается один раз, после монтирования входных файлов и перед callMain —
+            // см. вызов installWriteTracking() в обработчике клика на "Launch viewer" выше.
+            function installWriteTracking() {
+                var origFsWrite = Module.FS.write;
+                Module.FS.write = function(stream, buffer, offset, length, position, canOwn) {
+                    var bytesWritten = origFsWrite.call(Module.FS, stream, buffer, offset, length, position, canOwn);
+                    if (bytesWritten > 0 && stream && stream.path) {
+                        dirtyFiles.add(stream.path);
+                        updateSavePanel();
+                    }
+                    return bytesWritten;
+                };
+            }
+
+            // Плоское имя для File-скачивания (без директорий)
+            function flattenPathForDownload(path) {
+                return path.replace(/^\/+/, '').replace(/\//g, '__');
+            }
+
+            function downloadFileAsBlob(path) {
+                var data = Module.FS.readFile(path);
+                var blob = new Blob([data], { type: 'application/octet-stream' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = flattenPathForDownload(path);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+            }
+
+            // Несколько одновременных кликов по <a download> браузеры могут блокировать
+            // как "спам скачиваниями", поэтому разносим их по времени.
+            function downloadAllAsBlobs(paths) {
+                paths.forEach(function(path, i) {
+                    setTimeout(function() { downloadFileAsBlob(path); }, i * 300);
+                });
+            }
+
+            // File System Access API (showDirectoryPicker) не заработал, сделаем как получится
+            savePanelBtn.addEventListener('click', function() {
+                var paths = Array.from(dirtyFiles);
+                if (paths.length === 0) return;
+
+                downloadAllAsBlobs(paths);
+                dirtyFiles.clear();
+                updateSavePanel();
+            });
+
+            // Нативное предупреждение "изменения могут быть потеряны"
+            window.addEventListener('beforeunload', function(e) {
+                if (dirtyFiles.size > 0) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
             });
         }
     };
