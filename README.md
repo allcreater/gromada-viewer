@@ -3,7 +3,7 @@ Cross-platform asset viewer of the classic game "Gromada" developed by Buka Ente
 
 # Usage
 * Native: Just put the binaries to the root game directory and run the program.
-* Web version: https://allcreater.github.io/gromada-viewer-page/ — just drop game resources to the browser. Only fw.res is required, maps directory is optional
+* Web version: https://allcreater.github.io/gromada-viewer/ — just drop game resources to the browser. Only fw.res is required, maps directory is optional
 
 
 # Features
