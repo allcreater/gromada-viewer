@@ -1,0 +1,70 @@
+name: Deploy Web Viewer to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-emscripten:
+    uses: ./.github/workflows/cmake-build.yml
+    with:
+      os: ubuntu-latest
+      cmake_preset: emscripten-wasm-release
+      use_emcmake: true
+      build_container: emscripten/emsdk:6.0.5
+
+  deploy:
+    needs: build-emscripten
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: build-emscripten-wasm-release
+          path: artifact
+
+      - name: Prepare page (cache-busting via a unique per-build filename)
+        run: |
+          set -eu
+          mkdir -p dist
+
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          JS_FILE="GromadaEditor.${SHORT_SHA}.js"
+          WASM_FILE="GromadaEditor.${SHORT_SHA}.wasm"
+
+          # index.html stays under a stable name - it's tiny, so a few minutes of GitHub
+          # Pages' default caching before it picks up a new build is harmless. The heavy
+          # .js/.wasm pair is published under a unique per-commit filename instead, so it's
+          # safe to let the browser cache it forever without ever going stale.
+          cp "artifact/GromadaEditor.html" dist/index.html
+          cp "artifact/GromadaEditor.js" "dist/${JS_FILE}"
+          cp "artifact/GromadaEditor.wasm" "dist/${WASM_FILE}"
+
+          # Point the <script> tag at the renamed JS bundle.
+          sed -i -E "s#(src=\")[^\"]+\.js(\")#\1${JS_FILE}\2#" dist/index.html
+          # Fill in the locateFile() hook from viewer_shell.html so it resolves the
+          # renamed .wasm instead of the plain "GromadaEditor.wasm".
+          sed -i "s/var buildHash = '';/var buildHash = '${SHORT_SHA}';/" dist/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
