@@ -45,6 +45,12 @@ export std::optional<std::pair<std::size_t, std::size_t>> getAnimationFrameRange
 	auto firstFrameIndex = std::accumulate(vid.animationLengths.begin(), vid.animationLengths.begin() + actionIndex, 0) * vid.directionsCount + directionIndex * animationLength;
 
 	const auto lastFrameIndex = firstFrameIndex + std::max(animationLength - 1, 0);
+	assert(lastFrameIndex >= 0 && firstFrameIndex >= 0);
+	if (lastFrameIndex >= vid.graphics().frames.size() || firstFrameIndex >= vid.graphics().frames.size()) {
+		//assert(false);
+		return std::nullopt;
+	}
+
 	return std::pair{firstFrameIndex, lastFrameIndex};
 }
 
