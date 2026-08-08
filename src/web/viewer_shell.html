@@ -139,16 +139,6 @@
         print: function(text) { console.log(text); },
         printErr: function(text) { console.error(text); },
 
-        // CI (deploy-pages.yml) publishes the .wasm under a per-commit-hash filename so it
-        // can be cached by the browser forever, and rewrites the literal '' below to that
-        // hash right after the build. Left empty, this is a no-op - local/manual builds keep
-        // loading the plain "GromadaEditor.wasm" sitting next to the .js as usual.
-        locateFile: function(path) {
-            var buildHash = '';
-            if (!buildHash || !/\.wasm$/.test(path)) return path;
-            return path.replace(/\.wasm$/, '.' + buildHash + '.wasm');
-        },
-
         // 2. Эта функция вызовется, когда WebAssembly будет готов к работе,
         // а виртуальная файловая система (FS) инициализирована.
         onRuntimeInitialized: function() {
