@@ -47,6 +47,8 @@ jobs:
 
       - name: Configure CMake (Emscripten)
         if: inputs.use_emcmake == true
+        env:
+          BUILD_COMMIT_HASH: ${{ github.sha }}
         run: >
           emcmake cmake --preset ${{ inputs.cmake_preset }}
           -DCMAKE_TOOLCHAIN_FILE="/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
