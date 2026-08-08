@@ -104,6 +104,28 @@
             font-size: 16px;
         }
         button:disabled { background: #555; cursor: not-allowed; }
+
+        /* Панель "есть несохранённые файлы", появляется после записи в VFS */
+        #save-panel {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: rgba(40, 40, 40, 0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        #save-panel.visible { display: flex; }
+        #save-panel button {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -121,6 +143,12 @@
     </div>
     <ul id="file-list"></ul>
     <button id="start-btn" disabled>Launch viewer</button>
+</div>
+
+<!-- Панель уведомления о несохранённых файлах, появившихся в VFS во время работы -->
+<div id="save-panel">
+    <span id="save-panel-text">0 files changed</span>
+    <button id="save-panel-btn">Download</button>
 </div>
 
 <script type="text/javascript">
@@ -372,12 +400,203 @@
                     // Прячем интерфейс
                     ui.style.display = 'none';
 
+                    installWriteTracking();
+
                     // 4. Вручную запускаем C++ main() без аргументов: достаточно наличия в рабочей директории fw.res
                     Module.callMain([]);
                 }).catch(function(err) {
                     console.error('Failed to mount files into VFS:', err);
                     btn.disabled = false;
                 });
+            });
+
+            // --- Отслеживание файлов, записанных приложением в VFS во время работы, ---
+            // --- и предложение пользователю скачать их
+            var savePanel = document.getElementById('save-panel');
+            var savePanelText = document.getElementById('save-panel-text');
+            var savePanelBtn = document.getElementById('save-panel-btn');
+            var dirtyFiles = new Set();
+
+            function updateSavePanel() {
+                if (dirtyFiles.size === 0) {
+                    savePanel.classList.remove('visible');
+                    return;
+                }
+                savePanelText.textContent = dirtyFiles.size + (dirtyFiles.size === 1 ? ' file changed' : ' files changed');
+                savePanel.classList.add('visible');
+            }
+
+            // Вызывается один раз, после монтирования входных файлов и перед callMain —
+            // см. вызов installWriteTracking() в обработчике клика на "Launch viewer" выше.
+            function installWriteTracking() {
+                var origFsWrite = Module.FS.write;
+                Module.FS.write = function(stream, buffer, offset, length, position, canOwn) {
+                    var bytesWritten = origFsWrite.call(Module.FS, stream, buffer, offset, length, position, canOwn);
+                    if (bytesWritten > 0 && stream && stream.path) {
+                        dirtyFiles.add(stream.path);
+                        updateSavePanel();
+                    }
+                    return bytesWritten;
+                };
+            }
+
+            // --- Упаковка изменённых файлов в один .zip и скачивание одним файлом.   ---
+            // --- Сжатие (DEFLATE) делает нативный CompressionStream браузера — не    ---
+            // --- переизобретаем алгоритм сжатия. Сам контейнер zip собираем вручную, ---
+            // --- т.к. готового браузерного API для него нет, но это лишь реализация  ---
+            // --- фиксированного формата (заголовок на файл, центральный каталог,     ---
+            // --- завершающая запись, CRC32) — так же поступают и сторонние минимальные ---
+            // --- zip-библиотеки (напр. client-zip). Если CompressionStream недоступен ---
+            // --- (старый браузер) — файл кладётся в архив как есть (store).          ---
+
+            var crc32Table = (function() {
+                var table = new Uint32Array(256);
+                for (var n = 0; n < 256; n++) {
+                    var c = n;
+                    for (var k = 0; k < 8; k++) {
+                        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                    }
+                    table[n] = c >>> 0;
+                }
+                return table;
+            })();
+
+            function crc32(data) {
+                var crc = 0xFFFFFFFF;
+                for (var i = 0; i < data.length; i++) {
+                    crc = crc32Table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+                }
+                return (crc ^ 0xFFFFFFFF) >>> 0;
+            }
+
+            // Zip хранит время/дату в DOS-формате (в файле часто расходится с реальным
+            // временем модификации в VFS на пару секунд из-за 2-секундной точности DOS-формата
+            // — это нормально и не мешает распаковке).
+            function dosDateTime(date) {
+                return {
+                    time: ((date.getHours() & 0x1F) << 11) | ((date.getMinutes() & 0x3F) << 5) | ((date.getSeconds() >> 1) & 0x1F),
+                    date: (((date.getFullYear() - 1980) & 0x7F) << 9) | (((date.getMonth() + 1) & 0xF) << 5) | (date.getDate() & 0x1F)
+                };
+            }
+
+            function deflateRaw(data) {
+                var stream = new Blob([data]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+                return new Response(stream).arrayBuffer().then(function(buf) { return new Uint8Array(buf); });
+            }
+
+            // entry: { name, data: Uint8Array } -> { name, rawData, storedData, method }
+            // method: 8 = deflate, 0 = store (нет CompressionStream или сжатие не дало выигрыша).
+            function compressEntry(entry) {
+                if (!window.CompressionStream) {
+                    return Promise.resolve({ name: entry.name, rawData: entry.data, storedData: entry.data, method: 0 });
+                }
+                return deflateRaw(entry.data).then(function(compressed) {
+                    var useCompressed = compressed.length < entry.data.length;
+                    return {
+                        name: entry.name,
+                        rawData: entry.data,
+                        storedData: useCompressed ? compressed : entry.data,
+                        method: useCompressed ? 8 : 0
+                    };
+                });
+            }
+
+            // entries: [{ name: 'relative/path.ext', data: Uint8Array }]
+            function buildZipBlob(entries) {
+                return Promise.all(entries.map(compressEntry)).then(function(compressed) {
+                    var now = dosDateTime(new Date());
+                    var localParts = [];
+                    var centralParts = [];
+                    var offset = 0;
+
+                    compressed.forEach(function(entry) {
+                        var nameBytes = new TextEncoder().encode(entry.name);
+                        var crc = crc32(entry.rawData);
+                        var uncompressedSize = entry.rawData.length;
+                        var compressedSize = entry.storedData.length;
+
+                        var local = new DataView(new ArrayBuffer(30));
+                        local.setUint32(0, 0x04034b50, true);
+                        local.setUint16(4, 20, true);
+                        local.setUint16(6, 0x0800, true); // UTF-8 имя
+                        local.setUint16(8, entry.method, true);
+                        local.setUint16(10, now.time, true);
+                        local.setUint16(12, now.date, true);
+                        local.setUint32(14, crc, true);
+                        local.setUint32(18, compressedSize, true);
+                        local.setUint32(22, uncompressedSize, true);
+                        local.setUint16(26, nameBytes.length, true);
+                        local.setUint16(28, 0, true);
+
+                        localParts.push(new Uint8Array(local.buffer), nameBytes, entry.storedData);
+
+                        var central = new DataView(new ArrayBuffer(46));
+                        central.setUint32(0, 0x02014b50, true);
+                        central.setUint16(4, 20, true);
+                        central.setUint16(6, 20, true);
+                        central.setUint16(8, 0x0800, true);
+                        central.setUint16(10, entry.method, true);
+                        central.setUint16(12, now.time, true);
+                        central.setUint16(14, now.date, true);
+                        central.setUint32(16, crc, true);
+                        central.setUint32(20, compressedSize, true);
+                        central.setUint32(24, uncompressedSize, true);
+                        central.setUint16(28, nameBytes.length, true);
+                        central.setUint32(42, offset, true);
+
+                        centralParts.push(new Uint8Array(central.buffer), nameBytes);
+
+                        offset += local.buffer.byteLength + nameBytes.length + compressedSize;
+                    });
+
+                    var centralOffset = offset;
+                    var centralSize = centralParts.reduce(function(sum, p) { return sum + p.length; }, 0);
+
+                    var end = new DataView(new ArrayBuffer(22));
+                    end.setUint32(0, 0x06054b50, true);
+                    end.setUint16(8, compressed.length, true);
+                    end.setUint16(10, compressed.length, true);
+                    end.setUint32(12, centralSize, true);
+                    end.setUint32(16, centralOffset, true);
+
+                    return new Blob(localParts.concat(centralParts, [new Uint8Array(end.buffer)]), { type: 'application/zip' });
+                });
+            }
+
+            function downloadAllAsZip(paths) {
+                var entries = paths.map(function(path) {
+                    return { name: path.replace(/^\/+/, ''), data: Module.FS.readFile(path) };
+                });
+                return buildZipBlob(entries).then(function(blob) {
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'gromada-viewer-output.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+                });
+            }
+
+            savePanelBtn.addEventListener('click', function() {
+                var paths = Array.from(dirtyFiles);
+                if (paths.length === 0) return;
+
+                downloadAllAsZip(paths).then(function() {
+                    paths.forEach(function(path) { dirtyFiles.delete(path); });
+                    updateSavePanel();
+                }).catch(function(err) {
+                    console.error('Failed to build zip archive:', err);
+                });
+            });
+
+            // Нативное предупреждение "изменения могут быть потеряны"
+            window.addEventListener('beforeunload', function(e) {
+                if (dirtyFiles.size > 0) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
             });
         }
     };
