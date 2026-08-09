@@ -49,27 +49,35 @@ private:
     int m_selectedTile = 0;
 };
 
-export class ExportMapDialog {
+export class SaveDialog {
 public:
-    void open(Model& model) {
+    SaveDialog(std::function<void(std::ostream&&)> saveCallback, const char* windowTitle)
+    : m_saveCallback{std::move(saveCallback)}
+    , m_windowTitle{windowTitle}
+    {}
+
+    void open(std::string initialPath) {
         m_shouldOpen = true;
 
-        if (const auto* activeMapPath = model.component<ActiveLevel>().try_get<Path>())
-            m_filename = std::format("{}.json", activeMapPath->stem().generic_string());
-        else
-            m_filename.clear();
+        m_filename = initialPath;
     }
 
-    void updateUI(std::span<const Vid> vids, Model& model) {
-        if (!MyImUtils::BeginModalPopup("Export map JSON", m_shouldOpen))
+    void updateUI() {
+        if (!MyImUtils::BeginModalPopup(m_windowTitle, m_shouldOpen))
             return;
 
-        ImGui::InputText("Exporting map to", &m_filename);
+        ImGui::InputText("Save as", &m_filename);
         if (ImGui::Button("OK", ImVec2(120, 0))) {
             ImGui::CloseCurrentPopup();
 
-            std::ofstream stream{m_filename, std::ios_base::out};
-            ExportMapToJson(vids, model.saveMap(), stream);
+            try {
+                std::ofstream stream{m_filename, std::ios_base::out};
+                stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+                m_saveCallback(std::move(stream));
+            } catch (std::ifstream::failure& e) {
+                std::cerr << e.what() << std::endl;
+            }
         }
 
         ImGui::SameLine();
@@ -82,5 +90,7 @@ public:
 
 private:
     bool m_shouldOpen = false;
+    const char* m_windowTitle = "";
     std::string m_filename;
+    std::function<void(std::ostream&&)> m_saveCallback;
 };

@@ -22,8 +22,11 @@ import :dialogs;
 export class ViewModel {
 public:
 	explicit ViewModel(Model& model)
-		: m_model{model} {
-
+		: m_model{model}
+		, m_exportMapDialog{std::bind_front(&ViewModel::exportMapAsJson, this), "Export Map"}
+		, m_saveMapDialog{std::bind_front(&ViewModel::saveMapToFile, this), "Save Map"}
+		, m_exportVidsDialog{std::bind_front(&ViewModel::exportVidsToCsv, this), "Export Vids CSV"}
+	{
 	    m_model.newMap({}, 10, 10);
 	}
 
@@ -90,8 +93,6 @@ Controls:
 	}
 
 	void drawMenu() {
-	    const auto vids = m_model.get<const GameResources>().vids();
-
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
 		    if (ImGui::MenuItem("New map")) {
@@ -99,20 +100,20 @@ Controls:
             }
 
 			if (ImGui::MenuItem("Export map JSON")) {
-				m_exportMapDialog.open(m_model);
+				const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>();
+				m_exportMapDialog.open(activeMapPath ? std::format("{}.json", activeMapPath->stem().generic_string()) : std::string{"map.json"});
 			}
 
 		    if (ImGui::MenuItem("Save map")) {
-		        std::ofstream file {"maps/EXPERIMENTAL_SAVE.map", std::ios_base::out | std::ios_base::binary};
-		        saveMap(vids, m_model.saveMap(), file);
+		    	const auto& mapsPath = m_model.get<const GameResources>().mapsPath();
+
+		    	const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>();
+		        m_saveMapDialog.open(activeMapPath && !activeMapPath->empty() ? activeMapPath->generic_string() : (mapsPath / "NEW_MAP.map").generic_string());
 		    }
 
 			// TODO: reuse popup from previous item
 			if (ImGui::MenuItem("Export vids to CSV")) {
-				std::ofstream stream{"vids.csv", std::ios_base::out};
-				stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-				ExportVidsToCsv(vids, stream);
+				m_exportVidsDialog.open("vids.csv");
 			}
 
 			if (ImGui::MenuItem("Exit")) {
@@ -126,8 +127,10 @@ Controls:
 		    ImGui::EndMenu();
 		}
 
-		m_exportMapDialog.updateUI(vids, m_model);
 		m_newMapDialog.updateUI(m_model);
+		m_exportMapDialog.updateUI();
+		m_saveMapDialog.updateUI();
+		m_exportVidsDialog.updateUI();
 
 		{
 			ImGui::SameLine( 0, 50 );
@@ -160,6 +163,19 @@ Controls:
 	}
 
 private:
+	void exportMapAsJson(std::ostream&& stream) {
+		ExportMapToJson(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
+	}
+
+	void saveMapToFile(std::ostream&& stream) {
+		saveMap(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
+	}
+
+	void exportVidsToCsv(std::ostream&& stream) {
+		ExportVidsToCsv(m_model.get<const GameResources>().vids(), stream);
+	}
+
+private:
 	Model& m_model;
 
 	VidsWindowViewModel m_vidsViewModel{m_model};
@@ -169,5 +185,7 @@ private:
     SoundsWindowViewModel m_soundsViewModel{m_model};
 
     NewMapDialog m_newMapDialog;
-    ExportMapDialog m_exportMapDialog;
+    SaveDialog m_exportMapDialog;
+    SaveDialog m_saveMapDialog;
+    SaveDialog m_exportVidsDialog;
 };

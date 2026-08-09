@@ -67,7 +67,7 @@ public:
 	        throw std::invalid_argument("Model::newMap: resulting map size is too large");
 	    }
 
-	    activeLevel.set<Path>({});
+	    //activeLevel.set<Path>({});
 	    activeLevel.set<Armies>({});
 	    activeLevel.set<MapHeaderRawData>(MapHeaderRawData{
             .width = static_cast<std::uint32_t>(fullWidth),
