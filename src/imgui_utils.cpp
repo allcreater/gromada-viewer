@@ -141,6 +141,19 @@ std::optional<std::pair<T, const ImGuiPayload*>> AcceptDragDropPayload(ImGuiDrag
 	return std::pair{std::move(object), payload};
 }
 
+// Opens `name` as a modal popup once when `shouldOpen` is true (resetting the flag), centers it on
+// first appearance, and forwards to BeginPopupModal. Mirrors BeginPopupModal's contract: only call
+// EndPopup() if this returns true.
+export bool BeginModalPopup(const char* name, bool& shouldOpen, ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse) {
+    if (shouldOpen) {
+        ImGui::OpenPopup(name);
+        shouldOpen = false;
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    return ImGui::BeginPopupModal(name, nullptr, flags);
+}
+
 export void ToggleButton (const char* label, bool active, auto&& onClick) {
     if (active) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));

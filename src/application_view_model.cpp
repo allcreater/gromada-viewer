@@ -2,7 +2,6 @@ module;
 #include <flecs.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
-#include <misc/cpp/imgui_stdlib.h>
 
 export module application.view_model;
 
@@ -18,6 +17,7 @@ import :map_selector;
 import :vids_window;
 import :map_properties;
 import :sounds_window;
+import :dialogs;
 
 export class ViewModel {
 public:
@@ -90,24 +90,16 @@ Controls:
 	}
 
 	void drawMenu() {
-		constexpr const char* ExportPopup = "Export map JSON";
-		constexpr const char* NewMapPopup = "New map";
-		const char* openPopup = nullptr;
-
 	    const auto vids = m_model.get<const GameResources>().vids();
 
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
 		    if (ImGui::MenuItem("New map")) {
-		       openPopup = NewMapPopup;
+		        m_newMapDialog.open();
             }
 
 			if (ImGui::MenuItem("Export map JSON")) {
-				openPopup = ExportPopup;
-				m_savePopupfilenameBuffer.emplace();
-			    if (const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>()) {
-			    	std::format_to(m_savePopupfilenameBuffer->data(), "{}.json", activeMapPath->stem().generic_string().c_str());
-			    }
+				m_exportMapDialog.open(m_model);
 			}
 
 		    if (ImGui::MenuItem("Save map")) {
@@ -134,48 +126,8 @@ Controls:
 		    ImGui::EndMenu();
 		}
 
-		if (openPopup != nullptr) {
-			ImGui::OpenPopup(openPopup);
-		}
-
-		if (ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
-			ImGui::InputText("Exporting map to", &m_savePopupfilenameBuffer.value());
-			if (ImGui::Button("OK", ImVec2(120, 0))) {
-				ImGui::CloseCurrentPopup();
-
-				std::ofstream stream{*m_savePopupfilenameBuffer, std::ios_base::out};
-				ExportMapToJson(vids, m_model.saveMap(), stream);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-				ImGui::CloseCurrentPopup();
-			}
-
-			ImGui::EndPopup();
-		} else if (ImGui::BeginPopupModal(NewMapPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
-            ImGui::InputInt("Width", &m_newMapPopupState.width );
-		    ImGui::InputInt("Height", &m_newMapPopupState.height);
-
-		    auto& gameResources = m_model.get<GameResources>();
-
-		    auto baseTiles = gameResources.baseTilesVids();
-		    MyImUtils::ComboBox("Ground", &m_newMapPopupState.selectedTile, baseTiles, [&](const auto& vid) {
-		        return vid ? vid->getName() : "None [size in pixels]";
-		    });
-
-		    if (ImGui::Button("OK", ImVec2(120, 0))) {
-		        ImGui::CloseCurrentPopup();
-
-		        m_model.newMap(baseTiles[m_newMapPopupState.selectedTile], m_newMapPopupState.width, m_newMapPopupState.height);
-		    }
-
-		    ImGui::SameLine();
-		    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-                ImGui::CloseCurrentPopup();
-            }
-
-		    ImGui::EndPopup();
-		}
+		m_exportMapDialog.updateUI(vids, m_model);
+		m_newMapDialog.updateUI(m_model);
 
 		{
 			ImGui::SameLine( 0, 50 );
@@ -210,17 +162,12 @@ Controls:
 private:
 	Model& m_model;
 
-	std::optional<std::string> m_savePopupfilenameBuffer;
-
-    struct NewMapPopupState {
-        int width = 10;
-        int height = 10;
-        int selectedTile = 0;
-    } m_newMapPopupState;
-
 	VidsWindowViewModel m_vidsViewModel{m_model};
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
     MapPropertiesViewModel m_mapPropertiesViewModel{m_model};
     SoundsWindowViewModel m_soundsViewModel{m_model};
+
+    NewMapDialog m_newMapDialog;
+    ExportMapDialog m_exportMapDialog;
 };
