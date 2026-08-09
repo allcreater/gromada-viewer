@@ -163,15 +163,15 @@ Controls:
 	}
 
 private:
-	void exportMapAsJson(std::ostream&& stream) {
+	void exportMapAsJson(std::ostream&& stream) const {
 		ExportMapToJson(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
 	}
 
-	void saveMapToFile(std::ostream&& stream) {
+	void saveMapToFile(std::ostream&& stream) const {
 		saveMap(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
 	}
 
-	void exportVidsToCsv(std::ostream&& stream) {
+	void exportVidsToCsv(std::ostream&& stream) const {
 		ExportVidsToCsv(m_model.get<const GameResources>().vids(), stream);
 	}
 
