@@ -35,6 +35,50 @@ struct SelectionRect {
     glm::ivec2 max;
 };
 
+struct IdleGesture {};
+struct BoxSelectGesture { SelectionRect rect; };
+struct DraggingObjectsGesture {};
+struct PlacingGesture {};
+using EditorGesture = std::variant<IdleGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture>;
+
+// Snapshot of raw ImGui input, captured once per frame. This is the single seam through which
+// map-editing logic reads user input; nothing below should call ImGui::IsKey*/IsMouse* directly.
+struct FrameInput {
+    glm::ivec2 mouseScreenPos;
+    glm::ivec2 mouseDelta;
+    glm::ivec2 leftDragDelta;
+    float mouseWheel = 0.0f;
+    bool leftMouseReleased = false;
+    bool leftMouseDragging = false;
+    bool isPanning = false;
+    bool ctrlDown = false;
+    bool shiftDown = false;
+    bool deletePressed = false;
+    bool windowHovered = false;
+    bool mousePosValid = false;
+    bool dragDropActive = false;
+};
+
+static FrameInput captureFrameInput() {
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+    return FrameInput{
+        .mouseScreenPos = from_imvec(ImGui::GetMousePos()),
+        .mouseDelta = from_imvec(io.MouseDelta),
+        .leftDragDelta = from_imvec(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
+        .mouseWheel = io.MouseWheel,
+        .leftMouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
+        .leftMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
+        .isPanning = ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ctrlDown,
+        .ctrlDown = ctrlDown,
+        .shiftDown = ImGui::IsKeyDown(ImGuiKey_LeftShift),
+        .deletePressed = ImGui::IsKeyPressed(ImGuiKey_Delete),
+        .windowHovered = ImGui::IsWindowHovered(),
+        .mousePosValid = ImGui::IsMousePosValid(),
+        .dragDropActive = ImGui::IsDragDropActive(),
+    };
+}
+
 export class MapViewModel {
     public:
     explicit MapViewModel(flecs::world& world) : m_world(world) {
@@ -68,8 +112,8 @@ export class MapViewModel {
         //         ImGui::Image(simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0});
         //     });
     }
-    void updatePrototype(const Viewport& viewport, bool enabled) {
-        auto prototype = m_world.target<ObjectPrototype>(); // m_world.component<ObjectPrototype>();
+    void updatePrototype(bool enabled, bool confirmPlacement, const FrameInput& input, glm::ivec2 mouseWorldPos) {
+        auto prototype = m_world.target<ObjectPrototype>();
 		if (!prototype.is_valid())
 			return;
 
@@ -77,10 +121,9 @@ export class MapViewModel {
 		if (enabled) {
 			prototype.enable();
 
-		    const auto mouseWorldPos = viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
 		    prototype_transform.x = mouseWorldPos.x;
 		    prototype_transform.y = mouseWorldPos.y;
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			if (confirmPlacement) {
 				prototype.clone().child_of(m_world.component<ActiveLevel>());
 			}
 		}
@@ -88,9 +131,9 @@ export class MapViewModel {
 			prototype.disable();
 		}
 
-        if (std::abs(ImGui::GetIO().MouseWheel) > 0.0f) {
+        if (std::abs(input.mouseWheel) > 0.0f) {
             const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
-            prototype_transform.direction += (ImGui::GetIO().MouseWheel > 0 ? 1 : -1) * step;
+            prototype_transform.direction += (input.mouseWheel > 0 ? 1 : -1) * step;
         }
     }
 
@@ -113,9 +156,10 @@ export class MapViewModel {
 	void updateUI() {
         auto* levelInfo = m_world.component<ActiveLevel>().try_get<MapHeaderRawData>();
         auto& viewport = m_world.get_mut<Viewport>();
+        const FrameInput input = captureFrameInput();
 
-        if (!ImGui::IsDragDropActive() && ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::GetIO().MouseWheel != 0.0f) {
-            viewport.magnificationFactor += static_cast<int>(glm::sign(ImGui::GetIO().MouseWheel));
+        if (!input.dragDropActive && input.ctrlDown && input.mouseWheel != 0.0f) {
+            viewport.magnificationFactor += static_cast<int>(glm::sign(input.mouseWheel));
         }
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -135,27 +179,63 @@ export class MapViewModel {
             displayMapBounds(draw_list, viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
         }
 
-        updateViewport(viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+        updateViewport(viewport, levelInfo ? *levelInfo : MapHeaderRawData{}, input);
 
-        // TODO: remake to some king of state machine instead of this spagetthi logic
+        const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
+        updateGesture(input, mouseWorldPos, viewport);
+
+        const bool is_placingGesture = std::holds_alternative<PlacingGesture>(m_gesture);
+        updatePrototype(is_placingGesture, is_placingGesture && input.leftMouseReleased, input, mouseWorldPos);
+
+        if (input.deletePressed) {
+            deleteSelectedObjects();
+        }
+    }
+
+    void updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const Viewport& viewport) {
         const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>().state);
         const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>().state);
 
-        bool prototype_enabled = is_placementMode && ImGui::IsWindowHovered() && ImGui::IsMousePosValid() && !(ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
-        if (!ImGui::IsDragDropActive() && ImGui::IsWindowHovered()) {
-            if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || is_selectionMode) {
-                prototype_enabled = false;
-                updateSelection(viewport.screenToWorldPos(from_imvec(ImGui::GetMousePos())));
-            } else {
-                moveSelectedObjects(viewport);
-            }
-        }
+        const bool canStartGesture = input.windowHovered && !input.dragDropActive && !input.isPanning;
 
-        updatePrototype(viewport, prototype_enabled);
+        auto enterDragGesture = [&]() -> EditorGesture {
+            if (input.shiftDown || is_selectionMode)
+                return BoxSelectGesture{{mouseWorldPos, mouseWorldPos}};
+            return DraggingObjectsGesture{};
+        };
 
-        if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
-            deleteSelectedObjects();
-        }
+        std::visit(overloaded{
+            [&](IdleGesture) {
+                if (!canStartGesture)
+                    return;
+                if (input.leftMouseDragging)
+                    m_gesture = enterDragGesture();
+                else if (is_placementMode && input.mousePosValid)
+                    m_gesture = PlacingGesture{};
+            },
+            [&](BoxSelectGesture& gesture) {
+                if (!input.leftMouseDragging) {
+                    m_gesture = IdleGesture{};
+                    return;
+                }
+                gesture.rect.max = mouseWorldPos;
+                applyBoxSelection(gesture.rect);
+            },
+            [&](DraggingObjectsGesture&) {
+                if (!input.leftMouseDragging) {
+                    m_gesture = IdleGesture{};
+                    return;
+                }
+                moveSelectedObjects(viewport, input);
+            },
+            [&](PlacingGesture&) {
+                if (!canStartGesture || !is_placementMode) {
+                    m_gesture = IdleGesture{};
+                } else if (input.leftMouseDragging) {
+                    m_gesture = enterDragGesture();
+                }
+            },
+        }, m_gesture);
     }
 
     auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& worldTransform, auto&& boundsGetter) {
@@ -214,8 +294,8 @@ export class MapViewModel {
             ImGui::End();
         }
 
-        if (m_selectionFrame) {
-            draw_list->AddRect(to_imvec(viewport.worldToScreenPos(m_selectionFrame->min)), to_imvec(viewport.worldToScreenPos(m_selectionFrame->max)), IM_COL32(0, 255, 0, 200));
+        if (const auto* boxSelect = std::get_if<BoxSelectGesture>(&m_gesture)) {
+            draw_list->AddRect(to_imvec(viewport.worldToScreenPos(boxSelect->rect.min)), to_imvec(viewport.worldToScreenPos(boxSelect->rect.max)), IM_COL32(0, 255, 0, 200));
         }
     }
 
@@ -272,16 +352,15 @@ export class MapViewModel {
 	}
 
     // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
-    static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader) {
+    static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader, const FrameInput& input) {
         const auto magnificationFactor = vp.magnificationFactor = std::clamp(vp.magnificationFactor, 1, 8);
         vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
-            vp.camPos -= from_imvec(ImGui::GetIO().MouseDelta);
+        if (input.isPanning) {
+            vp.camPos -= input.mouseDelta;
         }
 
         vp.camPos = glm::clamp(vp.camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
-
 
         vp.viewportPos = vp.camPos - vp.viewportSize / 2;
         vp.screenToWorldMat = glm::mat3x3{
@@ -292,30 +371,19 @@ export class MapViewModel {
         vp.worldToScreenMat = glm::inverse(vp.screenToWorldMat);
     }
 
-    void updateSelection(glm::ivec2 mouseWorldPos) {
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-            if (!m_selectionFrame) {
-                m_selectionFrame = {mouseWorldPos, mouseWorldPos};
-            }
-            else {
-                m_selectionFrame->max = mouseWorldPos;
-                m_world.remove_all<Selected>();
-                m_world.defer([&] {
-                    m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(m_selectionFrame->min.x, m_selectionFrame->min.y, m_selectionFrame->max.x, m_selectionFrame->max.y), [this](flecs::entity entity) {
-                        if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->unitType) & m_selectionType) != 0) {
-                            entity.add<Selected>();
-                        }
-                    });
-                });
-            }
-        }
-        else if (m_selectionFrame) {
-            m_selectionFrame.reset();
-        }
+    void applyBoxSelection(const SelectionRect& rect) {
+        m_world.remove_all<Selected>();
+        m_world.defer([&] {
+            m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(rect.min.x, rect.min.y, rect.max.x, rect.max.y), [this](flecs::entity entity) {
+                if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->unitType) & m_selectionType) != 0) {
+                    entity.add<Selected>();
+                }
+            });
+        });
     }
 
-    void moveSelectedObjects(const Viewport& viewport) {
-        const auto delta_ws = viewport.screenToWorldMat * glm::vec3{from_imvec(ImGui::GetMouseDragDelta(0)), 0.0f};
+    void moveSelectedObjects(const Viewport& viewport, const FrameInput& input) {
+        const auto delta_ws = viewport.screenToWorldMat * glm::vec3{input.leftDragDelta, 0.0f};
         m_selectionQuery.each([delta_ws](flecs::entity id, const Vid& vid, const Transform& _) {
             auto& transform_ls = id.get_mut<Transform, Local>();
 
@@ -336,7 +404,7 @@ export class MapViewModel {
 
     flecs::world& m_world;
     flecs::query<const VidRef, const Transform> m_selectionQuery;
-    std::optional<SelectionRect> m_selectionFrame;
+    EditorGesture m_gesture = IdleGesture{};
     std::underlying_type_t<UnitType> m_selectionType = 0b01111110; // Default selection type
 
     struct SelectionUIState {
