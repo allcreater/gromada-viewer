@@ -18,10 +18,13 @@ import Gromada.VisualLogic;
 
 import utils;
 
+export struct Camera {
+	glm::ivec2 position{0.0f, 0.0f};
+	int magnificationFactor = 1; // actual range is from 1 to 8
+};
+
 export struct Viewport {
-    glm::ivec2 camPos{0.0f, 0.0f};
     glm::ivec2 viewportSize;
-    int magnificationFactor = 1; // actual range is from 1 to 8
 
     // derivatives
     glm::ivec2 viewportPos;
@@ -56,6 +59,9 @@ public:
             .each([](flecs::entity entity, const Transform& world_transform, const Vid& vid) {
                 entity.ensure<RenderOrder>() = {world_transform, vid};
         });
+
+	    world.component<Camera>().add(flecs::Singleton);
+		world.set<Camera>({});
 
 	    world.component<Viewport>().add(flecs::Singleton);
 	    world.set<Viewport>({.viewportSize = {1024, 768}});

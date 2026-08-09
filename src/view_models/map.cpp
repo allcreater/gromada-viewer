@@ -36,10 +36,11 @@ struct SelectionRect {
 };
 
 struct IdleGesture {};
+struct PanningGesture {};
 struct BoxSelectGesture { SelectionRect rect; };
 struct DraggingObjectsGesture {};
 struct PlacingGesture {};
-using EditorGesture = std::variant<IdleGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture>;
+using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture>;
 
 // Snapshot of raw ImGui input, captured once per frame. This is the single seam through which
 // map-editing logic reads user input; nothing below should call ImGui::IsKey*/IsMouse* directly.
@@ -94,10 +95,10 @@ export class MapViewModel {
 
 
         // TODO: is this coordinates are even used by original game?
-        world.observer<const MapHeaderRawData, Viewport>()
+        world.observer<const MapHeaderRawData, Camera>()
             .event(flecs::OnSet)
-            .each([](flecs::entity, const MapHeaderRawData& mapHeader, Viewport& viewport) {
-                viewport.camPos =  {mapHeader.observerX, mapHeader.observerY};
+            .each([](flecs::entity, const MapHeaderRawData& mapHeader, Camera& viewport) {
+                viewport.position =  {mapHeader.observerX, mapHeader.observerY};
             });
 
         m_selectionQuery = world.query_builder<const VidRef, const Transform>("selectionQuery")
@@ -126,15 +127,15 @@ export class MapViewModel {
 			if (confirmPlacement) {
 				prototype.clone().child_of(m_world.component<ActiveLevel>());
 			}
+
+			if (std::abs(input.mouseWheel) > 0.0f) {
+				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
+				prototype_transform.direction += (input.mouseWheel > 0 ? 1 : -1) * step;
+			}
 		}
 		else {
 			prototype.disable();
 		}
-
-        if (std::abs(input.mouseWheel) > 0.0f) {
-            const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
-            prototype_transform.direction += (input.mouseWheel > 0 ? 1 : -1) * step;
-        }
     }
 
     void onMenu() {
@@ -154,13 +155,10 @@ export class MapViewModel {
 	}
 
 	void updateUI() {
-        auto* levelInfo = m_world.component<ActiveLevel>().try_get<MapHeaderRawData>();
+        const auto* levelInfo = m_world.component<ActiveLevel>().try_get<MapHeaderRawData>();
         auto& viewport = m_world.get_mut<Viewport>();
+        auto& camera = m_world.get_mut<Camera>();
         const FrameInput input = captureFrameInput();
-
-        if (!input.dragDropActive && input.ctrlDown && input.mouseWheel != 0.0f) {
-            viewport.magnificationFactor += static_cast<int>(glm::sign(input.mouseWheel));
-        }
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
@@ -176,10 +174,16 @@ export class MapViewModel {
             displaySelection(draw_list, viewport);
             updateSelectedObjectsPropertiesWindow(draw_list, viewport);
 
-            displayMapBounds(draw_list, viewport, levelInfo ? *levelInfo : MapHeaderRawData{});
+            displayMapBounds(draw_list, viewport, camera, levelInfo ? *levelInfo : MapHeaderRawData{});
         }
 
-        updateViewport(viewport, levelInfo ? *levelInfo : MapHeaderRawData{}, input);
+        // Resolved before the camera/viewport update, so that starting to pan pre-empts whatever
+        // canvas gesture was in progress (box-select/drag-objects/placing) before updateGesture
+        // even looks at it - camera panning always wins.
+        updatePanningGesture(input);
+
+        updateCamera(camera, levelInfo ? *levelInfo : MapHeaderRawData{}, input);
+        updateViewport(viewport, camera);
 
         const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
         updateGesture(input, mouseWorldPos, viewport);
@@ -192,11 +196,20 @@ export class MapViewModel {
         }
     }
 
+    void updatePanningGesture(const FrameInput& input) {
+        if (input.isPanning)
+            m_gesture = PanningGesture{};
+        else if (std::holds_alternative<PanningGesture>(m_gesture))
+            m_gesture = IdleGesture{};
+    }
+
     void updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const Viewport& viewport) {
         const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>().state);
         const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>().state);
 
-        const bool canStartGesture = input.windowHovered && !input.dragDropActive && !input.isPanning;
+        // isPanning is deliberately not checked here: updatePanningGesture already forced m_gesture
+        // to PanningGesture this frame if panning is active, so this code only ever runs otherwise.
+        const bool canStartGesture = input.windowHovered && !input.dragDropActive;
 
         auto enterDragGesture = [&]() -> EditorGesture {
             if (input.shiftDown || is_selectionMode)
@@ -205,6 +218,9 @@ export class MapViewModel {
         };
 
         std::visit(overloaded{
+            [&](PanningGesture&) {
+                // handled by updatePanningGesture before this call; nothing to do here
+            },
             [&](IdleGesture) {
                 if (!canStartGesture)
                     return;
@@ -280,8 +296,9 @@ export class MapViewModel {
             auto& transform = objectHandle.get<Transform, World>();
 
             if (ImGui::Button("Center camera")) {
-                viewport.camPos = {transform.x, transform.y};
+                m_world.get_mut<Camera>().position = {transform.x, transform.y};
             }
+
             ImGui::SameLine( );
             if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
                 m_world.get_mut<GlobalEditorState>().selectedNvid = vidComponent;
@@ -342,8 +359,8 @@ export class MapViewModel {
         }
     }
 
-    void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const MapHeaderRawData& mapHeader) {
-        const auto margins = glm::ivec2{50, 50} * viewport.magnificationFactor;
+    void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const Camera& camera, const MapHeaderRawData& mapHeader) {
+        const auto margins = glm::ivec2{50, 50} * camera.magnificationFactor;
         const auto vp_min = viewport.worldToScreenPos(glm::ivec2{});
         const auto vp_max = viewport.worldToScreenPos(glm::ivec2{mapHeader.width, mapHeader.height });
 
@@ -351,18 +368,25 @@ export class MapViewModel {
 			draw_list, ImRect{to_imvec(vp_min - margins), to_imvec(vp_max + margins)}, ImRect{to_imvec(vp_min), to_imvec(vp_max)}, IM_COL32(255, 0, 0, 100), 0);
 	}
 
-    // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
-    static void updateViewport(Viewport& vp, const MapHeaderRawData& mapHeader, const FrameInput& input) {
-        const auto magnificationFactor = vp.magnificationFactor = std::clamp(vp.magnificationFactor, 1, 8);
-        vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
+    static void updateCamera(Camera& camera, const MapHeaderRawData& mapHeader, const FrameInput& input) {
+        if (!input.dragDropActive && input.ctrlDown && input.mouseWheel != 0.0f) {
+            camera.magnificationFactor += static_cast<int>(glm::sign(input.mouseWheel));
+        }
+        camera.magnificationFactor = std::clamp(camera.magnificationFactor, 1, 8);
 
         if (input.isPanning) {
-            vp.camPos -= input.mouseDelta;
+            camera.position -= input.mouseDelta;
         }
 
-        vp.camPos = glm::clamp(vp.camPos, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
+        camera.position = glm::clamp(camera.position, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
+    }
 
-        vp.viewportPos = vp.camPos - vp.viewportSize / 2;
+    // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
+    static void updateViewport(Viewport& vp, const Camera& camera) {
+        const auto magnificationFactor = camera.magnificationFactor;
+        vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
+
+        vp.viewportPos = camera.position - vp.viewportSize / 2;
         vp.screenToWorldMat = glm::mat3x3{
             1.0f / magnificationFactor, 0.0f, 0.0f,
             0.0f, 1.0f / magnificationFactor, 0.0f,

@@ -201,7 +201,7 @@ Controls:
 		    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
 	        const auto& vp = m_model.get<const Viewport>();
 		    const auto pos = vp.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), vp.magnificationFactor);
+		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), m_model.get<const Camera>().magnificationFactor);
 	    }
 
 		ImGui::EndMainMenuBar();
