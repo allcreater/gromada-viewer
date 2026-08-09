@@ -48,6 +48,7 @@ struct FrameInput {
     glm::ivec2 mouseScreenPos;
     glm::ivec2 mouseDelta;
     glm::ivec2 leftDragDelta;
+    glm::fvec2 wsadDirection;
     float mouseWheel = 0.0f;
     bool leftMouseReleased = false;
     bool leftMouseDragging = false;
@@ -63,10 +64,17 @@ struct FrameInput {
 static FrameInput captureFrameInput() {
     const ImGuiIO& io = ImGui::GetIO();
     const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+
+    glm::fvec2 wsadDirection = { ImGui::IsKeyDown( ImGuiKey_D) - ImGui::IsKeyDown(ImGuiKey_A), ImGui::IsKeyDown( ImGuiKey_S) - ImGui::IsKeyDown(ImGuiKey_W)};
+    if (auto length = glm::dot(wsadDirection, wsadDirection); length > 0.0f) {
+        wsadDirection *= glm::inversesqrt(length);
+    }
+
     return FrameInput{
         .mouseScreenPos = from_imvec(ImGui::GetMousePos()),
         .mouseDelta = from_imvec(io.MouseDelta),
         .leftDragDelta = from_imvec(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
+        .wsadDirection = wsadDirection,
         .mouseWheel = io.MouseWheel,
         .leftMouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
         .leftMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
@@ -375,10 +383,15 @@ export class MapViewModel {
         camera.magnificationFactor = std::clamp(camera.magnificationFactor, 1, 8);
 
         if (input.isPanning) {
-            camera.position -= input.mouseDelta;
+            camera.position -= glm::vec2{input.mouseDelta};
         }
 
-        camera.position = glm::clamp(camera.position, glm::ivec2{0, 0}, glm::ivec2{mapHeader.width, mapHeader.height});
+        camera.velocity += (input.wsadDirection * 8000.0f - camera.velocity*5.0f) * ImGui::GetIO().DeltaTime;
+        camera.position += camera.velocity * ImGui::GetIO().DeltaTime;
+        //camera.velocity = camera.velocity * 0.93f;
+
+        camera.position = glm::clamp(camera.position, glm::vec2{0, 0}, glm::vec2{mapHeader.width, mapHeader.height});
+
     }
 
     // NOTE: implicedly uses ImGui::GetMainViewport() to get the viewport size
@@ -386,7 +399,7 @@ export class MapViewModel {
         const auto magnificationFactor = camera.magnificationFactor;
         vp.viewportSize = from_imvec(ImGui::GetMainViewport()->Size) / magnificationFactor;
 
-        vp.viewportPos = camera.position - vp.viewportSize / 2;
+        vp.viewportPos = glm::ivec2{camera.position} - vp.viewportSize / 2;
         vp.screenToWorldMat = glm::mat3x3{
             1.0f / magnificationFactor, 0.0f, 0.0f,
             0.0f, 1.0f / magnificationFactor, 0.0f,

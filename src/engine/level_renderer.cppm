@@ -19,7 +19,8 @@ import Gromada.VisualLogic;
 import utils;
 
 export struct Camera {
-	glm::ivec2 position{0.0f, 0.0f};
+	glm::vec2 position{0.0f, 0.0f};
+	glm::vec2 velocity{0.0f, 0.0f};
 	int magnificationFactor = 1; // actual range is from 1 to 8
 };
 
