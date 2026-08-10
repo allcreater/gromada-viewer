@@ -65,14 +65,30 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("Help")) {
-				ImGui::TextUnformatted(
-					R"(
-Controls:
-- Ctrl+Wheel - zoom in/out
-- Right mouse button / Ctrl + mouse - move camera
-- Left mouse button - select object
-- Del - delete selected objects
-)");
+				using std::literals::operator""sv;
+				constexpr std::array controls{
+					std::pair{"WSAD"sv, "Move camera"sv},
+					std::pair{"Ctrl+Wheel"sv, "Zoom in/out"sv},
+					std::pair{"Right mouse button / Ctrl + mouse"sv, "Move camera"sv},
+					std::pair{"Left mouse button"sv, "Select object"sv},
+					std::pair{"Del"sv, "Delete selected objects"sv},
+				};
+
+				if (ImGui::BeginTable("Controls", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+					ImGui::TableSetupColumn("Key/Action", ImGuiTableColumnFlags_WidthFixed, 200);
+					ImGui::TableSetupColumn("Description");
+					ImGui::TableHeadersRow();
+
+					for (const auto& [key, description] : controls) {
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::TextUnformatted(key.data(), key.data() + key.size());
+						ImGui::TableSetColumnIndex(1);
+						ImGui::TextUnformatted(description.data(), description.data() + description.size());
+					}
+
+					ImGui::EndTable();
+				}
 
 				ImGui::Separator();
 
