@@ -315,7 +315,8 @@ export class MapViewModel {
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
-            showObjectPayloadWindow(objectHandle.get_mut<GameObject::Payload>());
+            processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
+            processObjectPropertiesWindow(objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
         }
 
@@ -324,7 +325,21 @@ export class MapViewModel {
         }
     }
 
-    void showObjectPayloadWindow(GameObject::Payload& payload) {
+    void processObjectTransformTab(Transform& worldTransform) {
+        if (!ImGui::CollapsingHeader("Transform"))
+            return;
+
+        static_assert(sizeof(worldTransform.x) == sizeof(int32_t));
+        ImGui::InputScalar("X",  ImGuiDataType_S32, &worldTransform.x, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::InputScalar("Υ",  ImGuiDataType_S32, &worldTransform.y, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
+        constexpr static std::uint8_t minDirection = 0, maxDirection = 255;
+        ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
+    }
+
+    void processObjectPropertiesWindow(GameObject::Payload& payload ) {
+        if (!ImGui::CollapsingHeader("Payload"))
+            return;
+
         if (ImGui::BeginTabBar("PayloadTabs")) {
             if (ImGui::BeginTabItem("General")) {
                 ImGui::PushItemWidth(100.0f);
