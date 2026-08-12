@@ -11,35 +11,32 @@ import Gromada.ResourceReader;
 
 // Implementation
 GameObject::Payload readObjectPayload(MapVersion mapVersion, std::uint8_t behavior, BinaryStreamReader& reader) {
-    GameObject::Payload result;
-    switch(getObjectSerializationClass(behavior)) {
-	case ObjectSerializationClass::Static: {
-	    result.hp = reader.read<std::uint8_t>();
-	} break;
-	case ObjectSerializationClass::Dynamic: {
-	    result.hp = reader.read<std::uint8_t>();
-	    if (std::to_underlying(mapVersion) > 2) {
-	        result.buildTime = reader.read<std::uint8_t>();
-	    }
+    GameObject::Payload result = getPayloadPrototype(behavior);
+	std::visit( overloaded {
+		[](Payloads::VisualObject&) {},
+		[&reader](Payloads::MaterialObject& payload) {
+			payload.hp = reader.read<std::uint8_t>();
+		},
+		[&](Payloads::AssetObject& payload) {
+			payload.hp = reader.read<std::uint8_t>();
+			if (std::to_underlying(mapVersion) > 2) {
+				payload.buildTime = reader.read<std::uint8_t>();
+			}
 
-	    if (std::to_underlying(mapVersion) > 1) {
-	        result.army = reader.read<std::uint8_t>();
-	    }
+			if (std::to_underlying(mapVersion) > 1) {
+				payload.army = reader.read<std::uint8_t>();
+			}
 
-	    result.behave = reader.read<std::uint8_t>();
+			payload.behave = reader.read<std::uint8_t>();
 
-	    if (std::to_underlying(mapVersion) == 0)
-	        break;
+			if (std::to_underlying(mapVersion) == 0)
+				return;
 
-	    for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0;) {
-	        result.items.push_back(itemId);
-	    }
-	} break;
-	case ObjectSerializationClass::NoPayload:
-        break;
-    default:
-        throw std::runtime_error("Unknown object class");
-    }
+			for (std::int16_t itemId = 0; itemId = reader.read<std::int16_t>(), itemId >= 0;) {
+				payload.items.push_back(itemId);
+			}
+		}
+	}, result);
 
     return result;
 }
@@ -110,12 +107,14 @@ void readCommandsSection(std::span<const std::uint32_t> objectIds, std::span<Gam
     };
 
     for (std::uint32_t subjectId; subjectId = reader.read<std::uint32_t>(); ) {
-        auto& commandArray = lookupSubject(subjectId).payload.commands;
+        auto* pAssetPayload = std::get_if<Payloads::AssetObject>(&lookupSubject(subjectId).payload);
+    	if (!pAssetPayload)
+    		continue;
 
         const auto count = reader.read<std::int32_t>();
-        commandArray.reserve(count);
+        pAssetPayload->commands.reserve(count);
         for (int i = 0; i < count; i++) {
-            commandArray.push_back(ObjectCommand {
+            pAssetPayload->commands.push_back(ObjectCommand {
                 .command = Action{reader.read<std::uint8_t>()},
                 .p1 =  reader.read<std::uint32_t>(),
                 .p2 =  reader.read<std::uint32_t>(),

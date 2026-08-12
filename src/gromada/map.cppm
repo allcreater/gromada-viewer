@@ -14,6 +14,20 @@ export {
         std::uint32_t p1, p2;
     };
 
+    namespace Payloads {
+        struct VisualObject {};
+        struct MaterialObject : VisualObject {
+            std::uint8_t hp = 0;
+        };
+        struct AssetObject : MaterialObject {
+            std::uint8_t buildTime = 20;
+            std::uint8_t army = 0; // Real default is vid[nvid].army
+            std::uint8_t behave = 1;
+            std::vector<std::int16_t> items;
+            std::vector<ObjectCommand> commands;
+        };
+    }
+
     struct GameObject {
         std::uint16_t nvid;
         std::int16_t x;
@@ -22,19 +36,8 @@ export {
         std::uint8_t direction;
         std::uint8_t action = 0; // It seems usually not used in original game
 
-        // NOTE: this is all fields that are loaded in the original game
-        // Not all of them may be saved/loaded at same time: it depends on the object type (specifically, vid[nvid].behave)
-        struct Payload {
-            std::vector<ObjectCommand> commands;
-
-            // for most static objects
-            std::uint8_t hp = 0;
-            // For units
-            std::uint8_t buildTime = 20;
-            std::uint8_t army = 0; // Real default is vid[nvid].army
-            std::uint8_t behave = 1;
-            std::vector<std::int16_t> items;
-        } payload;
+        using Payload = std::variant<Payloads::VisualObject, Payloads::MaterialObject, Payloads::AssetObject>;
+        Payload payload;
 
         std::uint32_t id; // Unique ID for the object, used as a target for some commands and map armies info
     };
@@ -75,28 +78,22 @@ export {
     std::vector<GameObject> loadMenu(std::span<const Vid> vids, std::istream&& stream);
     void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream);
 
-    enum class ObjectSerializationClass : std::uint8_t {
-        Unknown,
-        NoPayload,
-        Static,
-        Dynamic,
-    };
-    ObjectSerializationClass getObjectSerializationClass(std::uint8_t behavior) noexcept;
+    GameObject::Payload getPayloadPrototype(std::uint8_t behavior);
 }
 
 // Implementation
-ObjectSerializationClass getObjectSerializationClass(std::uint8_t behavior) noexcept {
-    static constexpr auto staticClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
-    static constexpr auto dynamicClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
+GameObject::Payload getPayloadPrototype(std::uint8_t behavior) {
+    static constexpr auto materialObjectClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
+    static constexpr auto assetObjectClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
     static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
 
     const auto containsClassPredicate = [behavior](std::uint8_t x) { return x == behavior; };
-    if (std::ranges::any_of(staticClasses, containsClassPredicate))
-        return ObjectSerializationClass::Static;
-    if (std::ranges::any_of(dynamicClasses, containsClassPredicate))
-        return ObjectSerializationClass::Dynamic;
+    if (std::ranges::any_of(materialObjectClasses, containsClassPredicate))
+        return Payloads::MaterialObject{};
+    if (std::ranges::any_of(assetObjectClasses, containsClassPredicate))
+        return Payloads::AssetObject{};
     if (std::ranges::any_of(otherClasses, containsClassPredicate))
-        return ObjectSerializationClass::NoPayload;
+        Payloads::VisualObject{};
 
-    return ObjectSerializationClass::Unknown;
+    throw std::runtime_error{"Invalid object class"};
 }

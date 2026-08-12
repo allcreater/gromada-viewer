@@ -60,21 +60,23 @@ void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
             writer.write(obj.direction);
             writer.write(obj.action);
 
-            switch(getObjectSerializationClass(vids[obj.nvid].behave)) {
-            case ObjectSerializationClass::Static: {
-                    writer.write(obj.payload.hp);
-                } break;
-            case ObjectSerializationClass::Dynamic: {
-                    writer.write(obj.payload.hp);
-                    writer.write(obj.payload.buildTime);
-                    writer.write(obj.payload.army);
-                    writer.write(obj.payload.behave);
-                    for (const auto itemId : obj.payload.items) {
+            std::visit( overloaded {
+                [](const Payloads::VisualObject& payload) {
+                },
+                [&](const Payloads::MaterialObject& payload) {
+                    writer.write(payload.hp);
+                },
+                [&](const Payloads::AssetObject& payload) {
+                    writer.write(payload.hp);
+                    writer.write(payload.buildTime);
+                    writer.write(payload.army);
+                    writer.write(payload.behave);
+                    for (const auto itemId : payload.items) {
                         writer.write(itemId);
                     }
                     writer.write(static_cast<std::int16_t>(-1)); // Items terminator
-                } break;
-            }
+                }
+            }, obj.payload);
         }
         writer.write<std::uint16_t>(-1); // Objects terminator
     }
@@ -90,11 +92,14 @@ void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
     {
         SectionWriter writer{SectionType::Command, 1, stream};
 
-        auto objects = map.objects | std::views::filter([](const GameObject& obj) { return !obj.payload.commands.empty(); });
-        for (const auto& obj : objects) {
+        for (const auto& obj : map.objects) {
+            auto* pPayload = std::get_if<Payloads::AssetObject>(&obj.payload);
+            if (!pPayload || pPayload->commands.empty())
+                continue;
+
             writer.write(obj.id);
-            writer.write(static_cast<std::int32_t>(obj.payload.commands.size()));
-            for (const auto& command : obj.payload.commands) {
+            writer.write(static_cast<std::int32_t>(pPayload->commands.size()));
+            for (const auto& command : pPayload->commands) {
                 writer.write(static_cast<std::uint8_t>(command.command));
                 writer.write(command.p1);
                 writer.write(command.p2);

@@ -316,7 +316,7 @@ export class MapViewModel {
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
             processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
-            processObjectPropertiesWindow(objectHandle.get_mut<GameObject::Payload>());
+            processObjectPropertiesTab(objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
         }
 
@@ -336,50 +336,57 @@ export class MapViewModel {
         ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
     }
 
-    void processObjectPropertiesWindow(GameObject::Payload& payload ) {
-        if (!ImGui::CollapsingHeader("Payload"))
-            return;
+    void processObjectPropertiesTab(GameObject::Payload& somePayload ) {
+        std::visit( overloaded{
+        []( Payloads::VisualObject ) {
+            ImGui::Text("Just a visual object, no payload");
+        },
+        []( Payloads::MaterialObject &payload ) {
+            ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
+        },
+        [this]( Payloads::AssetObject &payload ) {
+            if (ImGui::BeginTabBar("PayloadTabs")) {
+                if (ImGui::BeginTabItem("General")) {
+                    ImGui::PushItemWidth(100.0f);
+                    ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
+                    ImGui::InputScalar("Build time",  ImGuiDataType_U8, &payload.buildTime);
+                    ImGui::InputScalar("Army",  ImGuiDataType_U8, &payload.army );
+                    ImGui::InputScalar("Behavior",  ImGuiDataType_U8, &payload.behave );
+                    ImGui::PopItemWidth();
 
-        if (ImGui::BeginTabBar("PayloadTabs")) {
-            if (ImGui::BeginTabItem("General")) {
-                ImGui::PushItemWidth(100.0f);
-                ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
-                ImGui::InputScalar("Build time",  ImGuiDataType_U8, &payload.buildTime);
-                ImGui::InputScalar("Army",  ImGuiDataType_U8, &payload.army );
-                ImGui::InputScalar("Behavior",  ImGuiDataType_U8, &payload.behave );
-                ImGui::PopItemWidth();
-
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Commands")) {
-                MyImUtils::ListBox("commands", &m_selectionUIState.currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&](const ObjectCommand& cmd) {
-                    return std::format("[{:3}] {:^10}\t{}\t{}", std::distance(const_cast<const ObjectCommand*>(payload.commands.data()), &cmd), to_string(cmd.command), cmd.p1, cmd.p2);
-                }));
-
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Items")) {
-                MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [&gr = m_world.get<const GameResources>()](std::int16_t nvid) {
-                    return std::format("[{:3}] {}", nvid, gr.getVid(nvid)->getName());
-                } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
-
-                if (ImGui::Button("+")) {
-                    payload.items.push_back( m_world.get<GlobalEditorState>().selectedNvid.nvid());
+                    ImGui::EndTabItem();
                 }
-                ImGui::SameLine();
 
-                ImGui::BeginDisabled(payload.items.empty());
-                if (ImGui::Button("-")) {
-                    payload.items.erase(payload.items.begin() + m_selectionUIState.currentItem);
+                if (ImGui::BeginTabItem("Commands")) {
+                    MyImUtils::ListBox("commands", &m_selectionUIState.currentCommand, std::span{payload.commands}, MyImUtils::MakeSelectableCallback<const ObjectCommand>([&](const ObjectCommand& cmd) {
+                        return std::format("[{:3}] {:^10}\t{}\t{}", std::distance(const_cast<const ObjectCommand*>(payload.commands.data()), &cmd), to_string(cmd.command), cmd.p1, cmd.p2);
+                    }));
+
+                    ImGui::EndTabItem();
                 }
-                ImGui::EndDisabled();
-                ImGui::EndTabItem();
-            }
 
-            ImGui::EndTabBar();
+                if (ImGui::BeginTabItem("Items")) {
+                    MyImUtils::ListBox("items", &m_selectionUIState.currentItem, std::span{payload.items},MyImUtils::MakeSelectableCallback<std::int16_t>( [&gr = m_world.get<const GameResources>()](std::int16_t nvid) {
+                        return std::format("[{:3}] {}", nvid, gr.getVid(nvid)->getName());
+                    } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
+
+                    if (ImGui::Button("+")) {
+                        payload.items.push_back( m_world.get<GlobalEditorState>().selectedNvid.nvid());
+                    }
+                    ImGui::SameLine();
+
+                    ImGui::BeginDisabled(payload.items.empty());
+                    if (ImGui::Button("-")) {
+                        payload.items.erase(payload.items.begin() + m_selectionUIState.currentItem);
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
+            }
         }
+        }, somePayload );
     }
 
     void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const Camera& camera, const MapHeaderRawData& mapHeader) {
