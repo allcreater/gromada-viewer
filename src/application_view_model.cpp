@@ -12,12 +12,12 @@ import Gromada.DataExporters;
 import engine.level_renderer; // For Viewport. Better to split
 
 import application.model;
+import application.dialogs;
 import :map;
 import :map_selector;
 import :vids_window;
 import :map_properties;
 import :sounds_window;
-import :dialogs;
 
 export class ViewModel {
 public:

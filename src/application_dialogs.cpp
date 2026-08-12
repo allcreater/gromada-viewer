@@ -2,7 +2,7 @@ module;
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h>
 
-export module application.view_model : dialogs;
+export module application.dialogs;
 
 import std;
 import imgui_utils;
@@ -139,4 +139,31 @@ private:
     std::string m_filename;
     std::string m_errorMessage;
     std::function<void(std::ostream&&)> m_saveCallback;
+};
+
+export class MessageDialog {
+public:
+    explicit MessageDialog(const char* windowTitle) : m_windowTitle{windowTitle} {}
+
+    void open(std::string message) {
+        m_shouldOpen = true;
+        m_message = std::move(message);
+    }
+
+    void updateUI() {
+        if (!MyImUtils::BeginModalPopup(m_windowTitle, m_shouldOpen))
+            return;
+
+        ImGui::Text(m_message.c_str());
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+private:
+    bool m_shouldOpen = false;
+    const char* m_windowTitle = "";
+    std::string m_message;
 };

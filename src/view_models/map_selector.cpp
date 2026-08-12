@@ -8,11 +8,15 @@ import std;
 import imgui_utils;
 
 import application.model;
+import application.dialogs;
 
 export class MapsSelectorViewModel {
 public:
 	explicit MapsSelectorViewModel(Model& model)
-		: m_model{model}, m_mapsBaseDirectory{model.get<const GameResources>().mapsPath()} {}
+		: m_model{model}
+		, m_mapsBaseDirectory{model.get<const GameResources>().mapsPath()}
+		, m_errorDialog{"Error"}
+{}
 
 	void updateUI() {
 	    const auto activeLevel = m_model.component<ActiveLevel>();
@@ -20,14 +24,21 @@ public:
 		if (MyImUtils::ListBox("Maps", &m_selectedMap, std::span<const MapEntry>{m_maps}, MyImUtils::MakeSelectableCallback<const MapEntry&>(&MapEntry::name))) {
 			const auto& selectedMap = m_maps[m_selectedMap];
 			if (auto* currentPath = activeLevel.try_get<Path>(); !currentPath || (selectedMap.path != *currentPath)) {
-				m_model.loadMap(selectedMap.path);
+				try {
+					m_model.loadMap(selectedMap.path);
+				} catch ( const std::exception& e) {
+					m_errorDialog.open(std::format("Error loading map \"{}\":\n\n{}", selectedMap.path.generic_string(), e.what()));
+				}
 			}
 		}
+
+		m_errorDialog.updateUI();
 	}
 
 private:
 	Model& m_model;
 	int m_selectedMap = 0;
+	MessageDialog m_errorDialog;
 
 	struct MapEntry {
 		std::u8string name;
