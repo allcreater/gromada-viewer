@@ -262,7 +262,10 @@ private:
 					world.target<ObjectPrototype>().destruct();
 
 				if (state.selectedNvid) {
-					auto prototype = world.entity().emplace<VidRef>(state.selectedNvid);
+					auto prototype = world.entity()
+						.emplace<VidRef>(state.selectedNvid)
+						.emplace<GameObject::Payload>(getPayloadPrototype( state.selectedNvid.vid() ));
+
 					world.add<ObjectPrototype>(prototype);
 				}
 			});

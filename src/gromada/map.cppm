@@ -79,6 +79,7 @@ export {
     void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream);
 
     GameObject::Payload getPayloadPrototype(std::uint8_t behavior);
+    GameObject::Payload getPayloadPrototype(const Vid& vid);
 }
 
 // Implementation
@@ -93,7 +94,22 @@ GameObject::Payload getPayloadPrototype(std::uint8_t behavior) {
     if (std::ranges::any_of(assetObjectClasses, containsClassPredicate))
         return Payloads::AssetObject{};
     if (std::ranges::any_of(otherClasses, containsClassPredicate))
-        Payloads::VisualObject{};
+        return Payloads::VisualObject{};
 
     throw std::runtime_error{"Invalid object class"};
+}
+
+GameObject::Payload getPayloadPrototype(const Vid& vid) {
+    auto prototype = getPayloadPrototype(vid.behave);
+    std::visit(overloaded{
+        [&](Payloads::AssetObject& payload) {
+            payload.army = vid.army;
+            payload.hp = vid.maxHP;
+        },[&](Payloads::MaterialObject& payload) {
+            payload.hp = vid.maxHP;
+        },
+        [](auto&) {}
+    }, prototype);
+
+    return prototype;
 }
