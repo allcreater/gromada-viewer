@@ -58,6 +58,7 @@ export {
                     .current_frame = static_cast<std::uint32_t>(std::hash<std::uint64_t>{}(entity.id()))
                 });
                 entity.add<Transform, World>();
+                entity.emplace<GameObject::Payload>(getPayloadPrototype( vid.vid() ));
             });
 
 

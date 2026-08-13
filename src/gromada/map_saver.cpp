@@ -60,6 +60,10 @@ void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream) {
             writer.write(obj.direction);
             writer.write(obj.action);
 
+            if (getPayloadPrototype( vids[obj.nvid] ).index() != obj.payload.index()) {
+                throw std::runtime_error("Map object payload does not match the prototype for its nvid");
+            }
+
             std::visit( overloaded {
                 [](const Payloads::VisualObject& payload) {
                 },
