@@ -31,7 +31,7 @@ auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
 	const std::array comparators{
 		+[](const Vid& a, const Vid& b) { return &a <=> &b; }, // we are sure they are in the same array, so that it's safe
 		+[](const Vid& a, const Vid& b) { return a.name <=> b.name; },
-		+[](const Vid& a, const Vid& b) { return a.behave <=> b.behave; },
+		+[](const Vid& a, const Vid& b) { return a.type <=> b.type; },
 		+[](const Vid& a, const Vid& b) { return extractGraphicsGormat(a) <=> extractGraphicsGormat(b); },
 	};
 
@@ -66,12 +66,13 @@ public:
 
 	    ImGui::Checkbox("Show details", &m_showDetails);
 		if (ImGui::BeginTable(
-				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter)) {
+				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable)) {
 			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 30.0f);
-			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 30.0f);
-			ImGui::TableSetupColumn("Graphics format", ImGuiTableColumnFlags_WidthFixed, 30.0f);
+			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 100.0f);
+			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthStretch, 60.0f);
+			ImGui::TableSetupColumn("G/F", ImGuiTableColumnFlags_WidthFixed, 30.0f);
 
+			ImGui::TableSetupScrollFreeze(0, 1); // Make header always visible
 			ImGui::TableHeadersRow();
 
 			if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty) {
@@ -98,7 +99,7 @@ public:
 				ImGui::Text("%s", vid->getName().c_str());
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%i", vid->behave);
+				ImGui::Text("%s", to_string(vid->type).c_str());
 
 				ImGui::TableNextColumn();
 			    ImGui::Text("%i", vid->graphics().dataFormat);
@@ -169,8 +170,8 @@ private:
 };
 
 namespace {
-	constexpr auto classifyUnitType(UnitType unitType) -> const char* {
-		using enum UnitType;
+	constexpr auto classifyUnitType(ObjectCategory unitType) -> const char* {
+		using enum ObjectCategory;
 		switch (unitType) {
 			case Terrain: return "Terrain";
 			case Object: return "Object";
@@ -216,8 +217,8 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	});
 
     ImGui::Text("%s", self.getName().c_str());
-    ImGui::Text("unitType: %s ", classifyUnitType(self.unitType));
-    ImGui::Text("Behave: %i ", self.behave);
+    ImGui::Text("unitType: %s ", classifyUnitType(self.category));
+    ImGui::Text("Class: %s ", to_string(self.type).c_str());
     ImGui::Text("Flags: %s", to_string(self.flags).c_str());
     ImGui::Text("Collision mask: %x", self.collisionMask);
     ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);

@@ -10,7 +10,7 @@ import utils;
 import cp866;
 import nlohmann.json;
 
-export enum class UnitType : std::uint8_t {
+export enum class ObjectCategory : std::uint8_t {
 	Terrain = 0x1,
 	Object = 0x2,
 	Monster = 0x4,
@@ -20,29 +20,31 @@ export enum class UnitType : std::uint8_t {
 	Item = 0x40,
 };
 
-export constexpr std::string_view to_string(UnitType unitType) {
-    using enum UnitType;
-    switch (unitType) {
-    case Terrain: return "Terrain";
-    case Object: return "Object";
-    case Monster: return "Monster";
-    case Avia: return "Avia";
-    case Cannon: return "Cannon";
-    case Sprite: return "Sprite";
-    case Item: return "Item";
-    default:
-        return "Unknown";
-    }
-}
-
-
-export struct ColorRgb8 {
-	std::uint8_t r;
-	std::uint8_t g;
-	std::uint8_t b;
+export enum class ObjectClass : std::uint8_t {
+	Terrain = 0,
+	Static = 1,
+	Vehicle = 2,
+	Building = 3,
+	AviaVehicle = 4,
+	Projectile = 5,
+	CannonMissile = 6,
+	DownedAviaVehicle = 7,
+	NA = 8,
+	Superstructure = 9,
+	Image = 10,
+	Effect1 = 11,
+	Effect2 = 12,
+	Mine = 13,
+	Shell = 14,
+	AviaMissile = 15,
+	Debris = 16,
+	Kassandra = 17,
+	Bonus = 18,
+	Font = 19,
+	RepairCannon = 20,
 };
 
- export enum /*class*/ ObjectFlags : std::uint16_t {
+export enum /*class*/ ObjectFlags : std::uint16_t {
      RandomDirection = 0x1,
      Gravity = 0x2,
      Calltact = 0x4,
@@ -60,34 +62,16 @@ export struct ColorRgb8 {
      CollisionBehavior = 0x4000,
 };
 
-export std::string to_string(ObjectFlags flags) {
-    std::string result;
-    if (flags == 0) return "None";
+export constexpr std::string to_string(ObjectCategory category);
+export constexpr std::string to_string(ObjectClass objectClass);
+export constexpr std::string to_string(ObjectFlags flags);
 
-    if (flags & ObjectFlags::RandomDirection) result += "RandomDirection, ";
-    if (flags & ObjectFlags::Gravity) result += "Gravity, ";
-    if (flags & ObjectFlags::Calltact) result += "Calltact, ";
-    if (flags & ObjectFlags::SkipUpdate) result += "SkipUpdate, ";
-    if (flags & ObjectFlags::SpawnChildren) result += "SpawnChildren, ";
-    if (flags & ObjectFlags::NoCollision) result += "NoCollision, ";
-    if (flags & ObjectFlags::PresentOnGrid) result += "PresentOnGrid, ";
-    if (flags & ObjectFlags::Shadow) result += "Shadow, ";
-    if (flags & ObjectFlags::Randomized) result += "Randomized, ";
-    if (flags & ObjectFlags::Hz1) result += "Hz1, ";
-    if (flags & ObjectFlags::InvisibleSubobjects) result += "InvisibleSubobjects, ";
-    if (flags & ObjectFlags::OwnGamma) result += "OwnGamma, ";
-    if (flags & ObjectFlags::Wind) result += "Wind, ";
-    if (flags & ObjectFlags::Hz2) result += "Hz2, ";
-    if (flags & ObjectFlags::CollisionBehavior) result += "CollisionBehavior, ";
-
-    // Remove trailing comma and space
-    if (!result.empty()) {
-        result.pop_back();
-        result.pop_back();
-    }
-
-    return result;
-}
+export struct ColorRgb8 {
+	std::uint8_t r;
+	std::uint8_t g;
+	std::uint8_t b;
+};
+static_assert(sizeof(ColorRgb8) == 3);
 
 export struct VidGraphics {
     VidGraphics() = default;
@@ -119,8 +103,8 @@ export struct Vid {
     explicit Vid (BinaryStreamReader reader);
 
 	std::array<char, 34> name {0}; // In CP-866
-	UnitType unitType {};
-	std::uint8_t behave {};
+	ObjectCategory category {};
+	ObjectClass type {};
 	ObjectFlags flags {};
 
 	std::uint8_t collisionMask {};
@@ -187,8 +171,8 @@ export AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader
 Vid::Vid(BinaryStreamReader reader)
 {
 	reader.read_to(name);
-	reader.read_to(unitType);
-	reader.read_to(behave);
+	reader.read_to(category);
+	reader.read_to(type);
 	reader.read_to(flags);
 
 	reader.read_to(collisionMask);
@@ -273,4 +257,80 @@ AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader
     reader.read_to(std::as_writable_bytes(std::span{adjacencyData.data}));
 
     return adjacencyData;
+}
+
+// to_string... until we finally have reflection in C++29
+
+constexpr std::string to_string(ObjectCategory category) {
+	using enum ObjectCategory;
+	switch (category) {
+		case Terrain: return "Terrain";
+		case Object: return "Object";
+		case Monster: return "Monster";
+		case Avia: return "Avia";
+		case Cannon: return "Cannon";
+		case Sprite: return "Sprite";
+		case Item: return "Item";
+		default:
+			return "Unknown";
+	}
+}
+
+constexpr std::string to_string(ObjectClass objectClass) {
+	using enum ObjectClass;
+	switch (objectClass) {
+		case Terrain: return "Terrain";
+		case Static: return "Static";
+		case Vehicle: return "Vehicle";
+		case Building: return "Building";
+		case AviaVehicle: return "AviaVehicle";
+		case Projectile: return "Projectile";
+		case CannonMissile: return "CannonMissile";
+		case DownedAviaVehicle: return "DownedAviaVehicle";
+		case NA: return "NA";
+		case Superstructure: return "Superstructure";
+		case Image: return "Image";
+		case Effect1: return "Effect1";
+		case Effect2: return "Effect2";
+		case Mine: return "Mine";
+		case Shell: return "Shell";
+		case AviaMissile: return "AviaMissile";
+		case Debris: return "Debris";
+		case Kassandra: return "Kassandra";
+		case Bonus: return "Bonus";
+		case Font: return "Font";
+		case RepairCannon: return "RepairCannon";
+
+		default:
+			return "Unknown";
+	}
+}
+
+constexpr std::string to_string(ObjectFlags flags) {
+	std::string result;
+	if (flags == 0) return "None";
+
+	if (flags & ObjectFlags::RandomDirection) result += "RandomDirection, ";
+	if (flags & ObjectFlags::Gravity) result += "Gravity, ";
+	if (flags & ObjectFlags::Calltact) result += "Calltact, ";
+	if (flags & ObjectFlags::SkipUpdate) result += "SkipUpdate, ";
+	if (flags & ObjectFlags::SpawnChildren) result += "SpawnChildren, ";
+	if (flags & ObjectFlags::NoCollision) result += "NoCollision, ";
+	if (flags & ObjectFlags::PresentOnGrid) result += "PresentOnGrid, ";
+	if (flags & ObjectFlags::Shadow) result += "Shadow, ";
+	if (flags & ObjectFlags::Randomized) result += "Randomized, ";
+	if (flags & ObjectFlags::Hz1) result += "Hz1, ";
+	if (flags & ObjectFlags::InvisibleSubobjects) result += "InvisibleSubobjects, ";
+	if (flags & ObjectFlags::OwnGamma) result += "OwnGamma, ";
+	if (flags & ObjectFlags::Wind) result += "Wind, ";
+	if (flags & ObjectFlags::Hz2) result += "Hz2, ";
+	if (flags & ObjectFlags::CollisionBehavior) result += "CollisionBehavior, ";
+
+	// Remove trailing comma and space
+	if (!result.empty()) {
+		result.pop_back();
+		result.pop_back();
+	}
+
+	return result;
 }

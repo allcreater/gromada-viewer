@@ -78,17 +78,18 @@ export {
     std::vector<GameObject> loadMenu(std::span<const Vid> vids, std::istream&& stream);
     void saveMap(std::span<const Vid> vids, const Map& map, std::ostream& stream);
 
-    GameObject::Payload getPayloadPrototype(std::uint8_t behavior);
+    GameObject::Payload getPayloadPrototype(ObjectClass behavior);
     GameObject::Payload getPayloadPrototype(const Vid& vid);
 }
 
 // Implementation
-GameObject::Payload getPayloadPrototype(std::uint8_t behavior) {
-    static constexpr auto materialObjectClasses = std::to_array<std::uint8_t>({0, 1, 5, 6, 7, 8, 11, 14, 15, 16, 18, 20});
-    static constexpr auto assetObjectClasses = std::to_array<std::uint8_t>({2, 3, 4, 13, 17});
-    static constexpr auto otherClasses = std::to_array<std::uint8_t>({9, 10, 12, 19});
+GameObject::Payload getPayloadPrototype(ObjectClass behavior) {
+    using enum ObjectClass;
+    static constexpr auto materialObjectClasses = std::to_array<ObjectClass>({Terrain, Static, Projectile, CannonMissile, DownedAviaVehicle, NA, Superstructure, Shell, AviaMissile, Debris, Bonus, RepairCannon});
+    static constexpr auto assetObjectClasses = std::to_array<ObjectClass>({Vehicle, Building, AviaVehicle, Mine, Kassandra});
+    static constexpr auto otherClasses = std::to_array<ObjectClass>({Superstructure, Image, Effect2, Font});
 
-    const auto containsClassPredicate = [behavior](std::uint8_t x) { return x == behavior; };
+    const auto containsClassPredicate = [behavior](ObjectClass x) { return x == behavior; };
     if (std::ranges::any_of(materialObjectClasses, containsClassPredicate))
         return Payloads::MaterialObject{};
     if (std::ranges::any_of(assetObjectClasses, containsClassPredicate))
@@ -100,7 +101,7 @@ GameObject::Payload getPayloadPrototype(std::uint8_t behavior) {
 }
 
 GameObject::Payload getPayloadPrototype(const Vid& vid) {
-    auto prototype = getPayloadPrototype(vid.behave);
+    auto prototype = getPayloadPrototype(vid.type);
     std::visit(overloaded{
         [&](Payloads::AssetObject& payload) {
             payload.army = vid.army;

@@ -230,7 +230,7 @@ private:
     void generateDefaultTerrain(VidRef vid, int width, int height) {
         const auto activeLevel = this->component<ActiveLevel>();
 
-        assert(vid->unitType == UnitType::Terrain);
+        assert(vid->category == ObjectCategory::Terrain);
 
         std::mt19937 rng{std::random_device{}()};
         std::uniform_int_distribution<int> directionsDistribution{0, 255};

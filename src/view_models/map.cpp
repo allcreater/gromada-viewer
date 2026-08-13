@@ -28,7 +28,7 @@ import Gromada.SoftwareRenderer;
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
 constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
 
-constexpr static ImU32 objectSelectionColor(UnitType unitType);
+constexpr static ImU32 objectSelectionColor(ObjectCategory unitType);
 
 struct SelectionRect {
     glm::ivec2 min;
@@ -148,12 +148,12 @@ export class MapViewModel {
 
     void onMenu() {
 		if (ImGui::BeginMenu("Selection")) {
-			constexpr static std::array<UnitType, 7> flags = {
-				UnitType::Terrain, UnitType::Object, UnitType::Monster, UnitType::Avia, UnitType::Cannon, UnitType::Sprite, UnitType::Item};
-			for (UnitType unitType : flags) {
+			constexpr static std::array<ObjectCategory, 7> flags = {
+				ObjectCategory::Terrain, ObjectCategory::Object, ObjectCategory::Monster, ObjectCategory::Avia, ObjectCategory::Cannon, ObjectCategory::Sprite, ObjectCategory::Item};
+			for (ObjectCategory unitType : flags) {
 				const auto flag = std::to_underlying(unitType);
 				bool isSelected = (m_selectionType & flag) != 0;
-				if (ImGui::MenuItem(to_string(unitType).data(), nullptr, isSelected)) {
+				if (ImGui::MenuItem(to_string(unitType).c_str(), nullptr, isSelected)) {
 					m_selectionType ^= flag;
 				}
 			}
@@ -271,7 +271,7 @@ export class MapViewModel {
         m_selectionUIState.selectedObjects.clear();
 
         m_selectionQuery.each([&](flecs::entity id, const Vid& vid, const Transform& worldTransform) {
-            const auto  color = objectSelectionColor(vid.unitType);
+            const auto  color = objectSelectionColor(vid.category);
             const float rounding = std::min(vid.sizeX, vid.sizeY) * 0.25f;
 
             auto [min, max] = computeBBScreenSize(viewport, vid, worldTransform, PhysicalBoundsFn{});
@@ -434,7 +434,7 @@ export class MapViewModel {
         m_world.remove_all<Selected>();
         m_world.defer([&] {
             m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(rect.min.x, rect.min.y, rect.max.x, rect.max.y), [this](flecs::entity entity) {
-                if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->unitType) & m_selectionType) != 0) {
+                if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->category) & m_selectionType) != 0) {
                     entity.add<Selected>();
                 }
             });
@@ -464,7 +464,7 @@ export class MapViewModel {
     flecs::world& m_world;
     flecs::query<const VidRef, const Transform> m_selectionQuery;
     EditorGesture m_gesture = IdleGesture{};
-    std::underlying_type_t<UnitType> m_selectionType = 0b01111110; // Default selection type
+    std::underlying_type_t<ObjectCategory> m_selectionType = 0b01111110; // Default selection type
 
     struct SelectionUIState {
         int currentCommand = 0;
@@ -474,8 +474,8 @@ export class MapViewModel {
     } m_selectionUIState;
 };
 
-constexpr static ImU32 objectSelectionColor(UnitType unitType) {
-    using enum UnitType;
+constexpr static ImU32 objectSelectionColor(ObjectCategory unitType) {
+    using enum ObjectCategory;
     constexpr auto alpha = 70;
     switch (unitType) {
     case Terrain: return IM_COL32(50, 200, 50, alpha);

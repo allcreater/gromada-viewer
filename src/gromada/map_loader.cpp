@@ -10,7 +10,7 @@ import Gromada.ResourceReader;
 
 
 // Implementation
-GameObject::Payload readObjectPayload(MapVersion mapVersion, std::uint8_t behavior, BinaryStreamReader& reader) {
+GameObject::Payload readObjectPayload(MapVersion mapVersion, ObjectClass behavior, BinaryStreamReader& reader) {
     GameObject::Payload result = getPayloadPrototype(behavior);
 	std::visit( overloaded {
 		[](Payloads::VisualObject&) {},
@@ -84,7 +84,7 @@ void readDynamicObjectsSection(std::vector<GameObject>& result, MapVersion mapVe
 			.z = position[2],
 			.direction = direction,
 		    .action = action,
-			.payload = readObjectPayload(mapVersion, vids[nvid].behave, reader),
+			.payload = readObjectPayload(mapVersion, vids[nvid].type, reader),
 		});
 	}
 }

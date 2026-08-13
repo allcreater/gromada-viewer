@@ -76,12 +76,12 @@ void ExportMapToJson(std::span<const Vid> vids, const Map& map, std::ostream& st
 	stream << document;
 }
 
-template <auto MemberPtr> 
-auto MakePrintFunction() {
+template <auto MemberPtr, typename ProjectionFn = std::identity>
+auto MakePrintFunction(ProjectionFn&& projectionFn = ProjectionFn{}) {
 	constexpr static auto Formatter = [](std::ostream& stream, const auto& value) {
 		using ValueType = std::decay_t<decltype(value)>;
 		if constexpr (std::ranges::contiguous_range<ValueType>) {
-			stream << std::string_view{value.data(), std::char_traits<char>::find(value.data(), value.size(), '\0')};
+			stream << std::string_view{value};
 		}
 		else if constexpr (std::is_integral_v<ValueType>) {
 			stream << +value;
@@ -92,16 +92,21 @@ auto MakePrintFunction() {
 	};
 
 	return std::function {
-		[](std::ostream& stream, std::add_const_t<type_from_member_t<decltype(MemberPtr)>> obj) { Formatter(stream, std::invoke(MemberPtr, obj)); }
+		[projectionFn = std::forward<ProjectionFn>(projectionFn)](std::ostream& stream, std::add_const_t<type_from_member_t<decltype(MemberPtr)>> obj) { Formatter(stream, std::invoke(projectionFn, std::invoke(MemberPtr, obj))); }
 	};
 }
 
 
 void ExportVidsToCsv(std::span<const Vid> vids, std::ostream& stream) {
+	static constexpr auto toStringProj = [](auto value) {
+		using std::to_string;
+		return to_string(value);
+	};
+
 	static std::initializer_list<std::pair<std::string_view, std::function<void(std::ostream&, const Vid&)>>> printFunctions = {
 		{"name", MakePrintFunction<&Vid::name>()},
-		{"unitType", MakePrintFunction<&Vid::unitType>()},
-		{"behave", MakePrintFunction<&Vid::behave>()},
+		{"category", MakePrintFunction<&Vid::category>(toStringProj)},
+		{"type", MakePrintFunction<&Vid::type>(toStringProj)},
 		{"flags", MakePrintFunction<&Vid::flags>()},
 		{"collisionMask", MakePrintFunction<&Vid::collisionMask>()},
 		{"sizeX", MakePrintFunction<&Vid::sizeX>()},
