@@ -54,12 +54,12 @@ export enum /*class*/ ObjectFlags : std::uint16_t {
      PresentOnGrid = 0x40,
      Shadow = 0x80,
      Randomized = 0x100,
-     Hz1 = 0x200,
+     ZeroZ = 0x200,
      InvisibleSubobjects = 0x400,
-     OwnGamma = 0x800,
+     IgnoreGlobalGamma = 0x800,
      Wind = 0x1000,
-     Hz2 = 0x2000,
-     CollisionBehavior = 0x4000,
+     SkipMapEditor = 0x2000,
+     CrushOnCollision = 0x4000,
 };
 
 export constexpr std::string to_string(ObjectCategory category);
@@ -319,12 +319,12 @@ constexpr std::string to_string(ObjectFlags flags) {
 	if (flags & ObjectFlags::PresentOnGrid) result += "PresentOnGrid, ";
 	if (flags & ObjectFlags::Shadow) result += "Shadow, ";
 	if (flags & ObjectFlags::Randomized) result += "Randomized, ";
-	if (flags & ObjectFlags::Hz1) result += "Hz1, ";
+	if (flags & ObjectFlags::ZeroZ) result += "???1, ";
 	if (flags & ObjectFlags::InvisibleSubobjects) result += "InvisibleSubobjects, ";
-	if (flags & ObjectFlags::OwnGamma) result += "OwnGamma, ";
+	if (flags & ObjectFlags::IgnoreGlobalGamma) result += "IgnoreGlobalGamma, ";
 	if (flags & ObjectFlags::Wind) result += "Wind, ";
-	if (flags & ObjectFlags::Hz2) result += "Hz2, ";
-	if (flags & ObjectFlags::CollisionBehavior) result += "CollisionBehavior, ";
+	if (flags & ObjectFlags::SkipMapEditor) result += "???2, ";
+	if (flags & ObjectFlags::CrushOnCollision) result += "CrushOnCollision, ";
 
 	// Remove trailing comma and space
 	if (!result.empty()) {
