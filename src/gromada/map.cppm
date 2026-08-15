@@ -85,7 +85,7 @@ export {
 // Implementation
 GameObject::Payload getPayloadPrototype(ObjectClass behavior) {
     using enum ObjectClass;
-    static constexpr auto materialObjectClasses = std::to_array<ObjectClass>({Terrain, Static, Projectile, CannonMissile, DownedAviaVehicle, NA, Superstructure, Shell, AviaMissile, Debris, Bonus, RepairCannon});
+    static constexpr auto materialObjectClasses = std::to_array<ObjectClass>({Terrain, Static, Projectile, CannonMissile, DownedAviaVehicle, NA, Effect1, Shell, AviaMissile, Debris, Bonus, RepairCannon});
     static constexpr auto assetObjectClasses = std::to_array<ObjectClass>({Vehicle, Building, AviaVehicle, Mine, Kassandra});
     static constexpr auto otherClasses = std::to_array<ObjectClass>({Superstructure, Image, Effect2, Font});
 
