@@ -16,7 +16,7 @@ else()
 endif()
 
 project(GromadaEditor
-    VERSION 0.5.0
+    VERSION 0.5.1
     LANGUAGES CXX
 )
 

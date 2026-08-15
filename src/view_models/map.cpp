@@ -138,7 +138,7 @@ export class MapViewModel {
 
 			if (std::abs(input.mouseWheel) > 0.0f) {
 				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
-				prototype_transform.direction += (input.mouseWheel > 0 ? 1 : -1) * step;
+				prototype_transform.direction -= (input.mouseWheel > 0 ? 1 : -1) * step; // Reverse direction is more intuitive
 			}
 		}
 		else {
