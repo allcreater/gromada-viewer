@@ -139,7 +139,9 @@ export class MapViewModel {
 			if (std::abs(input.mouseWheel) > 0.0f) {
 				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
 				prototype_transform.direction -= (input.mouseWheel > 0 ? 1 : -1) * step; // Reverse direction is more intuitive
-			}
+			} else if (m_world.get<const GlobalEditorState>().randomizeObjectDirection && Flags{prototype.get<const VidRef>()->flags}[ObjectFlags::RandomDirection] ) {
+                prototype_transform.direction = std::rand() % 256;
+            }
 		}
 		else {
 			prototype.disable();
@@ -160,6 +162,8 @@ export class MapViewModel {
 
 			ImGui::EndMenu();
 		}
+
+        ImGui::MenuItem("Randomize directions", nullptr, &(m_world.get_mut<GlobalEditorState>().randomizeObjectDirection));
 	}
 
 	void updateUI() {

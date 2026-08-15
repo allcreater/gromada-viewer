@@ -51,7 +51,7 @@ ACTION(act_save           , 51,   ((StreamHandle, stream_id))       ) /*запи
 ACTION(act_restore        , 52,   ((StreamHandle, stream_id))       ) /**/                                                                                      \
 ACTION(act_destroy        , 54,   ()                                ) /**/                                                                                      \
 ACTION(act_coor_attack    , 56,   ((int, x), (int, y))              ) /*@ стрелять в точку χ, y*/                                                               \
-ACTION(act_child          , 57,   ()                                ) /*вызывается из createchild при создании child*/                                          \
+ACTION(act_child          , 57,   ((int, target_id), (int, index))  ) /*вызывается из createchild при создании child*/                                          \
 ACTION(act_saveframe      , 58,   ((StreamHandle, stream_id))       ) /*записать информацию относящуюся к данному frame в var1*/                                \
 ACTION(act_fullsave       , 59,   ((StreamHandle, stream_id))       ) /*записать всю информацию относящуюся к данному sprite, кроме записанной в act_save*/     \
 ACTION(act_gettarget      , 60,   ()                                ) /**/                                                                                      \

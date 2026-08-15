@@ -1,3 +1,6 @@
+module;
+#include <cassert>
+
 export module utils;
 
 import std;
@@ -92,4 +95,33 @@ export {
 
         return 0;
     }
+
+
+	template <typename Enum>
+	requires std::is_enum_v<Enum>
+	class Flags {
+    public:
+    	using underlying_type = std::underlying_type_t<Enum>;
+
+    	constexpr Flags() noexcept = default;
+    	explicit constexpr Flags(underlying_type raw_value) noexcept : m_value(raw_value) {}
+
+    	template <typename... Enums>
+    	requires (std::same_as<Enum, Enums> && ...)
+    	constexpr Flags(Enums... flags) noexcept : m_value{ (static_cast<underlying_type>(flags) | ...) } {}
+
+    	constexpr operator Enum() const noexcept { return static_cast<Enum>(m_value); }
+
+    	constexpr bool operator[](Enum flag) const noexcept {
+    		assert(std::popcount( static_cast<underlying_type>(flag)) == 1 && "Flags can only be checked for single flags, not combinations");
+			return m_value & static_cast<underlying_type>(flag);
+		}
+
+    private:
+    	underlying_type m_value = 0;
+    };
+
+	template <typename HeadEnum, typename... Enums>
+	Flags(HeadEnum, Enums...) -> Flags<HeadEnum>;
+
 }

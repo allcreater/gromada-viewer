@@ -31,6 +31,7 @@ export struct PlacementState {};
 export struct GlobalEditorState {
 	VidRef selectedNvid;
 	std::variant<SelectionState, PlacementState> state;
+	bool randomizeObjectDirection = true;
 };
 
 export struct EditorComponents {
