@@ -1,6 +1,6 @@
 module;
 
-export module Gromada.DataExporters;
+export module DataExporters;
 
 import std;
 import utils;

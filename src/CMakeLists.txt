@@ -26,6 +26,7 @@ add_executable (GromadaEditor
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"
+		"data_exporters.cppm"
 		"framebuffer.cppm"
 		"imgui_utils.cpp"
  )
@@ -37,6 +38,7 @@ target_link_libraries(GromadaEditor
 		third_party_libs
 		argparse::argparse
 		flecs::flecs_static
+		nlohmann_json_modules
 		libgromada
 )
 

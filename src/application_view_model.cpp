@@ -7,7 +7,7 @@ export module application.view_model;
 
 import std;
 import imgui_utils;
-import Gromada.DataExporters;
+import DataExporters;
 
 import engine.level_renderer; // For Viewport. Better to split
 

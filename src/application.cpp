@@ -16,7 +16,7 @@ import std;
 import application.model;
 import application.view_model;
 
-import Gromada.DataExporters;
+import DataExporters;
 
 template <>
 inline std::string argparse::details::repr<std::filesystem::path>(const std::filesystem::path& p) {

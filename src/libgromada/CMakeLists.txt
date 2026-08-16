@@ -11,7 +11,6 @@ target_sources(libgromada
 	TYPE CXX_MODULES
 	FILES
 		"actions.ixx"
-		"data_exporters.cppm"
 		"game_resources.cppm"
 		"graphics_decoder.cppm"
 		"map.cppm"
@@ -25,8 +24,6 @@ target_sources(libgromada
 target_link_libraries(libgromada
 	PUBLIC
 		GromadaCore
-	PRIVATE
-		nlohmann_json_modules
 )
 
 set_target_properties(libgromada PROPERTIES
