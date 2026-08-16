@@ -8,7 +8,6 @@ import Gromada.ResourceReader;
 import std;
 import utils;
 import cp866;
-import nlohmann.json;
 
 export enum class ObjectCategory : std::uint8_t {
 	Terrain = 0x1,

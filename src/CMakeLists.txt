@@ -2,9 +2,10 @@ cmake_minimum_required (VERSION 4.2)
 
 include(BuildInfo)
 
+add_subdirectory(core)
+add_subdirectory(libgromada)
+
 add_executable (GromadaEditor
-		"gromada/map_loader.cpp"
-		"gromada/map_saver.cpp"
 		"main.cpp"
 )
 
@@ -12,21 +13,10 @@ add_executable (GromadaEditor
 	FILE_SET modules
 	TYPE CXX_MODULES
 	FILES
-		"engine/bounding_box.cppm"
 		"engine/level_renderer.cppm"
 		"engine/objects_view.cppm"
 		"engine/world_components.cppm"
 		"engine/audio_engine.cppm"
-	 	"gromada/actions.ixx"
-		"gromada/data_exporters.cppm"
-		"gromada/game_resources.cppm"
-		"gromada/graphics_decoder.cppm"
-		"gromada/map.cppm"
-		"gromada/resource_reader.cppm"
-		"gromada/resources.cppm"
-		"gromada/resources_sound.cppm"
-		"gromada/software_renderer.cppm"
-		"gromada/visual_logic.cppm"
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"
@@ -36,10 +26,8 @@ add_executable (GromadaEditor
 		"application.cpp"
 		"application_model.cpp"
 		"application_view_model.cpp"
- 		"cp866.cppm"
 		"framebuffer.cppm"
 		"imgui_utils.cpp"
-		"utils.cppm"
  )
 
 #find_package(SFML REQUIRED)
@@ -49,7 +37,7 @@ target_link_libraries(GromadaEditor
 		third_party_libs
 		argparse::argparse
 		flecs::flecs_static
-		nlohmann_json_modules
+		libgromada
 )
 
 target_compile_definitions(GromadaEditor PUBLIC FLECS_CPP_NO_AUTO_REGISTRATION)
