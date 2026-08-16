@@ -336,6 +336,7 @@ export class MapViewModel {
         static_assert(sizeof(worldTransform.x) == sizeof(int32_t));
         ImGui::InputScalar("X",  ImGuiDataType_S32, &worldTransform.x, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::InputScalar("Υ",  ImGuiDataType_S32, &worldTransform.y, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::InputScalar("Z",  ImGuiDataType_S32, &worldTransform.z, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
         constexpr static std::uint8_t minDirection = 0, maxDirection = 255;
         ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
     }
