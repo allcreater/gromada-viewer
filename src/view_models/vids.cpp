@@ -175,7 +175,7 @@ namespace {
 		switch (unitType) {
 			case Terrain: return "Terrain";
 			case Object: return "Object";
-			case Monster: return "Monster";
+			case Vehicle: return "Monster";
 			case Avia: return "Avia";
 			case Cannon: return "Cannon";
 			case Sprite: return "Sprite";

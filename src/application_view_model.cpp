@@ -18,6 +18,7 @@ import :map_selector;
 import :vids_window;
 import :map_properties;
 import :sounds_window;
+import :weapons_window;
 
 export class ViewModel {
 public:
@@ -61,6 +62,11 @@ public:
 
 			if (ImGui::BeginTabItem("Sounds")) {
 				m_soundsViewModel.updateUI();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("Weapons")) {
+				m_weaponsViewModel.updateUI();
 				ImGui::EndTabItem();
 			}
 
@@ -199,6 +205,7 @@ private:
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
     MapPropertiesViewModel m_mapPropertiesViewModel{m_model};
     SoundsWindowViewModel m_soundsViewModel{m_model};
+    WeaponsWindowViewModel m_weaponsViewModel{m_model};
 
     NewMapDialog m_newMapDialog;
     SaveDialog m_exportMapDialog;

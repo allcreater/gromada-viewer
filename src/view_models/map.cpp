@@ -151,7 +151,7 @@ export class MapViewModel {
     void onMenu() {
 		if (ImGui::BeginMenu("Selection")) {
 			constexpr static std::array<ObjectCategory, 7> flags = {
-				ObjectCategory::Terrain, ObjectCategory::Object, ObjectCategory::Monster, ObjectCategory::Avia, ObjectCategory::Cannon, ObjectCategory::Sprite, ObjectCategory::Item};
+				ObjectCategory::Terrain, ObjectCategory::Object, ObjectCategory::Vehicle, ObjectCategory::Avia, ObjectCategory::Cannon, ObjectCategory::Sprite, ObjectCategory::Item};
 			for (ObjectCategory unitType : flags) {
 				const auto flag = std::to_underlying(unitType);
 				bool isSelected = (m_selectionType & flag) != 0;
@@ -485,7 +485,7 @@ constexpr static ImU32 objectSelectionColor(ObjectCategory unitType) {
     switch (unitType) {
     case Terrain: return IM_COL32(50, 200, 50, alpha);
     case Object: return IM_COL32(200, 200, 200, alpha);
-    case Monster: return IM_COL32(255, 100, 100, alpha);
+    case Vehicle: return IM_COL32(255, 100, 100, alpha);
     case Avia: return IM_COL32(50, 100, 200, alpha);
     case Cannon: return IM_COL32(128, 80, 50, alpha);
     case Sprite: return IM_COL32(100, 100, 100, alpha);

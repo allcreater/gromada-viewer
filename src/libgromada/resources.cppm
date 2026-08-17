@@ -12,7 +12,7 @@ import cp866;
 export enum class ObjectCategory : std::uint8_t {
 	Terrain = 0x1,
 	Object = 0x2,
-	Monster = 0x4,
+	Vehicle = 0x4,
 	Avia = 0x8,
 	Cannon = 0x10,
 	Sprite = 0x20,
@@ -166,6 +166,18 @@ export struct AdjacencyData {
 
 export AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader);
 
+export struct Weapon {
+	ObjectCategory targetCategory;
+	std::uint8_t flags;
+	std::uint16_t alwaysZero;
+	std::uint16_t weaponRange;
+	std::uint8_t scatter;
+	std::uint16_t cooldown;
+};
+
+export std::vector<Weapon> getWeapons(const Section& section, BinaryStreamReader reader);
+
+
 // Implementation
 Vid::Vid(BinaryStreamReader reader)
 {
@@ -258,6 +270,23 @@ AdjacencyData getAdjacencyData(const Section& section, BinaryStreamReader reader
     return adjacencyData;
 }
 
+std::vector<Weapon> getWeapons(const Section& section, BinaryStreamReader reader) {
+	if(section.header().type != SectionType::Weapon)
+		throw std::logic_error("Trying to get weapons with invalid section");
+
+	std::vector<Weapon> weapons(section.header().elementCount);
+	for (auto& weapon : weapons) {
+		reader.read_to(weapon.targetCategory);
+		reader.read_to(weapon.flags);
+		reader.read_to(weapon.alwaysZero);
+		reader.read_to(weapon.weaponRange);
+		reader.read_to(weapon.scatter);
+		reader.read_to(weapon.cooldown);
+	}
+
+	return weapons;
+}
+
 // to_string... until we finally have reflection in C++29
 
 constexpr std::string to_string(ObjectCategory category) {
@@ -265,7 +294,7 @@ constexpr std::string to_string(ObjectCategory category) {
 	switch (category) {
 		case Terrain: return "Terrain";
 		case Object: return "Object";
-		case Monster: return "Monster";
+		case Vehicle: return "Vehicle";
 		case Avia: return "Avia";
 		case Cannon: return "Cannon";
 		case Sprite: return "Sprite";

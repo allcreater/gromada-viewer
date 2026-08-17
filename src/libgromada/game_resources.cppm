@@ -66,6 +66,7 @@ export {
 		std::span<const VidRef> baseTilesVids() const { return m_baseTilesVids; }
 
 		std::span<const SoundData> sounds() const noexcept { return m_sounds; }
+		std::span<const Weapon> weapons() const noexcept { return m_weapons; }
 
 	private:
 	    std::filesystem::path m_gamePath;
@@ -77,6 +78,7 @@ export {
 		std::vector<VidRef> m_vidRefs;
 
 		std::vector<SoundData> m_sounds;
+		std::vector<Weapon> m_weapons;
 	};
 }
 // Implementation
@@ -111,6 +113,10 @@ GameResources::GameResources(std::filesystem::path path)
 
 	navigator.visitSectionsOfType(SectionType::Sound, [this](const Section& section, BinaryStreamReader reader) {
 		m_sounds = getSounds(section, reader);
+	});
+
+	navigator.visitSectionsOfType(SectionType::Weapon, [&](const Section& section, BinaryStreamReader reader) {
+		m_weapons = getWeapons(section, reader);
 	});
 }
 

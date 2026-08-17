@@ -22,6 +22,7 @@ add_executable (GromadaEditor
 		"view_models/map_selector.cpp"
 		"view_models/map_properties.cpp"
 		"view_models/sounds.cpp"
+		"view_models/weapons.cpp"
 		"application_dialogs.cpp"
 		"application.cpp"
 		"application_model.cpp"
