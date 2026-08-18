@@ -117,6 +117,28 @@ export {
 			return m_value & static_cast<underlying_type>(flag);
 		}
 
+		// Generic "None" / "A, B, C" rendering for any flags enum that has a to_string(Enum) for its individual bits.
+		friend std::string to_string(Flags flags)
+		requires requires (Enum flag) { { to_string(flag) } -> std::convertible_to<std::string>; }
+		{
+			if (flags.m_value == 0) {
+				return "None";
+			}
+
+			std::string result;
+			for (int bit = 0; bit < std::numeric_limits<underlying_type>::digits; ++bit) {
+				const auto mask = static_cast<underlying_type>(underlying_type{1} << bit);
+				if (!(flags.m_value & mask)) continue;
+
+				if (!result.empty()) {
+					result += ", ";
+				}
+				result += to_string(static_cast<Enum>(mask));
+			}
+
+			return result;
+		}
+
     private:
     	underlying_type m_value = 0;
     };

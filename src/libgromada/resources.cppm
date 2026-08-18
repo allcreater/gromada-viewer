@@ -43,7 +43,7 @@ export enum class ObjectClass : std::uint8_t {
 	RepairCannon = 20,
 };
 
-export enum /*class*/ ObjectFlags : std::uint16_t {
+export enum class ObjectFlags : std::uint16_t {
      RandomDirection = 0x1,
      Gravity = 0x2,
      Calltact = 0x4,
@@ -63,7 +63,7 @@ export enum /*class*/ ObjectFlags : std::uint16_t {
 
 export constexpr std::string to_string(ObjectCategory category);
 export constexpr std::string to_string(ObjectClass objectClass);
-export constexpr std::string to_string(ObjectFlags flags);
+export constexpr std::string to_string(ObjectFlags flag);
 
 export struct ColorRgb8 {
 	std::uint8_t r;
@@ -315,7 +315,7 @@ constexpr std::string to_string(ObjectClass objectClass) {
 		case Projectile: return "Projectile";
 		case CannonMissile: return "CannonMissile";
 		case DownedAviaVehicle: return "DownedAviaVehicle";
-		case NA: return "NA";
+		case NA: return "N/A";
 		case Superstructure: return "Superstructure";
 		case Image: return "Image";
 		case Effect1: return "Effect1";
@@ -334,31 +334,25 @@ constexpr std::string to_string(ObjectClass objectClass) {
 	}
 }
 
-constexpr std::string to_string(ObjectFlags flags) {
-	std::string result;
-	if (flags == 0) return "None";
-
-	if (flags & ObjectFlags::RandomDirection) result += "RandomDirection, ";
-	if (flags & ObjectFlags::Gravity) result += "Gravity, ";
-	if (flags & ObjectFlags::Calltact) result += "Calltact, ";
-	if (flags & ObjectFlags::SkipUpdate) result += "SkipUpdate, ";
-	if (flags & ObjectFlags::SpawnChildren) result += "SpawnChildren, ";
-	if (flags & ObjectFlags::NoCollision) result += "NoCollision, ";
-	if (flags & ObjectFlags::PresentOnGrid) result += "PresentOnGrid, ";
-	if (flags & ObjectFlags::Shadow) result += "Shadow, ";
-	if (flags & ObjectFlags::Randomized) result += "Randomized, ";
-	if (flags & ObjectFlags::ZeroZ) result += "???1, ";
-	if (flags & ObjectFlags::InvisibleSubobjects) result += "InvisibleSubobjects, ";
-	if (flags & ObjectFlags::IgnoreGlobalGamma) result += "IgnoreGlobalGamma, ";
-	if (flags & ObjectFlags::Wind) result += "Wind, ";
-	if (flags & ObjectFlags::SkipMapEditor) result += "???2, ";
-	if (flags & ObjectFlags::CrushOnCollision) result += "CrushOnCollision, ";
-
-	// Remove trailing comma and space
-	if (!result.empty()) {
-		result.pop_back();
-		result.pop_back();
+constexpr std::string to_string(ObjectFlags flag) {
+	using enum ObjectFlags;
+	switch (flag) {
+		case RandomDirection: return "RandomDirection";
+		case Gravity: return "Gravity";
+		case Calltact: return "Calltact";
+		case SkipUpdate: return "SkipUpdate";
+		case SpawnChildren: return "SpawnChildren";
+		case NoCollision: return "NoCollision";
+		case PresentOnGrid: return "PresentOnGrid";
+		case Shadow: return "Shadow";
+		case Randomized: return "Randomized";
+		case ZeroZ: return "???1";
+		case InvisibleSubobjects: return "InvisibleSubobjects";
+		case IgnoreGlobalGamma: return "IgnoreGlobalGamma";
+		case Wind: return "Wind";
+		case SkipMapEditor: return "???2";
+		case CrushOnCollision: return "CrushOnCollision";
+		default:
+			return "Unknown";
 	}
-
-	return result;
 }

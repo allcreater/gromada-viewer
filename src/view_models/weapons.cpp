@@ -6,6 +6,7 @@ export module application.view_model:weapons_window;
 
 import std;
 import application.model;
+import utils;
 
 export class WeaponsWindowViewModel {
 public:
@@ -37,7 +38,7 @@ public:
 				ImGui::Text("%zu", i);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", to_string(weapon.targetCategory).c_str());
+				ImGui::Text("%s", to_string(Flags{weapon.targetCategory}).c_str());
 
 				ImGui::TableNextColumn();
 				ImGui::Text("%u", weapon.flags);

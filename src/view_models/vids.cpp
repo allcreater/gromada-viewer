@@ -219,7 +219,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     ImGui::Text("%s", self.getName().c_str());
     ImGui::Text("unitType: %s ", classifyUnitType(self.category));
     ImGui::Text("Class: %s ", to_string(self.type).c_str());
-    ImGui::Text("Flags: %s", to_string(self.flags).c_str());
+    ImGui::Text("Flags: %s", to_string(Flags{self.flags}).c_str());
     ImGui::Text("Collision mask: %x", self.collisionMask);
     ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);
     ImGui::Text("max HP: %i", self.maxHP);
