@@ -170,27 +170,14 @@ private:
 };
 
 namespace {
-	constexpr auto classifyUnitType(ObjectCategory unitType) -> const char* {
-		using enum ObjectCategory;
-		switch (unitType) {
-			case Terrain: return "Terrain";
-			case Object: return "Object";
-			case Vehicle: return "Monster";
-			case Avia: return "Avia";
-			case Cannon: return "Cannon";
-			case Sprite: return "Sprite";
-			case Item: return "Item";
-			default:
-				return "???";
-		}
-	}
-
 	constexpr static std::array<const char*, 16> actionNames = {"Stand", "Build", "Go", "Start move", "L Rotate", "R Rotate", "Open", "Close", "Fight", "Salut",
 	"Stand open", "Load", "Unload", "Wound", "Birth", "Death"};
 }
 
 
 void VidsWindowViewModel::VidUI(const Vid& self) {
+	const auto& resources = m_model.get<const GameResources>();
+
     auto linkToId = [&, guiId = 0](int id, auto&& onClick) mutable {
         if (id) {
             std::array<char, 32> buffer {0};
@@ -207,7 +194,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
         }
     };
 
-	auto linkToNvidControl = std::bind_back(linkToId, [this, &resources = m_model.get<const GameResources>()](int nvid) {
+	auto linkToNvidControl = std::bind_back(linkToId, [this, &resources](int nvid) {
 		selectedSection(resources.getVid(std::abs(nvid)));
 		InvalidateSelection();
 	});
@@ -217,7 +204,7 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 	});
 
     ImGui::Text("%s", self.getName().c_str());
-    ImGui::Text("unitType: %s ", classifyUnitType(self.category));
+    ImGui::Text("unitType: %s ", to_string(self.category).c_str());
     ImGui::Text("Class: %s ", to_string(self.type).c_str());
     ImGui::Text("Flags: %s", to_string(Flags{self.flags}).c_str());
     ImGui::Text("Collision mask: %x", self.collisionMask);
@@ -230,7 +217,21 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
     ImGui::Text("Rotation period: %i", self.rotationPeriod);
 
     ImGui::Text("Army: %i", self.army);
-    ImGui::Text("Weapon?: %i", self.someWeaponIndex);
+
+	ImGui::Text("Weapon #%i:", self.someWeaponIndex);
+	if (self.someWeaponIndex <= 0) {
+		ImGui::SameLine();
+		ImGui::Text("N/A");
+	} else if (ImGui::BeginChild("Weapon", ImVec2(0, 0),  ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_Borders)) {
+		const auto& weapon = resources.weapons()[self.someWeaponIndex];
+	    ImGui::Text("Targets: %s", to_string(Flags{weapon.targetCategory}).c_str());
+		ImGui::Text("Flags: %x", weapon.flags);
+		ImGui::Text("Range: %i", weapon.weaponRange);
+		ImGui::Text("Scatter: %i", weapon.scatter);
+		ImGui::Text("Cooldown: %i", weapon.cooldown);
+		ImGui::EndChild();
+	}
+
     ImGui::Text("???: %i", self.unused2);
     ImGui::Text("Damage radius: %i", self.deathDamageRadius);
     ImGui::Text("Damage: %i", self.deathDamage);
