@@ -152,11 +152,9 @@ export class MapViewModel {
 		if (ImGui::BeginMenu("Selection")) {
 			constexpr static std::array<ObjectCategory, 7> flags = {
 				ObjectCategory::Terrain, ObjectCategory::Object, ObjectCategory::Vehicle, ObjectCategory::Avia, ObjectCategory::Cannon, ObjectCategory::Sprite, ObjectCategory::Item};
-			for (ObjectCategory unitType : flags) {
-				const auto flag = std::to_underlying(unitType);
-				bool isSelected = (m_selectionType & flag) != 0;
-				if (ImGui::MenuItem(to_string(unitType).c_str(), nullptr, isSelected)) {
-					m_selectionType ^= flag;
+			for (ObjectCategory flag : flags) {
+				if (ImGui::MenuItem(to_string(flag).c_str(), nullptr, m_selectionType[flag])) {
+					m_selectionType = m_selectionType ^ flag;
 				}
 			}
 
@@ -439,7 +437,7 @@ export class MapViewModel {
         m_world.remove_all<Selected>();
         m_world.defer([&] {
             m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(rect.min.x, rect.min.y, rect.max.x, rect.max.y), [this](flecs::entity entity) {
-                if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && (std::to_underlying(entity.get<const VidRef>()->category) & m_selectionType) != 0) {
+                if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && m_selectionType[entity.get<const VidRef>()->category]) {
                     entity.add<Selected>();
                 }
             });
@@ -469,7 +467,7 @@ export class MapViewModel {
     flecs::world& m_world;
     flecs::query<const VidRef, const Transform> m_selectionQuery;
     EditorGesture m_gesture = IdleGesture{};
-    std::underlying_type_t<ObjectCategory> m_selectionType = 0b01111110; // Default selection type
+    Flags<ObjectCategory> m_selectionType {0b01111110}; // Default selection type
 
     struct SelectionUIState {
         int currentCommand = 0;

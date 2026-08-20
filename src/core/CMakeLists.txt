@@ -12,6 +12,8 @@ target_sources(GromadaCore
 		"bounding_box.cppm"
 		"cp866.cppm"
 		"utils.cppm"
+		"utils_flags.cppm"
+		"utils_streamreader.cppm"
 )
 
 set_target_properties(GromadaCore PROPERTIES
