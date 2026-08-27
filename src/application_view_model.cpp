@@ -98,9 +98,9 @@ public:
 
 				ImGui::Separator();
 
-				ImGui::Text("Version: %s", BUILD_INFO_PROJECT_VERSION);
-				ImGui::Text("Build time: %s", BUILD_INFO_TIMESTAMP);
-				ImGui::Text("Commit: %s", BUILD_INFO_COMMIT_HASH);
+				MyImUtils::Text("Version: {}", BUILD_INFO_PROJECT_VERSION);
+				MyImUtils::Text("Build time: {}", BUILD_INFO_TIMESTAMP);
+				MyImUtils::Text("Commit: {}", BUILD_INFO_COMMIT_HASH);
 
 				ImGui::EndTabItem();
 			}
@@ -178,7 +178,7 @@ public:
 		    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
 	        const auto& vp = m_model.get<const Viewport>();
 		    const auto pos = vp.screenToWorldPos(from_imvec(ImGui::GetMousePos()));
-		    ImGui::Text("x: %i, y: %i, zoom: %i", static_cast<int>(pos.x), static_cast<int>(pos.y), m_model.get<const Camera>().magnificationFactor);
+		    MyImUtils::Text("x: {}, y: {}, zoom: {}", static_cast<int>(pos.x), static_cast<int>(pos.y), m_model.get<const Camera>().magnificationFactor);
 	    }
 
 		ImGui::EndMainMenuBar();

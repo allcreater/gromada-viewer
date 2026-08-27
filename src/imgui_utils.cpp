@@ -154,6 +154,14 @@ export bool BeginModalPopup(const char* name, bool& shouldOpen, ImGuiWindowFlags
     return ImGui::BeginPopupModal(name, nullptr, flags);
 }
 
+export template <typename... Args>
+void Text(std::format_string<Args...> fmt, Args&&... args) {
+    static std::string buffer;
+    buffer.clear();
+    std::format_to(std::back_inserter(buffer), fmt, std::forward<Args>(args)...);
+    ImGui::TextUnformatted(buffer.data(), buffer.data() + buffer.size());
+}
+
 export void ToggleButton (const char* label, bool active, auto&& onClick) {
     if (active) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));

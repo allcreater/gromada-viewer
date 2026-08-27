@@ -153,7 +153,7 @@ public:
         if (!MyImUtils::BeginModalPopup(m_windowTitle, m_shouldOpen))
             return;
 
-        ImGui::Text(m_message.c_str());
+        ImGui::TextUnformatted(m_message.c_str());
         if (ImGui::Button("OK", ImVec2(120, 0))) {
             ImGui::CloseCurrentPopup();
         }

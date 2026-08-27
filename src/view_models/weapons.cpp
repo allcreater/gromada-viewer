@@ -7,6 +7,7 @@ export module application.view_model:weapons_window;
 import std;
 import application.model;
 import utils;
+import imgui_utils;
 
 export class WeaponsWindowViewModel {
 public:
@@ -35,25 +36,25 @@ public:
 				ImGui::TableNextRow();
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%zu", i);
+				MyImUtils::Text("{}", i);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", to_string(Flags{weapon.targetCategory}).c_str());
+				MyImUtils::Text("{}", to_string(Flags{weapon.targetCategory}));
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%u", weapon.flags);
+				MyImUtils::Text("{}", weapon.flags);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%u", weapon.alwaysZero);
+				MyImUtils::Text("{}", weapon.alwaysZero);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%u", weapon.weaponRange);
+				MyImUtils::Text("{}", weapon.weaponRange);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%u", weapon.scatter);
+				MyImUtils::Text("{}", weapon.scatter);
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%u", weapon.cooldown);
+				MyImUtils::Text("{}", weapon.cooldown);
 			}
 
 			ImGui::EndTable();

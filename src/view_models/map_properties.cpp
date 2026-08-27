@@ -8,6 +8,7 @@ import std;
 
 import application.model;
 import Gromada.Map;
+import imgui_utils;
 
 export class MapPropertiesViewModel {
 public:
@@ -19,10 +20,10 @@ public:
         auto & header = activeLevel.ensure<MapHeaderRawData>();
 
 
-        ImGui::Text("Size: %d x %d", header.width, header.height);
-        ImGui::Text("Observer pos: %d, %d", header.observerX, header.observerY);
-        ImGui::Text("Scale: %u/%u", header.scaleX, header.scaleY);
-        ImGui::Text("Start timer: %u", header.startTimer);
+        MyImUtils::Text("Size: {} x {}", header.width, header.height);
+        MyImUtils::Text("Observer pos: {}, {}", header.observerX, header.observerY);
+        MyImUtils::Text("Scale: {}/{}", header.scaleX, header.scaleY);
+        MyImUtils::Text("Start timer: {}", header.startTimer);
     }
 
 private:

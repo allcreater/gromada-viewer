@@ -96,13 +96,13 @@ public:
 				}
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", vid->getName().c_str());
+				MyImUtils::Text("{}", vid->getName());
 
 				ImGui::TableNextColumn();
-				ImGui::Text("%s", to_string(vid->type).c_str());
+				MyImUtils::Text("{}", to_string(vid->type));
 
 				ImGui::TableNextColumn();
-			    ImGui::Text("%i", vid->graphics().dataFormat);
+			    MyImUtils::Text("{}", vid->graphics().dataFormat);
 
 				ImGui::TableNextRow();
 			}
@@ -203,43 +203,43 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 		soundEngine.playSound(resources.sounds()[nsfx]);
 	});
 
-    ImGui::Text("%s", self.getName().c_str());
-    ImGui::Text("unitType: %s ", to_string(self.category).c_str());
-    ImGui::Text("Class: %s ", to_string(self.type).c_str());
-    ImGui::Text("Flags: %s", to_string(Flags{self.flags}).c_str());
-    ImGui::Text("Collision mask: %x", self.collisionMask);
-    ImGui::Text("Sizes (W,H,Z): %i %i %i", self.sizeX, self.sizeY, self.sizeZ);
-    ImGui::Text("max HP: %i", self.maxHP);
-    ImGui::Text("visibility radius: %i", self.visibilityRadius);
+    MyImUtils::Text("{}", self.getName());
+    MyImUtils::Text("unitType: {} ", to_string(self.category));
+    MyImUtils::Text("Class: {} ", to_string(self.type));
+    MyImUtils::Text("Flags: {}", to_string(Flags{self.flags}));
+    MyImUtils::Text("Collision mask: {:x}", self.collisionMask);
+    MyImUtils::Text("Sizes (W,H,Z): {} {} {}", self.sizeX, self.sizeY, self.sizeZ);
+    MyImUtils::Text("max HP: {}", self.maxHP);
+    MyImUtils::Text("visibility radius: {}", self.visibilityRadius);
 
-    ImGui::Text("Speed: %i %i", self.speedX, self.speedY);
-    ImGui::Text("Acceleration: %i", self.acceleration);
-    ImGui::Text("Rotation period: %i", self.rotationPeriod);
+    MyImUtils::Text("Speed: {} {}", self.speedX, self.speedY);
+    MyImUtils::Text("Acceleration: {}", self.acceleration);
+    MyImUtils::Text("Rotation period: {}", self.rotationPeriod);
 
-    ImGui::Text("Army: %i", self.army);
+    MyImUtils::Text("Army: {}", self.army);
 
-	ImGui::Text("Weapon #%i:", self.someWeaponIndex);
+	MyImUtils::Text("Weapon #{}:", self.someWeaponIndex);
 	if (self.someWeaponIndex <= 0) {
 		ImGui::SameLine();
 		ImGui::Text("N/A");
 	} else if (ImGui::BeginChild("Weapon", ImVec2(0, 0),  ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_Borders)) {
 		const auto& weapon = resources.weapons()[self.someWeaponIndex];
-	    ImGui::Text("Targets: %s", to_string(Flags{weapon.targetCategory}).c_str());
-		ImGui::Text("Flags: %x", weapon.flags);
-		ImGui::Text("Range: %i", weapon.weaponRange);
-		ImGui::Text("Scatter: %i", weapon.scatter);
-		ImGui::Text("Cooldown: %i", weapon.cooldown);
+	    MyImUtils::Text("Targets: {}", to_string(Flags{weapon.targetCategory}));
+		MyImUtils::Text("Flags: {:x}", weapon.flags);
+		MyImUtils::Text("Range: {}", weapon.weaponRange);
+		MyImUtils::Text("Scatter: {}", weapon.scatter);
+		MyImUtils::Text("Cooldown: {}", weapon.cooldown);
 		ImGui::EndChild();
 	}
 
-    ImGui::Text("???: %i", self.unused2);
-    ImGui::Text("Damage radius: %i", self.deathDamageRadius);
-    ImGui::Text("Damage: %i", self.deathDamage);
-    ImGui::Text("Linked object offset (X,Y,Z): %i %i %i", self.linkX, self.linkY, self.linkZ);
+    MyImUtils::Text("???: {}", self.unused2);
+    MyImUtils::Text("Damage radius: {}", self.deathDamageRadius);
+    MyImUtils::Text("Damage: {}", self.deathDamage);
+    MyImUtils::Text("Linked object offset (X,Y,Z): {} {} {}", self.linkX, self.linkY, self.linkZ);
 
     ImGui::Text("Linked nVid: "); ImGui::SameLine(); linkToNvidControl(self.linkedObjectVid);
-    ImGui::Text("Directions count: % i", self.directionsCount);
-    ImGui::Text("Z Layer: % i", self.z_layer);
+    MyImUtils::Text("Directions count: {}", self.directionsCount);
+    MyImUtils::Text("Z Layer: {}", self.z_layer);
 
 
     ImGui::Spacing();
@@ -255,10 +255,10 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
     for (std::size_t i = 0; i < 16; ++i) {
         ImGui::TableNextColumn();
-        ImGui::Text(actionNames[i]);
+        ImGui::TextUnformatted(actionNames[i]);
 
         ImGui::TableNextColumn();
-        ImGui::Text("%i", self.animationLengths[i]);
+        MyImUtils::Text("{}", self.animationLengths[i]);
 
         ImGui::TableNextColumn();
 		linkToSound(self.nsfx[i]);
@@ -267,10 +267,10 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
         linkToNvidControl(self.childNvid[i]);
 
         ImGui::TableNextColumn();
-        ImGui::Text("%i", self.childrenCount[i]);
+        MyImUtils::Text("{}", self.childrenCount[i]);
 
         ImGui::TableNextColumn();
-        ImGui::Text("%i %i %i", self.childrenOffsets[0][i], self.childrenOffsets[1][i], self.childrenOffsets[2][i]);
+        MyImUtils::Text("{} {} {}", self.childrenOffsets[0][i], self.childrenOffsets[1][i], self.childrenOffsets[2][i]);
 
         ImGui::TableNextRow();
     }
@@ -279,15 +279,15 @@ void VidsWindowViewModel::VidUI(const Vid& self) {
 
     ImGui::Spacing();
     std::visit(overloaded{
-                   [](std::int32_t arg) { ImGui::Text("Source nVid: %i", arg); },
+                   [](std::int32_t arg) { MyImUtils::Text("Source nVid: {}", arg); },
                    [&self](const Vid::Graphics& arg) {
-                       ImGui::Text("frames size: %i", self.dataSizeOrNvid);
-                       ImGui::Text("data format: %x", arg->dataFormat);
-                       ImGui::Text("frame duration: %ims (%i FPS)", arg->frameDuration, 1000 / arg->frameDuration);
-                       ImGui::Text("numOfFrames: %i", arg->numOfFrames);
-                       ImGui::Text("dataSize: %i", arg->dataSize);
-                       ImGui::Text("width: %i", arg->width);
-                       ImGui::Text("height: %i", arg->height);
+                       MyImUtils::Text("frames size: {}", self.dataSizeOrNvid);
+                       MyImUtils::Text("data format: {:x}", arg->dataFormat);
+                       MyImUtils::Text("frame duration: {}ms ({} FPS)", arg->frameDuration, 1000 / arg->frameDuration);
+                       MyImUtils::Text("numOfFrames: {}", arg->numOfFrames);
+                       MyImUtils::Text("dataSize: {}", arg->dataSize);
+                       MyImUtils::Text("width: {}", arg->width);
+                       MyImUtils::Text("height: {}", arg->height);
                    },
                },
         self.graphicsData);
@@ -320,7 +320,7 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 
 				if (m_showFrameNumbers) {
 					ImGui::SetCursorScreenPos(std::exchange( pos, ImGui::GetCursorScreenPos() ));
-					ImGui::Text("%d", index + 1);
+					MyImUtils::Text("{}", index + 1);
 					ImGui::SetCursorScreenPos(pos);
 				}
 			}
@@ -345,7 +345,7 @@ void VidsWindowViewModel::ShowFramesWindow(const Vid& self) {
 					if (!frameRange)
 						continue;
 
-					ImGui::Text("%s", actionNames[i]);
+					ImGui::TextUnformatted(actionNames[i]);
 					ImGui::NewLine();
 					if (m_framesWindowState.showAnimation) {
 						ShowFrame(frameRange->first + m_framesWindowState.frameNumber % (frameRange->second - frameRange->first + 1));
