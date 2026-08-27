@@ -185,6 +185,10 @@ export class MapViewModel {
             updateSelectedObjectsPropertiesWindow(draw_list, viewport);
 
             displayMapBounds(draw_list, viewport, camera, levelInfo ? *levelInfo : MapHeaderRawData{});
+
+            if (const auto* boxSelect = std::get_if<BoxSelectGesture>(&m_gesture)) {
+                draw_list->AddRect(to_imvec(viewport.worldToScreenPos(boxSelect->rect.min)), to_imvec(viewport.worldToScreenPos(boxSelect->rect.max)), IM_COL32(0, 255, 0, 200));
+            }
         }
 
         // Resolved before the camera/viewport update, so that starting to pan pre-empts whatever
@@ -320,10 +324,6 @@ export class MapViewModel {
             processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
             processObjectPropertiesTab(objectHandle.get_mut<GameObject::Payload>());
             ImGui::End();
-        }
-
-        if (const auto* boxSelect = std::get_if<BoxSelectGesture>(&m_gesture)) {
-            draw_list->AddRect(to_imvec(viewport.worldToScreenPos(boxSelect->rect.min)), to_imvec(viewport.worldToScreenPos(boxSelect->rect.max)), IM_COL32(0, 255, 0, 200));
         }
     }
 
