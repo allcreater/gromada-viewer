@@ -299,7 +299,7 @@ export class MapViewModel {
 
             ImGui::SetNextWindowPos({500, 200}, ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2{200, 300}, ImGuiCond_FirstUseEver);
-            ImGui::Begin("Info");
+            ImGui::Begin("Selected object");
             MyImUtils::ComboBox( "object" , &m_selectionUIState.selectedObject, std::span{m_selectionUIState.selectedObjects}, [&](flecs::entity obj) {
                 return obj.get<VidRef>()->getName();
             } );
@@ -317,6 +317,14 @@ export class MapViewModel {
             if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
                 m_world.get_mut<GlobalEditorState>().selectedNvid = vidComponent;
                 m_world.modified<GlobalEditorState>();
+            }
+
+            ImGui::SameLine( );
+            if (ImGui::Button("Delete")) {
+                objectHandle.destruct();
+                // TODO: this early exit is actually a crutch :(
+                ImGui::End();
+                return;
             }
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
