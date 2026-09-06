@@ -111,7 +111,9 @@ public:
 
 		ImGui::End();
 
-		// ImGui::ShowDemoWindow();
+		if (std::holds_alternative<TerrainDrawState>(m_model.get<GlobalEditorState>().state)) {
+			baseTilesPalette();
+		}
 	}
 
 	void drawMenu() {
@@ -171,6 +173,13 @@ public:
 				m_model.modified<GlobalEditorState>();
 			});
 
+			ImGui::SameLine();
+
+			MyImUtils::ToggleButton("Draw", std::holds_alternative<TerrainDrawState>(state), [&](){
+				state = TerrainDrawState{};
+				m_model.modified<GlobalEditorState>();
+			});
+
 			ImGui::PopStyleVar();
 		}
 
@@ -195,6 +204,23 @@ private:
 
 	void exportVidsToCsv(std::ostream&& stream) const {
 		ExportVidsToCsv(m_model.get<const GameResources>().vids(), stream);
+	}
+
+	void baseTilesPalette() {
+		auto& state = m_model.get_mut<GlobalEditorState>();
+
+		ImGui::SetNextWindowSize( {120, 300}, ImGuiCond_Appearing );
+		if (ImGui::Begin("Palette")) {
+
+			ImGui::BeginListBox("##Palette", {-FLT_MIN, -FLT_MIN});
+			for (auto vid : m_model.get<const GameResources>().baseTilesVids()) {
+				if (ImGui::Selectable( ("#" + vid->getName()).c_str(), state.selectedNvid == vid))
+					state.selectedNvid = vid;
+			}
+			ImGui::EndListBox();
+
+			ImGui::End();
+		}
 	}
 
 private:

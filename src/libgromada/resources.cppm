@@ -41,6 +41,8 @@ export enum class ObjectClass : std::uint8_t {
 	Bonus = 18,
 	Font = 19,
 	RepairCannon = 20,
+
+	Unknown = 0xFF,
 };
 
 export enum class ObjectFlags : std::uint16_t {
@@ -103,7 +105,7 @@ export struct Vid {
 
 	std::array<char, 34> name {0}; // In CP-866
 	ObjectCategory category {};
-	ObjectClass type {};
+	ObjectClass type {ObjectClass::Unknown};
 	ObjectFlags flags {};
 
 	std::uint8_t collisionMask {};
@@ -159,7 +161,8 @@ export struct Vid {
 export struct AdjacencyData {
     std::vector<std::int16_t> data;
 
-    std::mdspan<const std::int16_t, std::extents<std::size_t, std::dynamic_extent, 16>> matrix() const  {
+	using MatrixType = std::mdspan<const std::int16_t, std::extents<std::size_t, std::dynamic_extent, 16>>;
+    MatrixType operator()() const  {
         return std::mdspan{data.data(), std::extents<std::size_t, std::dynamic_extent, 16>{data.size() / 16}};
     }
 };

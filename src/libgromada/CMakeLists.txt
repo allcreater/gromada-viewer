@@ -14,6 +14,7 @@ target_sources(libgromada
 		"game_resources.cppm"
 		"graphics_decoder.cppm"
 		"map.cppm"
+		"terramorphing.cppm"
 		"resource_reader.cppm"
 		"resources.cppm"
 		"resources_sound.cppm"

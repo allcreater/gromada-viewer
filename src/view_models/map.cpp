@@ -50,6 +50,7 @@ struct FrameInput {
     glm::ivec2 leftDragDelta;
     glm::fvec2 wsadDirection;
     float mouseWheel = 0.0f;
+    bool leftMouseDown = false;
     bool leftMouseReleased = false;
     bool leftMouseDragging = false;
     bool isPanning = false;
@@ -76,6 +77,7 @@ static FrameInput captureFrameInput() {
         .leftDragDelta = from_imvec(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
         .wsadDirection = wsadDirection,
         .mouseWheel = io.MouseWheel,
+        .leftMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left),
         .leftMouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
         .leftMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
         .isPanning = ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ctrlDown,
@@ -121,7 +123,7 @@ export class MapViewModel {
         //         ImGui::Image(simgui_imtextureid(framebuffer.getImage()), ImVec2{0, 0});
         //     });
     }
-    void updatePrototype(bool enabled, bool confirmPlacement, const FrameInput& input, glm::ivec2 mouseWorldPos) {
+    void updatePrototype(bool enabled, const FrameInput& input, glm::ivec2 mouseWorldPos) {
         auto prototype = m_world.target<ObjectPrototype>();
 		if (!prototype.is_valid())
 			return;
@@ -132,14 +134,11 @@ export class MapViewModel {
 
 		    prototype_transform.x = mouseWorldPos.x;
 		    prototype_transform.y = mouseWorldPos.y;
-			if (confirmPlacement) {
-				prototype.clone().child_of(m_world.component<ActiveLevel>());
-			}
 
 			if (std::abs(input.mouseWheel) > 0.0f) {
 				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
 				prototype_transform.direction -= (input.mouseWheel > 0 ? 1 : -1) * step; // Reverse direction is more intuitive
-			} else if (m_world.get<const GlobalEditorState>().randomizeObjectDirection && Flags{prototype.get<const VidRef>()->flags}[ObjectFlags::RandomDirection] ) {
+			} else if (m_editorState->randomizeObjectDirection && Flags{prototype.get<const VidRef>()->flags}[ObjectFlags::RandomDirection] ) {
                 prototype_transform.direction = std::rand() % 256;
             }
 		}
@@ -161,7 +160,7 @@ export class MapViewModel {
 			ImGui::EndMenu();
 		}
 
-        ImGui::MenuItem("Randomize directions", nullptr, &(m_world.get_mut<GlobalEditorState>().randomizeObjectDirection));
+        ImGui::MenuItem("Randomize directions", nullptr, &(m_editorState->randomizeObjectDirection));
 	}
 
 	void updateUI() {
@@ -203,7 +202,22 @@ export class MapViewModel {
         updateGesture(input, mouseWorldPos, viewport);
 
         const bool is_placingGesture = std::holds_alternative<PlacingGesture>(m_gesture);
-        updatePrototype(is_placingGesture, is_placingGesture && input.leftMouseReleased, input, mouseWorldPos);
+        updatePrototype(is_placingGesture, input, mouseWorldPos);
+
+        // Placement / drawing
+        {
+            std::visit(overloaded{
+                [&](PlacementState) {
+                    const auto& prototype = m_world.target<ObjectPrototype>();
+                    if (is_placingGesture && input.leftMouseReleased)
+                        prototype.clone().child_of(m_world.component<ActiveLevel>());
+                },[&](TerrainDrawState) {
+                    const auto vid = m_editorState->selectedNvid;
+                    if (input.leftMouseDown && (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection])))
+                        insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
+                },[](auto _){}
+            }, m_editorState->state);
+        }
 
         if (input.deletePressed) {
             deleteSelectedObjects();
@@ -218,8 +232,8 @@ export class MapViewModel {
     }
 
     void updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const Viewport& viewport) {
-        const auto is_placementMode = std::holds_alternative<PlacementState>(m_world.get<GlobalEditorState>().state);
-        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_world.get<GlobalEditorState>().state);
+        const auto is_placementMode = std::holds_alternative<PlacementState>(m_editorState->state);
+        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_editorState->state);
 
         // isPanning is deliberately not checked here: updatePanningGesture already forced m_gesture
         // to PanningGesture this frame if panning is active, so this code only ever runs otherwise.
@@ -315,8 +329,9 @@ export class MapViewModel {
 
             ImGui::SameLine( );
             if (ImGui::Button(std::format("Select nvid [{}]", vidComponent.nvid()).c_str())) {
-                m_world.get_mut<GlobalEditorState>().selectedNvid = vidComponent;
+                m_editorState->selectedNvid = vidComponent;
                 m_world.modified<GlobalEditorState>();
+                flushDerivedState(m_world);
             }
 
             ImGui::SameLine( );
@@ -382,7 +397,7 @@ export class MapViewModel {
                     } ), {-FLT_MIN, ImGui::GetContentRegionAvail().y - 50.0f});
 
                     if (ImGui::Button("+")) {
-                        payload.items.push_back( m_world.get<GlobalEditorState>().selectedNvid.nvid());
+                        payload.items.push_back( m_editorState->selectedNvid.nvid());
                     }
                     ImGui::SameLine();
 
@@ -473,6 +488,7 @@ export class MapViewModel {
 
 
     flecs::world& m_world;
+    flecs::ref<GlobalEditorState> m_editorState = m_world.get_ref<GlobalEditorState>();
     flecs::query<const VidRef, const Transform> m_selectionQuery;
     EditorGesture m_gesture = IdleGesture{};
     Flags<ObjectCategory> m_selectionType {0b01111110}; // Default selection type

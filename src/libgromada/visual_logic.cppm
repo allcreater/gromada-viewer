@@ -32,6 +32,15 @@ export int getDirectionIndex(std::uint8_t directionsCount, std::uint8_t directio
 	return ((direction + roundAddition) & 0xFF) * directionsCount / 256;
 }
 
+export std::uint8_t getDirectionFromIndex(std::uint8_t directionsCount, int directionIndex) {
+	assert(directionIndex >= 0 && directionIndex < directionsCount);
+	if (directionsCount == 0)
+		return 0;
+
+	int centerDirection = (2 * directionIndex + 1) * 256 / (2 * directionsCount);
+	return static_cast<std::uint8_t>(centerDirection & 0xFF);
+}
+
 export std::optional<std::pair<std::size_t, std::size_t>> getAnimationFrameRangeDirIndex(const Vid& vid, Action action, int directionIndex) {
 	auto actionIndex = std::to_underlying(action);
 	assert(actionIndex >= 0 && actionIndex < 16);

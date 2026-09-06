@@ -62,7 +62,7 @@ export {
 	    const std::filesystem::path& gamePath() const noexcept { return m_gamePath; }
 	    std::filesystem::path mapsPath() const noexcept { return m_gamePath / "maps"; }
 
-	    auto adjacencyData() const { return m_adjacencyData.matrix(); }
+	    const AdjacencyData& adjacencyData() const { return m_adjacencyData; }
 		std::span<const VidRef> baseTilesVids() const { return m_baseTilesVids; }
 
 		std::span<const SoundData> sounds() const noexcept { return m_sounds; }
@@ -103,10 +103,10 @@ GameResources::GameResources(std::filesystem::path path)
 
 	navigator.visitSectionsOfType(SectionType::TilesTable, [&](const Section& section, BinaryStreamReader reader) {
 		m_adjacencyData = getAdjacencyData(section, reader);
-		m_baseTilesVids = std::views::iota(0, std::min<int>(adjacencyData().extent(0), adjacencyData().extent(1)))
+		m_baseTilesVids = std::views::iota(0, std::min<int>(m_adjacencyData().extent(0), m_adjacencyData().extent(1)))
 		| std::views::transform([this](int i) {
-			auto nvid = std::abs(adjacencyData()[i, i]);
-			return nvid ? getVid(nvid) : VidRef{};
+			auto nvid = std::abs(m_adjacencyData()[i, i]);
+			return nvid > 0 ? getVid(nvid) : VidRef{};
 		})
 		| std::ranges::to<std::vector>();
 	});
@@ -129,13 +129,17 @@ VidRef::VidRef(const GameResources& resources, const Vid* vid)
 
 const GameResources & VidRef::parent() const {
 	if (!m_parent) [[unlikely]] {
-		throw std::logic_error("VidRef is empty");
+		throw std::logic_error("this VidRef is not bound to GameResources instance");
 	}
 
 	return *m_parent;
 }
 
 std::uint16_t VidRef::nvid() const noexcept {
+	if (m_vid == &nullVid) [[unlikely]] {
+		throw std::logic_error("Null VidRef does not have a valid index");
+	}
+
 	auto distance = std::distance(parent().vids().data(), m_vid);
 	assert(distance < std::numeric_limits<std::uint16_t>::max());
 	return static_cast<std::uint16_t>(distance);

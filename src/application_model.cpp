@@ -8,6 +8,7 @@ import utils;
 
 import Gromada.ResourceReader;
 import Gromada.Map;
+import Gromada.Terromorphing;
 import engine.bounding_box;
 import engine.level_renderer;
 import engine.audio;
@@ -27,12 +28,17 @@ export using Armies = std::array<Army, 2>;
 
 export struct SelectionState {};
 export struct PlacementState {};
+export struct TerrainDrawState {};
 
 export struct GlobalEditorState {
 	VidRef selectedNvid;
-	std::variant<SelectionState, PlacementState> state;
+	std::variant<SelectionState, PlacementState, TerrainDrawState> state;
 	bool randomizeObjectDirection = true;
 };
+
+export void flushDerivedState(flecs::world& world) {
+	world.progress(0.0f);
+}
 
 export struct EditorComponents {
     EditorComponents(flecs::world& world) {
@@ -78,21 +84,23 @@ public:
         });
 
 	    // debug
-	    // auto adjacency = this->get<const GameResources>()->adjacencyData();
-	    // for (int j = 0; j < adjacency.extent(0); ++j) {
-     //        for (int i = 0; i < adjacency.extent(1); ++i) {
-     //           if (adjacency[j, i] != 0) {
-     //                 auto e = this->entity();
-     //                 e.set<Transform, Local>({.x = i * 80, .y = j * 50, .z = 0, .direction = 0});
-     //                 e.emplace<VidComponent>(*this->get<const GameResources>(), std::abs(adjacency[j, i]));
-     //                 e.child_of(activeLevel);
-     //           }
-     //        }
-     //    }
-	}
+#if 0
+		const auto vids = this->get<const GameResources>().baseTilesVids();
+		for (int j = 0; j < vids.size(); ++j) {
+			for (int i = 0; i < vids.size(); ++i) {
+				const auto transition = getTilesTransition( vids[i], vids[j]);
+				if (!transition)
+					continue;
 
-    void insertTile(VidRef vid, int x, int y) {
+				this->entity()
+				.set<Transform, Local>({.x = i * 80, .y = j * 50 - 200, .z = 0, .direction = 0})
+				.emplace<VidRef>(transition->targetVid)
+				.child_of(activeLevel);
+			}
+		}
+#endif
 
+	    flushDerivedState(*this);
 	}
 
     // TODO: "this->" leaved to remember that it will be a free function soon
@@ -114,6 +122,8 @@ public:
 	    activeLevel.set<MapHeaderRawData>(map.header);
         activeLevel.set<Path>(std::move(path));
 	    activeLevel.set<Armies>(std::move(map.armies));
+
+	    flushDerivedState(*this);
 	}
 
     static GameObject makeGameObject(const VidRef& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
@@ -273,3 +283,51 @@ private:
     }
 
 };
+
+export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y) {
+	const auto& baseTiles = world.get<const GameResources>().baseTilesVids();
+	if (std::ranges::find(baseTiles, baseTerrainTile) == baseTiles.end())
+		return;
+
+	bool doExecuteCommands = true;
+	std::vector<std::function<void()>> creationCommands;
+
+	const auto referenceSizeTile = baseTiles[1]; //TODO: crutch
+	const auto region = BoundingBox::fromPositions(x - referenceSizeTile->sizeX/2, y - referenceSizeTile->sizeY/2, x + referenceSizeTile->sizeX/2, y + referenceSizeTile->sizeY/2);
+
+	world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
+		entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
+			if ((vid && vid->category != ObjectCategory::Terrain) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
+				return;
+
+			const auto getDirection = [](int deltaX, int deltaY) -> CornerDirection {
+				return deltaX > 0 ? (deltaY > 0 ? CornerDirection::BottomRight : CornerDirection::TopRight) : (deltaY > 0 ? CornerDirection::BottomLeft : CornerDirection::TopLeft);
+			};
+
+
+			const Tile sourceTile{vid, transform->direction};
+			if (const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y)); substitution) {
+				if (*substitution != sourceTile) {
+					creationCommands.emplace_back([&world, entity, transform, tile = *substitution]() {
+						if (tile) {
+							world.entity()
+									.set<VidRef>(tile)
+									.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction})
+									.set<EditorOrdering>(entity.get<EditorOrdering>())
+									.child_of(world.component<ActiveLevel>());
+						}
+						entity.destruct();
+					});
+				}
+			} else {
+				doExecuteCommands = false;
+			}
+		});
+	});
+
+	if (doExecuteCommands) {
+		std::ranges::for_each( creationCommands, [](auto command){command();} );
+	}
+
+    flushDerivedState(world);
+}
