@@ -34,7 +34,7 @@ export std::optional<Tile> trySubstituteTile(Tile sourceTile, VidRef destination
 
 Tile directionGroupToTile(VidRef vid, int directionGroup) noexcept {
     const auto numVariations = vid->directionsCount / 14;
-    const auto direction = numVariations * directionGroup + std::rand() % numVariations;
+    const auto direction = numVariations * directionGroup + randomIndex(numVariations);
     return Tile{vid, getDirectionFromIndex(vid->directionsCount, direction)};
 }
 
@@ -110,7 +110,7 @@ std::optional<Tile> trySubstituteTile(Tile sourceTile, VidRef destinationVid, Co
     }
 
     if (mask == 0x0F)
-        return Tile{destinationVid,  static_cast<std::uint8_t>(destinationVid ?  std::rand() % destinationVid->directionsCount : 0)};
+        return Tile{destinationVid,  static_cast<std::uint8_t>(destinationVid ?  randomIndex(destinationVid->directionsCount) : 0)};
 
     const auto maskIt = std::ranges::find(directionIndexToCoverageMask, flipCoverage(mask, invertedCoverage));
     if (maskIt == directionIndexToCoverageMask.end() || !resultVid)

@@ -30,4 +30,13 @@ export {
         return 0;
     }
 
+    std::mt19937& randomEngine() noexcept {
+        thread_local std::mt19937 rng{std::random_device{}()};
+        return rng;
+    }
+
+    int randomIndex(int count) noexcept {
+        return std::uniform_int_distribution<int>{0, count - 1}(randomEngine());
+    }
+
 }

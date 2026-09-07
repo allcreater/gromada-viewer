@@ -170,11 +170,11 @@ public:
 	        }
 	    });
 
-        auto generate_new_id = [&known_ids, rng = std::mt19937{std::random_device{}()}] mutable {
+        auto generate_new_id = [&known_ids] {
             std::uniform_int_distribution<std::uint32_t> dist{1, std::numeric_limits<std::uint32_t>::max()};
             std::uint32_t id;
             do {
-                id = dist(rng);
+                id = dist(randomEngine());
             } while (!known_ids.insert(id).second);
             return id;
         };
@@ -243,14 +243,11 @@ private:
 
         assert(vid->category == ObjectCategory::Terrain);
 
-        std::mt19937 rng{std::random_device{}()};
-        std::uniform_int_distribution<int> directionsDistribution{0, 255};
-
         for (int j = 0; j < height; ++j) {
             for (int i = 0; i < width; ++i) {
                 this->entity()
                     .set<VidRef>(vid)
-                    .set<Transform, Local>({.x = static_cast<std::int16_t>(i * vid->sizeX + vid->sizeX / 2), .y = static_cast<std::int16_t>(j * vid->sizeY + vid->sizeY / 2), .z = 0, .direction = static_cast<std::uint8_t>(directionsDistribution(rng))})
+                    .set<Transform, Local>({.x = static_cast<std::int16_t>(i * vid->sizeX + vid->sizeX / 2), .y = static_cast<std::int16_t>(j * vid->sizeY + vid->sizeY / 2), .z = 0, .direction = static_cast<std::uint8_t>(randomIndex(256))})
                     .set<EditorOrdering>({.uid = 0, .index = static_cast<std::uint16_t>(j * width + i)})
                     .child_of(activeLevel);
             }

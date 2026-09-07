@@ -139,7 +139,7 @@ export class MapViewModel {
 				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
 				prototype_transform.direction -= (input.mouseWheel > 0 ? 1 : -1) * step; // Reverse direction is more intuitive
 			} else if (m_editorState->randomizeObjectDirection && Flags{prototype.get<const VidRef>()->flags}[ObjectFlags::RandomDirection] ) {
-                prototype_transform.direction = std::rand() % 256;
+                prototype_transform.direction = static_cast<std::uint8_t>(randomIndex(256));
             }
 		}
 		else {
