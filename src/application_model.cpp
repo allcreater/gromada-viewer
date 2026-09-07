@@ -295,39 +295,41 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 	const auto referenceSizeTile = baseTiles[1]; //TODO: crutch
 	const auto region = BoundingBox::fromPositions(x - referenceSizeTile->sizeX/2, y - referenceSizeTile->sizeY/2, x + referenceSizeTile->sizeX/2, y + referenceSizeTile->sizeY/2);
 
-	world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
-		entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
-			if ((vid && vid->category != ObjectCategory::Terrain) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
-				return;
+	world.defer([&] {
+		world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
+			entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
+				if ((vid && vid->category != ObjectCategory::Terrain) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
+					return;
 
-			const auto getDirection = [](int deltaX, int deltaY) -> CornerDirection {
-				return deltaX > 0 ? (deltaY > 0 ? CornerDirection::BottomRight : CornerDirection::TopRight) : (deltaY > 0 ? CornerDirection::BottomLeft : CornerDirection::TopLeft);
-			};
+				const auto getDirection = [](int deltaX, int deltaY) -> CornerDirection {
+					return deltaX > 0 ? (deltaY > 0 ? CornerDirection::BottomRight : CornerDirection::TopRight) : (deltaY > 0 ? CornerDirection::BottomLeft : CornerDirection::TopLeft);
+				};
 
 
-			const Tile sourceTile{vid, transform->direction};
-			if (const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y)); substitution) {
-				if (*substitution != sourceTile) {
-					creationCommands.emplace_back([&world, entity, transform, tile = *substitution]() {
-						if (tile) {
-							world.entity()
-									.set<VidRef>(tile)
-									.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction})
-									.set<EditorOrdering>(entity.get<EditorOrdering>())
-									.child_of(world.component<ActiveLevel>());
-						}
-						entity.destruct();
-					});
+				const Tile sourceTile{vid, transform->direction};
+				if (const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y)); substitution) {
+					if (*substitution != sourceTile) {
+						creationCommands.emplace_back([&world, entity, transform = *transform, tile = *substitution]() {
+							if (tile) {
+								world.entity()
+										.set<VidRef>(tile)
+										.set<Transform, Local>({.x = transform.x, .y = transform.y, .z = 0, .direction = tile.direction})
+										.set<EditorOrdering>(entity.get<EditorOrdering>())
+										.child_of(world.component<ActiveLevel>());
+							}
+							entity.destruct();
+						});
+					}
+				} else {
+					doExecuteCommands = false;
 				}
-			} else {
-				doExecuteCommands = false;
-			}
+			});
 		});
-	});
 
-	if (doExecuteCommands) {
-		std::ranges::for_each( creationCommands, [](auto command){command();} );
-	}
+		if (doExecuteCommands) {
+			std::ranges::for_each( creationCommands, [](auto command){command();} );
+		}
+	});
 
     flushDerivedState(world);
 }

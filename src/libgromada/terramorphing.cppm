@@ -62,7 +62,7 @@ std::optional<TransitionalTileTransition> getTilesTransition(VidRef source, VidR
     if (!dstIndex)
         return std::nullopt; // At least not implemented
 
-    if (srcIndex) { // It's already composite, need to determine coverage direction
+    if (srcIndex) { // It means that both source and destination tiles was bases
         const auto nvid = resources.adjacencyData()()[*dstIndex, *srcIndex];
         if (nvid == 0) // Ok, no transition
             return std::nullopt;
@@ -70,6 +70,7 @@ std::optional<TransitionalTileTransition> getTilesTransition(VidRef source, VidR
         return TransitionalTileTransition{resources.getVid( std::abs(nvid)), nvid < 0};
     }
 
+    // Else: it's already composite, but we still need to determine coverage direction
     const int tableStride = resources.adjacencyData()().extent( 1 );
     const auto tableRow = std::span{resources.adjacencyData().data}.subspan(*dstIndex * tableStride, tableStride);
     const auto it = std::ranges::find(tableRow, source.nvid(), [](auto x){return std::abs(x);});
@@ -85,6 +86,9 @@ constexpr std::uint8_t flipCoverage(std::uint8_t coverageMask, bool flip) noexce
 
 std::optional<Tile> trySubstituteTile(Tile sourceTile, VidRef destinationVid, CornerDirection cornerDirection) noexcept {
     assert(sourceTile);
+
+    if (sourceTile == destinationVid)
+        return sourceTile;
 
     constexpr static std::array<std::uint8_t, 14> directionIndexToCoverageMask{
         0b1100, 0b1110, 0b0110, 0b0111,
