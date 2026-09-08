@@ -85,11 +85,20 @@ public:
 	}
 
 	// Captures `entity`'s current state as "before" the first time it's staged in the current
-	// (possibly nested) transaction; later calls for the same entity are no-ops.
+	// (innermost) transaction; later calls for the same entity within it are no-ops. Scoped to
+	// just this transaction's own records (from its savepoint onward) - not to the whole nested
+	// stack - so a later sibling transaction (e.g. the next frame's insertTile, nested inside one
+	// long painting-gesture transaction) can still stage an entity a previous, already-committed
+	// sibling transaction touched: that entity may have changed since, and this transaction needs
+	// its own "before" to be able to roll itself back independently of the earlier one.
 	void stage(flecs::entity entity) {
 		entity = resolve(entity);
 		assert(!m_savepoints.empty() && "stage() called outside a transaction");
-		if (!m_touched.insert(entity.id()).second)
+
+		const auto currentTransactionStart = m_savepoints.back();
+		const bool alreadyStagedHere = std::any_of(m_current.begin() + currentTransactionStart, m_current.end(),
+			[&](const ChangeRecord& change) { return change.entity == entity; });
+		if (alreadyStagedHere)
 			return;
 
 		m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
@@ -122,7 +131,6 @@ public:
 			m_redoStack.clear();
 		}
 		m_current.clear();
-		m_touched.clear();
 	}
 
 	// Restores whatever was staged since the matching beginTransaction() and discards it, without
@@ -141,7 +149,6 @@ public:
 			const auto target = resolve(m_current[i].entity);
 			const auto restored = apply(target, m_current[i].before);
 			redirect(target, restored);
-			m_touched.erase(m_current[i].entity.id());
 			if (hasEnclosingTransaction && m_current[i].before)
 				toAdopt.push_back(restored);
 		}
@@ -253,7 +260,6 @@ private:
 
 	std::vector<std::size_t> m_savepoints;
 	std::vector<ChangeRecord> m_current;
-	std::unordered_set<std::uint64_t> m_touched;
 	std::unordered_map<std::uint64_t, flecs::entity> m_redirects;
 
 	std::vector<UndoStep> m_undoStack;
