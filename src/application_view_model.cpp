@@ -32,6 +32,8 @@ public:
 	}
 
 	void updateUI() {
+		checkShortcuts();
+
 		drawMenu();
 		const auto* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -116,6 +118,17 @@ public:
 		}
 	}
 
+	void checkShortcuts() {
+		if (!ImGui::GetIO().WantTextInput) {
+			const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl);
+			if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+				undo();
+			} else if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Y)) {
+				redo();
+			}
+		}
+	}
+
 	void drawMenu() {
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) {
@@ -135,13 +148,23 @@ public:
 		        m_saveMapDialog.open(activeMapPath && !activeMapPath->empty() ? activeMapPath->generic_string() : (mapsPath / "NEW_MAP.map").generic_string());
 		    }
 
-			// TODO: reuse popup from previous item
 			if (ImGui::MenuItem("Export vids to CSV")) {
 				m_exportVidsDialog.open("vids.csv");
 			}
 
 			if (ImGui::MenuItem("Exit")) {
 				throw std::runtime_error("Exit requested");
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Edit")) {
+			const auto& history = m_model.get<const History>();
+			if (ImGui::MenuItem("Undo", "Ctrl+Z", false, history.canUndo())) {
+				undo();
+			}
+			if (ImGui::MenuItem("Redo", "Ctrl+Y", false, history.canRedo())) {
+				redo();
 			}
 			ImGui::EndMenu();
 		}
@@ -194,6 +217,22 @@ public:
 	}
 
 private:
+	void undo() {
+		auto& history = m_model.get_mut<History>();
+		if (history.canUndo()) {
+			history.undo();
+			flushDerivedState(m_model);
+		}
+	}
+
+	void redo() {
+		auto& history = m_model.get_mut<History>();
+		if (history.canRedo()) {
+			history.redo();
+			flushDerivedState(m_model);
+		}
+	}
+
 	void exportMapAsJson(std::ostream&& stream) const {
 		ExportMapToJson(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
 	}
@@ -223,7 +262,6 @@ private:
 		}
 	}
 
-private:
 	Model& m_model;
 
 	VidsWindowViewModel m_vidsViewModel{m_model};

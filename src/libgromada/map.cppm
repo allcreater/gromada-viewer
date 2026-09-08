@@ -12,12 +12,18 @@ export {
     struct ObjectCommand {
         Action command;
         std::uint32_t p1, p2;
+
+        bool operator==(const ObjectCommand&) const = default;
     };
 
     namespace Payloads {
-        struct VisualObject {};
+        struct VisualObject {
+            bool operator==(const VisualObject&) const = default;
+        };
         struct MaterialObject : VisualObject {
             std::uint8_t hp = 0;
+
+            bool operator==(const MaterialObject&) const = default;
         };
         struct AssetObject : MaterialObject {
             std::uint8_t buildTime = 20;
@@ -25,6 +31,8 @@ export {
             std::uint8_t behave = 1;
             std::vector<std::int16_t> items;
             std::vector<ObjectCommand> commands;
+
+            bool operator==(const AssetObject&) const = default;
         };
     }
 

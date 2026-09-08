@@ -29,6 +29,8 @@ struct World {};
 struct Transform {
     int x = 0, y = 0, z = 0;
     std::uint8_t direction = 0;
+
+    auto operator <=>(const Transform&) const = default;
 };
 
 struct VisualBoundsFn {

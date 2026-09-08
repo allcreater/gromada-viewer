@@ -20,6 +20,8 @@ export import engine.world_components;
 export struct EditorOrdering {
     std::uint32_t uid = 0;
     std::uint32_t index = 0;
+
+    bool operator==(const EditorOrdering&) const = default;
 };
 export struct Selected {};
 export struct ObjectPrototype {};
@@ -40,6 +42,224 @@ export void flushDerivedState(flecs::world& world) {
 	world.progress(0.0f);
 }
 
+
+// TODO: move to separate module after MSVC update - was strange internal compuler errors with flecs headers
+//
+// A snapshot of everything that makes an entity "a map object", as opposed to the lossy on-disk
+// GameObject DTO (int16_t coordinates, id-only payload reference etc). Entities with no VidRef
+// (i.e. not a map object at all) are represented by an absent ObjectSnapshot, not a default one.
+struct ObjectSnapshot {
+    VidRef vid;
+    Transform transform;
+    EditorOrdering ordering;
+    GameObject::Payload payload;
+
+    bool operator==(const ObjectSnapshot&) const = default;
+};
+
+struct ChangeRecord {
+    flecs::entity entity;
+    std::optional<ObjectSnapshot> before;
+    std::optional<ObjectSnapshot> after;
+};
+
+using UndoStep = std::vector<ChangeRecord>;
+
+// Generic undo/redo for map-object edits (create/modify/delete under ActiveLevel), built on
+// explicit staging rather than flecs OnSet observers: by the time an OnSet observer runs, the
+// new value is already written, so there is no generic way to recover "before" from one - call
+// sites must call stage() themselves, immediately before they touch an existing entity (or right
+// after creating a new, still-empty one).
+//
+// beginTransaction()/commitTransaction() nest like savepoints: only the outermost commit actually
+// diffs and pushes a step, so a multi-frame gesture (map.cpp) can wrap many inner calls (e.g. one
+// insertTile per frame) into a single undo step, while each inner call remains independently
+// correct - and rollbackTransaction() undoes only what was staged since ITS OWN beginTransaction(),
+// leaving an enclosing transaction's earlier progress untouched. This also replaces bespoke
+// all-or-nothing bookkeeping in callers: on failure, call rollbackTransaction() instead of
+// tracking a "did everything succeed" flag by hand.
+export class History {
+public:
+	void beginTransaction() {
+		m_savepoints.push_back(m_current.size());
+	}
+
+	// Captures `entity`'s current state as "before" the first time it's staged in the current
+	// (possibly nested) transaction; later calls for the same entity are no-ops.
+	void stage(flecs::entity entity) {
+		entity = resolve(entity);
+		assert(!m_savepoints.empty() && "stage() called outside a transaction");
+		if (!m_touched.insert(entity.id()).second)
+			return;
+
+		m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
+	}
+
+	// Declares that `to` now represents whatever `from` used to represent. A vid change is always
+	// destroy + recreate (see apply()), which mints a fresh entity id - so without this, a still-
+	// pending record elsewhere (an older, not-yet-undone step, or this transaction's own earlier
+	// stage() of `from`) that remembers `from` would go stale the moment something else destroys
+	// it, and its eventual undo would silently miss the entity that actually needs touching.
+	void redirect(flecs::entity from, flecs::entity to) {
+		if (from != to)
+			m_redirects[from.id()] = to;
+	}
+
+	void commitTransaction() {
+		assert(!m_savepoints.empty() && "commitTransaction() without a matching beginTransaction()");
+		m_savepoints.pop_back();
+		if (!m_savepoints.empty())
+			return; // an enclosing transaction is still open - it will diff/push on its own commit
+
+		std::erase_if(m_current, [this](ChangeRecord& change) {
+			change.entity = resolve(change.entity);
+			change.after = snapshot(change.entity);
+			return change.before == change.after;
+		});
+
+		if (!m_current.empty()) {
+			m_undoStack.push_back(std::move(m_current));
+			m_redoStack.clear();
+		}
+		m_current.clear();
+		m_touched.clear();
+	}
+
+	// Restores whatever was staged since the matching beginTransaction() and discards it, without
+	// affecting an enclosing transaction's earlier records. Restoring a "before" that still has a
+	// value can destroy-and-recreate the entity (see apply()); when an enclosing transaction is
+	// still open, that recreated entity is re-staged into it so it stays tracked instead of
+	// silently becoming an untracked (if currently correct-looking) part of the document.
+	void rollbackTransaction() {
+		assert(!m_savepoints.empty() && "rollbackTransaction() without a matching beginTransaction()");
+		const auto savepoint = m_savepoints.back();
+		m_savepoints.pop_back();
+		const bool hasEnclosingTransaction = !m_savepoints.empty();
+
+		std::vector<flecs::entity> toAdopt;
+		for (auto i = m_current.size(); i-- > savepoint; ) {
+			const auto target = resolve(m_current[i].entity);
+			const auto restored = apply(target, m_current[i].before);
+			redirect(target, restored);
+			m_touched.erase(m_current[i].entity.id());
+			if (hasEnclosingTransaction && m_current[i].before)
+				toAdopt.push_back(restored);
+		}
+		m_current.erase(m_current.begin() + savepoint, m_current.end());
+
+		for (auto entity : toAdopt)
+			stage(entity);
+	}
+
+	bool canUndo() const { return !m_undoStack.empty(); }
+	bool canRedo() const { return !m_redoStack.empty(); }
+
+	void undo() {
+		if (m_undoStack.empty())
+			return;
+
+		auto step = std::move(m_undoStack.back());
+		m_undoStack.pop_back();
+		for (auto& change : step | std::views::reverse) {
+			const auto target = resolve(change.entity);
+			change.entity = apply(target, change.before);
+			redirect(target, change.entity);
+		}
+		m_redoStack.push_back(std::move(step));
+	}
+
+	void redo() {
+		if (m_redoStack.empty())
+			return;
+
+		auto step = std::move(m_redoStack.back());
+		m_redoStack.pop_back();
+		for (auto& change : step) {
+			const auto target = resolve(change.entity);
+			change.entity = apply(target, change.after);
+			redirect(target, change.entity);
+		}
+		m_undoStack.push_back(std::move(step));
+	}
+
+	// Drops all history. Meant for whole-document replacement (new/load map), where old entity
+	// handles are invalidated anyway and there is nothing meaningful left to undo into.
+	void clear() {
+		assert(m_savepoints.empty() && "clear() called while a transaction is open");
+		m_undoStack.clear();
+		m_redoStack.clear();
+		m_redirects.clear();
+	}
+
+private:
+	// Follows the redirect chain to whatever entity currently represents `entity`, compacting
+	// every visited hop to point straight at the result so later lookups stay cheap.
+	flecs::entity resolve(flecs::entity entity) {
+		std::vector<std::uint64_t> visited;
+		for (auto it = m_redirects.find(entity.id()); it != m_redirects.end(); it = m_redirects.find(entity.id())) {
+			visited.push_back(entity.id());
+			entity = it->second;
+		}
+		for (auto id : visited)
+			m_redirects[id] = entity;
+		return entity;
+	}
+
+	static std::optional<ObjectSnapshot> snapshot(flecs::entity entity) {
+		if (!entity.is_alive())
+			return std::nullopt;
+
+		const auto* vid = entity.try_get<VidRef>();
+		if (!vid)
+			return std::nullopt;
+
+		const auto* transform = entity.try_get<Transform, Local>();
+		const auto* ordering = entity.try_get<EditorOrdering>();
+		const auto* payload = entity.try_get<GameObject::Payload>();
+		return ObjectSnapshot{
+			.vid = *vid,
+			.transform = transform ? *transform : Transform{},
+			.ordering = ordering ? *ordering : EditorOrdering{},
+			.payload = payload ? *payload : GameObject::Payload{},
+		};
+	}
+
+	// Applies `state` to `entity`, returning the (possibly new) handle that now represents it.
+	// A vid change is always destroy + recreate, never an in-place VidRef set: WorldModule's
+	// OnSet<VidRef> observer (world_components.cppm) resets Payload and spawns a linked child
+	// object every time VidRef is set, which is only safe for a brand-new entity - exactly the
+	// destroy+recreate discipline the rest of the codebase (e.g. tile substitution) already follows.
+	static flecs::entity apply(flecs::entity entity, const std::optional<ObjectSnapshot>& state) {
+		const auto* currentVid = entity.is_alive() ? entity.try_get<VidRef>() : nullptr;
+
+		if (!state) {
+			if (entity.is_alive())
+				entity.destruct();
+			return entity;
+		}
+
+		if (!currentVid || *currentVid != state->vid) {
+			flecs::world world = entity.world();
+			if (entity.is_alive())
+				entity.destruct();
+			entity = world.entity().set<VidRef>(state->vid).child_of(world.component<ActiveLevel>());
+		}
+
+		entity.set<Transform, Local>(state->transform);
+		entity.set<EditorOrdering>(state->ordering);
+		entity.set<GameObject::Payload>(state->payload);
+		return entity;
+	}
+
+	std::vector<std::size_t> m_savepoints;
+	std::vector<ChangeRecord> m_current;
+	std::unordered_set<std::uint64_t> m_touched;
+	std::unordered_map<std::uint64_t, flecs::entity> m_redirects;
+
+	std::vector<UndoStep> m_undoStack;
+	std::vector<UndoStep> m_redoStack;
+};
+
 export struct EditorComponents {
     EditorComponents(flecs::world& world) {
         world.component<EditorOrdering>();
@@ -49,6 +269,7 @@ export struct EditorComponents {
 		world.component<Armies>().set(flecs::Singleton);
     	world.component<GlobalEditorState>().set(flecs::Singleton);
 		world.component<AudioEngine>().set(flecs::Singleton);
+		world.component<History>().set(flecs::Singleton);
 	}
 };
 
@@ -60,6 +281,7 @@ public:
     void newMap(VidRef vid, int width, int height) {
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
+	    this->get_mut<History>().clear();
 
 	    if (width < 0 || height < 0)
             throw std::invalid_argument("Model::newMap: width and height must be non-negative");
@@ -109,6 +331,7 @@ public:
 		const auto map = ::loadMap(gameResources.vids(), path);
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
+	    this->get_mut<History>().clear();
 
 	    for (const auto& obj : map.objects) {
 	        this->entity()
@@ -262,6 +485,7 @@ private:
         world.emplace<GameResources>(resourcesPath);
         world.emplace<AudioEngine>();
     	world.emplace<GlobalEditorState>();
+    	world.emplace<History>();
 
     	world.observer<GlobalEditorState>()
 			.event(flecs::OnSet)
@@ -286,14 +510,21 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 	if (std::ranges::find(baseTiles, baseTerrainTile) == baseTiles.end())
 		return;
 
-	bool doExecuteCommands = true;
-	std::vector<std::function<void()>> creationCommands;
+	auto& history = world.get_mut<History>();
+	history.beginTransaction();
+	bool ok = true;
 
 	const auto referenceSizeTile = baseTiles[1]; //TODO: crutch
 	const auto region = BoundingBox::fromPositions(x - referenceSizeTile->sizeX/2, y - referenceSizeTile->sizeY/2, x + referenceSizeTile->sizeX/2, y + referenceSizeTile->sizeY/2);
 
+	// Structural changes (destruct, adding VidRef to a new entity) can't happen inline while a
+	// query is iterating the same table - defer() queues them and applies them once iteration ends.
 	world.defer([&] {
 		world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
+			if (!ok)
+				return;
+
+			// flecs::pair<Transform, Local> is needed (rather than plain Transform) because Transform is only ever stored as a (Transform, Local/World) pair
 			entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
 				if ((vid && vid->category != ObjectCategory::Terrain) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
 					return;
@@ -302,31 +533,34 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 					return deltaX > 0 ? (deltaY > 0 ? CornerDirection::BottomRight : CornerDirection::TopRight) : (deltaY > 0 ? CornerDirection::BottomLeft : CornerDirection::TopLeft);
 				};
 
-
 				const Tile sourceTile{vid, transform->direction};
-				if (const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y)); substitution) {
-					if (*substitution != sourceTile) {
-						creationCommands.emplace_back([&world, entity, transform = *transform, tile = *substitution]() {
-							if (tile) {
-								world.entity()
-										.set<VidRef>(tile)
-										.set<Transform, Local>({.x = transform.x, .y = transform.y, .z = 0, .direction = tile.direction})
-										.set<EditorOrdering>(entity.get<EditorOrdering>())
-										.child_of(world.component<ActiveLevel>());
-							}
-							entity.destruct();
-						});
-					}
-				} else {
-					doExecuteCommands = false;
+				const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y));
+				if (!substitution) {
+					ok = false;
+					return;
 				}
+				if (*substitution == sourceTile)
+					return;
+
+				history.stage(entity);
+				if (const auto tile = *substitution) {
+					auto newTile = world.entity();
+					history.stage(newTile); // before any component is set, so "before" means "didn't exist"
+					history.redirect(entity, newTile); // an earlier, still-undoable edit may still remember `entity`
+					newTile.set<VidRef>(tile)
+						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction})
+						.set<EditorOrdering>(entity.get<EditorOrdering>())
+						.child_of(world.component<ActiveLevel>());
+				}
+				entity.destruct();
 			});
 		});
-
-		if (doExecuteCommands) {
-			std::ranges::for_each( creationCommands, [](auto command){command();} );
-		}
 	});
+
+	if (ok)
+		history.commitTransaction();
+	else
+		history.rollbackTransaction();
 
     flushDerivedState(world);
 }

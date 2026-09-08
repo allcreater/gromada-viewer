@@ -40,7 +40,8 @@ struct PanningGesture {};
 struct BoxSelectGesture { SelectionRect rect; };
 struct DraggingObjectsGesture {};
 struct PlacingGesture {};
-using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture>;
+struct PaintingGesture {};
+using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture, PaintingGesture>;
 
 // Snapshot of raw ImGui input, captured once per frame. This is the single seam through which
 // map-editing logic reads user input; nothing below should call ImGui::IsKey*/IsMouse* directly.
@@ -168,6 +169,7 @@ export class MapViewModel {
         auto& viewport = m_world.get_mut<Viewport>();
         auto& camera = m_world.get_mut<Camera>();
         const FrameInput input = captureFrameInput();
+        const bool wasPainting = std::holds_alternative<PaintingGesture>(m_gesture);
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
@@ -201,20 +203,22 @@ export class MapViewModel {
         const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
         updateGesture(input, mouseWorldPos, viewport);
 
+        const bool isPainting = std::holds_alternative<PaintingGesture>(m_gesture);
+        if (isPainting && !wasPainting)
+            m_world.get_mut<History>().beginTransaction();
+        else if (wasPainting && !isPainting)
+            m_world.get_mut<History>().commitTransaction();
+
         const bool is_placingGesture = std::holds_alternative<PlacingGesture>(m_gesture);
         updatePrototype(is_placingGesture, input, mouseWorldPos);
 
-        // Placement / drawing
+        // Placement
         {
             std::visit(overloaded{
                 [&](PlacementState) {
                     const auto& prototype = m_world.target<ObjectPrototype>();
                     if (is_placingGesture && input.leftMouseReleased)
                         prototype.clone().child_of(m_world.component<ActiveLevel>());
-                },[&](TerrainDrawState) {
-                    const auto vid = m_editorState->selectedNvid;
-                    if (input.leftMouseDown && (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection])))
-                        insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
                 },[](auto _){}
             }, m_editorState->state);
         }
@@ -234,6 +238,7 @@ export class MapViewModel {
     void updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const Viewport& viewport) {
         const auto is_placementMode = std::holds_alternative<PlacementState>(m_editorState->state);
         const auto is_selectionMode = std::holds_alternative<SelectionState>(m_editorState->state);
+        const auto is_terrainDrawMode = std::holds_alternative<TerrainDrawState>(m_editorState->state);
 
         // isPanning is deliberately not checked here: updatePanningGesture already forced m_gesture
         // to PanningGesture this frame if panning is active, so this code only ever runs otherwise.
@@ -256,6 +261,8 @@ export class MapViewModel {
                     m_gesture = enterDragGesture();
                 else if (is_placementMode && input.mousePosValid)
                     m_gesture = PlacingGesture{};
+                else if (is_terrainDrawMode && input.leftMouseDown)
+                    m_gesture = PaintingGesture{};
             },
             [&](BoxSelectGesture& gesture) {
                 if (!input.leftMouseDragging) {
@@ -278,6 +285,15 @@ export class MapViewModel {
                 } else if (input.leftMouseDragging) {
                     m_gesture = enterDragGesture();
                 }
+            },
+            [&](PaintingGesture&) {
+                if (!input.leftMouseDown || !is_terrainDrawMode) {
+                    m_gesture = IdleGesture{};
+                    return;
+                }
+                const auto vid = m_editorState->selectedNvid;
+                if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
+                    insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
             },
         }, m_gesture);
     }
