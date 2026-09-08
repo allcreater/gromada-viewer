@@ -5,6 +5,9 @@
 .vs/*
 .vscode/*
 .idea/*
+
 out
 
 *.pdb
+
+CMakeUserPresets.json
