@@ -64,6 +64,7 @@ export {
 
 	    const AdjacencyData& adjacencyData() const { return m_adjacencyData; }
 		std::span<const VidRef> baseTilesVids() const { return m_baseTilesVids; }
+		std::span<const VidRef> substrateTilesVids() const { return m_substrateTilesVids; }
 
 		std::span<const SoundData> sounds() const noexcept { return m_sounds; }
 		std::span<const Weapon> weapons() const noexcept { return m_weapons; }
@@ -73,6 +74,7 @@ export {
 
 	    AdjacencyData m_adjacencyData;
 	    std::vector<VidRef> m_baseTilesVids;
+	    std::vector<VidRef> m_substrateTilesVids;
 
 	    std::vector<Vid> m_vids;
 		std::vector<VidRef> m_vidRefs;
@@ -118,6 +120,9 @@ GameResources::GameResources(std::filesystem::path path)
 	navigator.visitSectionsOfType(SectionType::Weapon, [&](const Section& section, BinaryStreamReader reader) {
 		m_weapons = getWeapons(section, reader);
 	});
+
+	m_substrateTilesVids.push_back( VidRef{} );
+	m_substrateTilesVids.append_range(m_vidRefs | std::views::filter([this](const Vid& vid) { return vid.type == ObjectClass::Terrain && vid.z_layer == 0; }));
 }
 
 VidRef::VidRef(const GameResources& resources, const Vid* vid)

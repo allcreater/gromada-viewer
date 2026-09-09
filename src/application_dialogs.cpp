@@ -25,14 +25,19 @@ public:
         auto& gameResources = model.get<GameResources>();
         auto baseTiles = gameResources.baseTilesVids();
         m_selectedTile = std::min<int>(m_selectedTile, baseTiles.size() );
-
         MyImUtils::ComboBox("Ground", &m_selectedTile, baseTiles, [](const auto& vid) {
             return vid ? vid->getName() : "None [size in pixels]";
         });
 
+        auto substrateTiles = gameResources.substrateTilesVids();
+        m_selectedSubstrateTile = std::min<int>(m_selectedSubstrateTile, substrateTiles.size() );
+        MyImUtils::ComboBox("Substrate", &m_selectedSubstrateTile, substrateTiles, [](const auto& vid) {
+            return vid ? vid->getName() : "None";
+        });
+
         if (ImGui::Button("OK", ImVec2(120, 0))) {
             ImGui::CloseCurrentPopup();
-            model.newMap(baseTiles[m_selectedTile], m_width, m_height);
+            model.newMap(baseTiles[m_selectedTile], substrateTiles[m_selectedSubstrateTile], m_width, m_height);
         }
 
         ImGui::SameLine();
@@ -48,6 +53,7 @@ private:
     int m_width = 30;
     int m_height = 20;
     int m_selectedTile = 1;
+    int m_selectedSubstrateTile = 1;
 };
 
 // Save-to-file dialog with a confirm-overwrite step and an error step, so a callback that throws

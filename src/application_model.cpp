@@ -284,7 +284,7 @@ public:
 	explicit Model(std::filesystem::path path)
 		: flecs::world{create_world(std::move(path))} {}
 
-    void newMap(VidRef vid, int width, int height) {
+    void newMap(VidRef vid, VidRef substrate, int width, int height) {
 	    const auto activeLevel = this->component<ActiveLevel>();
 	    this->delete_with(flecs::ChildOf, activeLevel);
 	    this->get_mut<History>().clear();
@@ -301,6 +301,10 @@ public:
 	    if (fullWidth > std::numeric_limits<std::int16_t>::max() || fullHeight > std::numeric_limits<std::int16_t>::max()) {
 	        throw std::invalid_argument("Model::newMap: resulting map size is too large");
 	    }
+
+		if (substrate) {
+			generateDefaultTerrain(substrate, fullWidth / substrate->sizeX, fullHeight / substrate->sizeY, /*isSubstrate=*/true);
+		}
 
 	    //activeLevel.set<Path>({});
 	    activeLevel.set<Armies>({});
@@ -467,17 +471,18 @@ private:
         header.observerY -= map_bounds.top;
     }
 
-    void generateDefaultTerrain(VidRef vid, int width, int height) {
+    void generateDefaultTerrain(VidRef vid, int width, int height, bool isSubstrate = false) {
         const auto activeLevel = this->component<ActiveLevel>();
 
         assert(vid->category == ObjectCategory::Terrain);
 
+    	//std::uint32_t baseIndex = this->count<EditorOrdering>();
         for (int j = 0; j < height; ++j) {
             for (int i = 0; i < width; ++i) {
-                this->entity()
+                auto e = this->entity()
                     .set<VidRef>(vid)
                     .set<Transform, Local>({.x = static_cast<std::int16_t>(i * vid->sizeX + vid->sizeX / 2), .y = static_cast<std::int16_t>(j * vid->sizeY + vid->sizeY / 2), .z = 0, .direction = static_cast<std::uint8_t>(randomIndex(256))})
-                    .set<EditorOrdering>({.uid = 0, .index = static_cast<std::uint16_t>(j * width + i)})
+                    //.set<EditorOrdering>({.uid = 0, .index = baseIndex++})
                     .child_of(activeLevel);
             }
         }
@@ -512,6 +517,7 @@ private:
 };
 
 export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y) {
+	const auto& substrateVids = world.get<const GameResources>().substrateTilesVids();
 	const auto& baseTiles = world.get<const GameResources>().baseTilesVids();
 	if (std::ranges::find(baseTiles, baseTerrainTile) == baseTiles.end())
 		return;
@@ -532,7 +538,7 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 
 			// flecs::pair<Transform, Local> is needed (rather than plain Transform) because Transform is only ever stored as a (Transform, Local/World) pair
 			entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
-				if ((vid && vid->category != ObjectCategory::Terrain) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
+				if ((vid && (vid->category != ObjectCategory::Terrain || std::ranges::find(substrateVids, vid) != substrateVids.end())) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
 					return;
 
 				const auto getDirection = [](int deltaX, int deltaY) -> CornerDirection {
@@ -555,8 +561,11 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 					history.redirect(entity, newTile); // an earlier, still-undoable edit may still remember `entity`
 					newTile.set<VidRef>(tile)
 						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction})
-						.set<EditorOrdering>(entity.get<EditorOrdering>())
 						.child_of(world.component<ActiveLevel>());
+
+					if (auto ordering = entity.try_get<EditorOrdering>()) {
+						newTile.set<EditorOrdering>(*ordering);
+					}
 				}
 				entity.destruct();
 			});

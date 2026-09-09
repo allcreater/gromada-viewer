@@ -28,7 +28,7 @@ public:
 		, m_saveMapDialog{std::bind_front(&ViewModel::saveMapToFile, this), "Save Map"}
 		, m_exportVidsDialog{std::bind_front(&ViewModel::exportVidsToCsv, this), "Export Vids CSV"}
 	{
-	    m_model.newMap({}, 10, 10);
+	    m_model.newMap({}, {}, 10, 10);
 	}
 
 	void updateUI() {
