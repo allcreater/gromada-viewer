@@ -352,7 +352,12 @@ export class MapViewModel {
 
             ImGui::SameLine( );
             if (ImGui::Button("Delete")) {
-                objectHandle.destruct();
+                auto& history = m_world.get_mut<History>();
+                history.beginTransaction();
+                history.stage(objectHandle);
+                setMapObjectEnabled(objectHandle, false); // soft delete - undoable
+                history.commitTransaction();
+
                 // TODO: this early exit is actually a crutch :(
                 ImGui::End();
                 return;
@@ -495,11 +500,15 @@ export class MapViewModel {
     }
 
     void deleteSelectedObjects() {
+        auto& history = m_world.get_mut<History>();
+        history.beginTransaction();
         m_world.defer([&] {
-            m_selectionQuery.each([](flecs::entity id, const Vid& vid, const Transform& _) {
-                id.destruct();
+            m_selectionQuery.each([&history](flecs::entity id, const Vid& vid, const Transform& _) {
+                history.stage(id);
+                setMapObjectEnabled(id, false); // soft delete - undoable
             });
         });
+        history.commitTransaction();
     }
 
 

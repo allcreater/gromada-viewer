@@ -99,6 +99,29 @@ export {
         entity.set<SyncedVid>({.nvid = vid.nvid()});
     }
 
+    // Enables/disables a map object together with its linked children. The single entry point
+    // for hiding objects from the document (soft delete, undo/redo of one): plain enable()/
+    // disable() on the object alone would leave its linked children rendering as ghosts.
+    // Disabled objects are skipped by all queries, so they are invisible to rendering,
+    // selection, region queries and export, but their handles stay valid - which is what lets
+    // History restore them without ever minting new entity ids.
+    void setMapObjectEnabled(flecs::entity entity, bool enabled) {
+        if (enabled)
+            entity.enable();
+        else
+            entity.disable();
+
+        entity.children(flecs::ChildOf, [enabled](flecs::entity child) {
+            if (!child.has<LinkedObject>())
+                return;
+
+            if (enabled)
+                child.enable();
+            else
+                child.disable();
+        });
+    }
+
     class WorldModule {
     public:
         WorldModule(flecs::world& world) {

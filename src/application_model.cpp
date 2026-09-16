@@ -47,11 +47,12 @@ export void flushDerivedState(flecs::world& world) {
 //
 // A snapshot of everything that makes an entity "a map object", as opposed to the lossy on-disk
 // GameObject DTO (int16_t coordinates, id-only payload reference etc). Entities with no VidRef
-// (i.e. not a map object at all) are represented by an absent ObjectSnapshot, not a default one.
+// (i.e. not a map object at all), as well as soft-deleted (disabled) ones, are represented by
+// an absent ObjectSnapshot, not a default one.
 struct ObjectSnapshot {
     VidRef vid;
     Transform transform;
-    EditorOrdering ordering;
+    std::optional<EditorOrdering> ordering;
     GameObject::Payload payload;
 
     bool operator==(const ObjectSnapshot&) const = default;
@@ -92,7 +93,6 @@ public:
 	// sibling transaction touched: that entity may have changed since, and this transaction needs
 	// its own "before" to be able to roll itself back independently of the earlier one.
 	void stage(flecs::entity entity) {
-		entity = resolve(entity);
 		assert(!m_savepoints.empty() && "stage() called outside a transaction");
 
 		const auto currentTransactionStart = m_savepoints.back();
@@ -104,18 +104,6 @@ public:
 		m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
 	}
 
-	// Declares that `to` now represents whatever `from` used to represent. Identity changes are
-	// rare now that vid changes are applied in place (see apply()): a fresh handle is minted only
-	// when an undo/redo re-creates a deleted entity, invalidating the old handle - so without
-	// this, a still-pending record elsewhere (an older, not-yet-undone step, or this transaction's
-	// own earlier stage() of `from`) that remembers `from` would go stale the moment something
-	// else destroys it, and its eventual undo would silently miss the entity that actually needs
-	// touching.
-	void redirect(flecs::entity from, flecs::entity to) {
-		if (from != to)
-			m_redirects[from.id()] = to;
-	}
-
 	void commitTransaction() {
 		assert(!m_savepoints.empty() && "commitTransaction() without a matching beginTransaction()");
 		m_savepoints.pop_back();
@@ -123,7 +111,6 @@ public:
 			return; // an enclosing transaction is still open - it will diff/push on its own commit
 
 		std::erase_if(m_current, [this](ChangeRecord& change) {
-			change.entity = resolve(change.entity);
 			change.after = snapshot(change.entity);
 			return change.before == change.after;
 		});
@@ -136,29 +123,15 @@ public:
 	}
 
 	// Restores whatever was staged since the matching beginTransaction() and discards it, without
-	// affecting an enclosing transaction's earlier records. Re-applying a "before" to a handle
-	// that is no longer alive re-creates the entity under a fresh one (see apply()); when an
-	// enclosing transaction is still open, that recreated entity is re-staged into it so it stays
-	// tracked instead of silently becoming an untracked (if currently correct-looking) part of
-	// the document.
+	// affecting an enclosing transaction's earlier records.
 	void rollbackTransaction() {
 		assert(!m_savepoints.empty() && "rollbackTransaction() without a matching beginTransaction()");
 		const auto savepoint = m_savepoints.back();
 		m_savepoints.pop_back();
-		const bool hasEnclosingTransaction = !m_savepoints.empty();
 
-		std::vector<flecs::entity> toAdopt;
-		for (auto i = m_current.size(); i-- > savepoint; ) {
-			const auto target = resolve(m_current[i].entity);
-			const auto restored = apply(target, m_current[i].before);
-			redirect(target, restored);
-			if (hasEnclosingTransaction && m_current[i].before)
-				toAdopt.push_back(restored);
-		}
+		for (auto i = m_current.size(); i-- > savepoint; )
+			apply(m_current[i].entity, m_current[i].before);
 		m_current.erase(m_current.begin() + savepoint, m_current.end());
-
-		for (auto entity : toAdopt)
-			stage(entity);
 	}
 
 	bool canUndo() const { return !m_undoStack.empty(); }
@@ -170,11 +143,8 @@ public:
 
 		auto step = std::move(m_undoStack.back());
 		m_undoStack.pop_back();
-		for (auto& change : step | std::views::reverse) {
-			const auto target = resolve(change.entity);
-			change.entity = apply(target, change.before);
-			redirect(target, change.entity);
-		}
+		for (auto& change : step | std::views::reverse)
+			apply(change.entity, change.before);
 		m_redoStack.push_back(std::move(step));
 	}
 
@@ -184,11 +154,8 @@ public:
 
 		auto step = std::move(m_redoStack.back());
 		m_redoStack.pop_back();
-		for (auto& change : step) {
-			const auto target = resolve(change.entity);
-			change.entity = apply(target, change.after);
-			redirect(target, change.entity);
-		}
+		for (auto& change : step)
+			apply(change.entity, change.after);
 		m_undoStack.push_back(std::move(step));
 	}
 
@@ -198,73 +165,60 @@ public:
 		assert(m_savepoints.empty() && "clear() called while a transaction is open");
 		m_undoStack.clear();
 		m_redoStack.clear();
-		m_redirects.clear();
 	}
 
 private:
-	// Follows the redirect chain to whatever entity currently represents `entity`, compacting
-	// every visited hop to point straight at the result so later lookups stay cheap.
-	flecs::entity resolve(flecs::entity entity) {
-		std::vector<std::uint64_t> visited;
-		for (auto it = m_redirects.find(entity.id()); it != m_redirects.end(); it = m_redirects.find(entity.id())) {
-			visited.push_back(entity.id());
-			entity = it->second;
-		}
-		for (auto id : visited)
-			m_redirects[id] = entity;
-		return entity;
-	}
-
+	// Absent snapshot == the object is not part of the document: never had a vid, or is
+	// soft-deleted (disabled).
 	static std::optional<ObjectSnapshot> snapshot(flecs::entity entity) {
-		if (!entity.is_alive())
+		if (!entity.is_alive() || !entity.enabled())
 			return std::nullopt;
 
 		const auto* vid = entity.try_get<VidRef>();
-		if (!vid)
+		const auto* transform = entity.try_get<Transform, Local>();
+		const auto* payload = entity.try_get<GameObject::Payload>();
+		if (!vid ||	!transform || !payload)
 			return std::nullopt;
 
-		const auto* transform = entity.try_get<Transform, Local>();
 		const auto* ordering = entity.try_get<EditorOrdering>();
-		const auto* payload = entity.try_get<GameObject::Payload>();
 		return ObjectSnapshot{
 			.vid = *vid,
-			.transform = transform ? *transform : Transform{},
+			.transform = *transform,
 			.ordering = ordering ? *ordering : EditorOrdering{},
-			.payload = payload ? *payload : GameObject::Payload{},
+			.payload = *payload,
 		};
 	}
 
-	// Applies `state` to `entity`, returning the (possibly new) handle that now represents it.
-	// A vid change is applied in place: WorldModule no longer hooks OnSet<VidRef> - derived state
-	// (animation, payload prototype, linked child) is reconciled by a system on the next
-	// flushDerivedState(), so set<VidRef> has no side effects. The restored payload is written
-	// after the vid and survives that reconciliation because the reconciler only replaces a
-	// payload whose variant type doesn't fit the vid's class. Only a dead handle is re-created
-	// (flecs cannot revive handles), minting a fresh entity id - history records are kept pointing
-	// at the right entity via redirect().
-	static flecs::entity apply(flecs::entity entity, const std::optional<ObjectSnapshot>& state) {
-		if (!state) {
-			if (entity.is_alive())
-				entity.destruct();
-			return entity;
-		}
-
+	// Applies `state` to `entity` in place. Deletion is soft (disable instead of destruct), so
+	// an object's handle stays valid for as long as the history exists, and no redirect
+	// bookkeeping is needed anywhere. A vid change is applied with a plain set: WorldModule's
+	// reconciliation system rebuilds the derived state (animation, payload prototype, linked
+	// child) on the next flushDerivedState(), and the restored payload is written after the vid
+	// and survives that reconciliation because the reconciler only replaces a payload whose
+	// variant type doesn't fit the vid's class.
+	static void apply(flecs::entity entity, const std::optional<ObjectSnapshot>& state) {
 		if (!entity.is_alive()) {
-			flecs::world world = entity.world();
-			entity = world.entity().set<VidRef>(state->vid).child_of(world.component<ActiveLevel>());
-		} else {
-			entity.set<VidRef>(state->vid);
+			assert(false && "map object destroyed outside history - deletions must go through setMapObjectEnabled()");
+			return;
 		}
 
+		if (!state) {
+			setMapObjectEnabled(entity, false);
+			return;
+		}
+
+		setMapObjectEnabled(entity, true);
+		entity.set<VidRef>(state->vid);
 		entity.set<Transform, Local>(state->transform);
-		entity.set<EditorOrdering>(state->ordering);
+		if (state->ordering)
+			entity.set<EditorOrdering>(*state->ordering);
+
 		entity.set<GameObject::Payload>(state->payload);
-		return entity;
 	}
 
 	std::vector<std::size_t> m_savepoints;
 	std::vector<ChangeRecord> m_current;
-	std::unordered_map<std::uint64_t, flecs::entity> m_redirects;
+	std::unordered_set<std::uint64_t> m_touched;
 
 	std::vector<UndoStep> m_undoStack;
 	std::vector<UndoStep> m_redoStack;
@@ -563,7 +517,9 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 					entity.set<VidRef>(tile)
 						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction});
 				} else {
-					entity.destruct();
+					// The substitution erases the tile entirely - a soft delete, so that undo
+					// can restore it.
+					setMapObjectEnabled(entity, false);
 				}
 			});
 		});
