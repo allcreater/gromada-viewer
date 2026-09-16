@@ -104,11 +104,13 @@ public:
 		m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
 	}
 
-	// Declares that `to` now represents whatever `from` used to represent. A vid change is always
-	// destroy + recreate (see apply()), which mints a fresh entity id - so without this, a still-
-	// pending record elsewhere (an older, not-yet-undone step, or this transaction's own earlier
-	// stage() of `from`) that remembers `from` would go stale the moment something else destroys
-	// it, and its eventual undo would silently miss the entity that actually needs touching.
+	// Declares that `to` now represents whatever `from` used to represent. Identity changes are
+	// rare now that vid changes are applied in place (see apply()): a fresh handle is minted only
+	// when an undo/redo re-creates a deleted entity, invalidating the old handle - so without
+	// this, a still-pending record elsewhere (an older, not-yet-undone step, or this transaction's
+	// own earlier stage() of `from`) that remembers `from` would go stale the moment something
+	// else destroys it, and its eventual undo would silently miss the entity that actually needs
+	// touching.
 	void redirect(flecs::entity from, flecs::entity to) {
 		if (from != to)
 			m_redirects[from.id()] = to;
@@ -134,10 +136,11 @@ public:
 	}
 
 	// Restores whatever was staged since the matching beginTransaction() and discards it, without
-	// affecting an enclosing transaction's earlier records. Restoring a "before" that still has a
-	// value can destroy-and-recreate the entity (see apply()); when an enclosing transaction is
-	// still open, that recreated entity is re-staged into it so it stays tracked instead of
-	// silently becoming an untracked (if currently correct-looking) part of the document.
+	// affecting an enclosing transaction's earlier records. Re-applying a "before" to a handle
+	// that is no longer alive re-creates the entity under a fresh one (see apply()); when an
+	// enclosing transaction is still open, that recreated entity is re-staged into it so it stays
+	// tracked instead of silently becoming an untracked (if currently correct-looking) part of
+	// the document.
 	void rollbackTransaction() {
 		assert(!m_savepoints.empty() && "rollbackTransaction() without a matching beginTransaction()");
 		const auto savepoint = m_savepoints.back();
@@ -232,24 +235,25 @@ private:
 	}
 
 	// Applies `state` to `entity`, returning the (possibly new) handle that now represents it.
-	// A vid change is always destroy + recreate, never an in-place VidRef set: WorldModule's
-	// OnSet<VidRef> observer (world_components.cppm) resets Payload and spawns a linked child
-	// object every time VidRef is set, which is only safe for a brand-new entity - exactly the
-	// destroy+recreate discipline the rest of the codebase (e.g. tile substitution) already follows.
+	// A vid change is applied in place: WorldModule no longer hooks OnSet<VidRef> - derived state
+	// (animation, payload prototype, linked child) is reconciled by a system on the next
+	// flushDerivedState(), so set<VidRef> has no side effects. The restored payload is written
+	// after the vid and survives that reconciliation because the reconciler only replaces a
+	// payload whose variant type doesn't fit the vid's class. Only a dead handle is re-created
+	// (flecs cannot revive handles), minting a fresh entity id - history records are kept pointing
+	// at the right entity via redirect().
 	static flecs::entity apply(flecs::entity entity, const std::optional<ObjectSnapshot>& state) {
-		const auto* currentVid = entity.is_alive() ? entity.try_get<VidRef>() : nullptr;
-
 		if (!state) {
 			if (entity.is_alive())
 				entity.destruct();
 			return entity;
 		}
 
-		if (!currentVid || *currentVid != state->vid) {
+		if (!entity.is_alive()) {
 			flecs::world world = entity.world();
-			if (entity.is_alive())
-				entity.destruct();
 			entity = world.entity().set<VidRef>(state->vid).child_of(world.component<ActiveLevel>());
+		} else {
+			entity.set<VidRef>(state->vid);
 		}
 
 		entity.set<Transform, Local>(state->transform);
@@ -556,18 +560,11 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 
 				history.stage(entity);
 				if (const auto tile = *substitution) {
-					auto newTile = world.entity();
-					history.stage(newTile); // before any component is set, so "before" means "didn't exist"
-					history.redirect(entity, newTile); // an earlier, still-undoable edit may still remember `entity`
-					newTile.set<VidRef>(tile)
-						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction})
-						.child_of(world.component<ActiveLevel>());
-
-					if (auto ordering = entity.try_get<EditorOrdering>()) {
-						newTile.set<EditorOrdering>(*ordering);
-					}
+					entity.set<VidRef>(tile)
+						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction});
+				} else {
+					entity.destruct();
 				}
-				entity.destruct();
 			});
 		});
 	});
