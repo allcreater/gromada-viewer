@@ -41,16 +41,22 @@ export {
         else
             entity.disable();
 
-        entity.children(flecs::ChildOf, [enabled](flecs::entity child) {
-            if (!child.has<LinkedObject>())
-                return;
+        entity.world().defer([&] {
+            entity.children(flecs::ChildOf, [enabled](flecs::entity child) {
+                if (!child.has<LinkedObject>())
+                    return;
 
-            if (enabled)
-                child.enable();
-            else
-                child.disable();
+                if (enabled)
+                    child.enable();
+                else
+                    child.disable();
+            });
         });
     }
+
+    flecs::entity instantiateObject(flecs::world world, const GameObject& obj, std::optional<flecs::entity> target = {});
+    GameObject makeGameObject(const VidRef& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id, Action action = Action::act_stand);
+
 
     class WorldModule {
     public:
@@ -132,6 +138,9 @@ void reconcileLinkedChild(flecs::entity entity, const VidRef& vid, int depth = 0
 void WorldModule::reconcileStaleObjects() {
     std::vector<flecs::entity> stale, linkedOnly;
     m_staleObjects.each([&](flecs::entity entity, const VidRef& vid, const SyncedVid* stamp) {
+        if (!vid)
+            return;
+
         if (!stamp || stamp->nvid != vid.nvid())
             stale.push_back(entity);
         else if (vid->linkedObjectVid > 0)
@@ -144,11 +153,37 @@ void WorldModule::reconcileStaleObjects() {
         reconcileLinkedChild(entity, entity.get<VidRef>());
 }
 
+flecs::entity instantiateObject(flecs::world world, const GameObject& obj, std::optional<flecs::entity> target) {
+    const auto& gameResources = world.get<const GameResources>();
+    const auto activeLevel = world.component<ActiveLevel>();
+    return target.or_else( [world] -> std::optional<flecs::entity>{return world.entity();} ).value()
+        .set<VidRef>(gameResources.getVid(obj.nvid))
+        .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
+        .set<GameObject::Payload>(obj.payload)
+        .child_of(activeLevel);
+}
+
+GameObject makeGameObject(const VidRef& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id, Action action) {
+    assert(transform.x > std::numeric_limits<std::int16_t>::min() && transform.y > std::numeric_limits<std::int16_t>::min() && transform.z > std::numeric_limits<std::int16_t>::min());
+    assert(transform.x < std::numeric_limits<std::int16_t>::max() && transform.y < std::numeric_limits<std::int16_t>::max() && transform.z < std::numeric_limits<std::int16_t>::max());
+
+    return GameObject {
+        .nvid = vid.nvid(),
+        .x = static_cast<std::int16_t>(transform.x),
+        .y = static_cast<std::int16_t>(transform.y),
+        .z = static_cast<std::int16_t>(transform.z),
+        .direction = transform.direction,
+        .action = std::to_underlying(action),
+        .payload = payload ? *payload : getPayloadPrototype(vid),
+        .id = id,
+    };
+}
+
 // Ensures the entity has exactly one linked child object matching vid->linkedObjectVid:
 // spawns it, replaces it after a vid change, or removes a stale one. Cheap enough to run
 // every frame even for already-stamped entities, which self-heals state the SyncedVid stamp
 // can't know about - most notably placement: flecs clone copies components, not children.
-void reconcileLinkedChild(flecs::entity entity, const VidRef& vid, int depth = 0) {
+void reconcileLinkedChild(flecs::entity entity, const VidRef& vid, int depth) {
     flecs::entity linked;
     entity.children(flecs::ChildOf, [&linked](flecs::entity child) {
         if (child.has<LinkedObject>())

@@ -48,6 +48,8 @@ export {
         Payload payload;
 
         std::uint32_t id; // Unique ID for the object, used as a target for some commands and map armies info
+
+        bool operator==(const GameObject&) const = default;
     };
 
     enum /*class*/ MapVersion : std::uint32_t {

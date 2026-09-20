@@ -126,7 +126,7 @@ export class MapViewModel {
     }
     void updatePrototype(bool enabled, const FrameInput& input, glm::ivec2 mouseWorldPos) {
         auto prototype = m_world.target<ObjectPrototype>();
-		if (!prototype.is_valid())
+		if (!prototype.get<VidRef>())
 			return;
 
 		auto& prototype_transform = prototype.ensure<Transform, Local>();
@@ -217,7 +217,7 @@ export class MapViewModel {
             std::visit(overloaded{
                 [&](PlacementState) {
                     const auto& prototype = m_world.target<ObjectPrototype>();
-                    if (is_placingGesture && input.leftMouseReleased)
+                    if (is_placingGesture && input.leftMouseReleased && prototype.get<VidRef>())
                         prototype.clone().child_of(m_world.component<ActiveLevel>());
                 },[](auto _){}
             }, m_editorState->state);

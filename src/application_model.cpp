@@ -42,18 +42,12 @@ export void flushDerivedState(flecs::world& world) {
 	world.progress(0.0f);
 }
 
-
 // TODO: move to separate module after MSVC update - was strange internal compuler errors with flecs headers
 //
-// A snapshot of everything that makes an entity "a map object", as opposed to the lossy on-disk
-// GameObject DTO (int16_t coordinates, id-only payload reference etc). Entities with no VidRef
-// (i.e. not a map object at all), as well as soft-deleted (disabled) ones, are represented by
-// an absent ObjectSnapshot, not a default one.
+// A snapshot of everything that makes an entity "a map object"
 struct ObjectSnapshot {
-    VidRef vid;
-    Transform transform;
-    std::optional<EditorOrdering> ordering;
-    GameObject::Payload payload;
+    GameObject object;
+    std::uint32_t orderingIndex = 0;
 
     bool operator==(const ObjectSnapshot&) const = default;
 };
@@ -182,38 +176,31 @@ private:
 
 		const auto* ordering = entity.try_get<EditorOrdering>();
 		return ObjectSnapshot{
-			.vid = *vid,
-			.transform = *transform,
-			.ordering = ordering ? *ordering : EditorOrdering{},
-			.payload = *payload,
+			.object = makeGameObject(*vid, *transform, payload, ordering ? ordering->uid : 0),
+			.orderingIndex = ordering ? ordering->index : 0,
 		};
 	}
 
 	// Applies `state` to `entity` in place. Deletion is soft (disable instead of destruct), so
 	// an object's handle stays valid for as long as the history exists, and no redirect
-	// bookkeeping is needed anywhere. A vid change is applied with a plain set: WorldModule's
-	// reconciliation system rebuilds the derived state (animation, payload prototype, linked
-	// child) on the next flushDerivedState(), and the restored payload is written after the vid
-	// and survives that reconciliation because the reconciler only replaces a payload whose
-	// variant type doesn't fit the vid's class.
+	// bookkeeping is needed anywhere. A vid change goes through instantiateObject(), the same
+	// GameObject -> components step used for loading maps: WorldModule's reconciliation system
+	// rebuilds the derived state (animation, payload prototype, linked child) on the next
+	// flushDerivedState(), and the restored payload survives that reconciliation because the
+	// reconciler only replaces a payload whose variant type doesn't fit the vid's class.
 	static void apply(flecs::entity entity, const std::optional<ObjectSnapshot>& state) {
 		if (!entity.is_alive()) {
 			assert(false && "map object destroyed outside history - deletions must go through setMapObjectEnabled()");
 			return;
 		}
 
+		setMapObjectEnabled(entity, state.has_value());
 		if (!state) {
-			setMapObjectEnabled(entity, false);
 			return;
 		}
 
-		setMapObjectEnabled(entity, true);
-		entity.set<VidRef>(state->vid);
-		entity.set<Transform, Local>(state->transform);
-		if (state->ordering)
-			entity.set<EditorOrdering>(*state->ordering);
-
-		entity.set<GameObject::Payload>(state->payload);
+		instantiateObject(entity.world(), state->object, entity);
+		entity.set<EditorOrdering>({.uid = state->object.id, .index = state->orderingIndex});
 	}
 
 	std::vector<std::size_t> m_savepoints;
@@ -302,12 +289,8 @@ public:
 	    this->get_mut<History>().clear();
 
 	    for (const auto& obj : map.objects) {
-	        this->entity()
-                .emplace<VidRef>(gameResources.getVid(obj.nvid))
-	            .set<Transform, Local>({.x = obj.x, .y = obj.y, .z = obj.z, .direction = obj.direction})
-	            .set<GameObject::Payload>(obj.payload)
-	            .set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())})
-                .child_of(activeLevel);
+	    	instantiateObject(*this, obj)
+	    		.set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())});
 	    }
 
 	    activeLevel.set<MapHeaderRawData>(map.header);
@@ -316,22 +299,6 @@ public:
 
 	    flushDerivedState(*this);
 	}
-
-    static GameObject makeGameObject(const VidRef& vid, const Transform& transform, const GameObject::Payload* payload, std::uint32_t id) {
-	    assert(transform.x > std::numeric_limits<std::int16_t>::min() && transform.y > std::numeric_limits<std::int16_t>::min() && transform.z > std::numeric_limits<std::int16_t>::min());
-	    assert(transform.x < std::numeric_limits<std::int16_t>::max() && transform.y < std::numeric_limits<std::int16_t>::max() && transform.z < std::numeric_limits<std::int16_t>::max());
-
-        return GameObject {
-            .nvid = vid.nvid(),
-            .x = static_cast<std::int16_t>(transform.x),
-            .y = static_cast<std::int16_t>(transform.y),
-            .z = static_cast<std::int16_t>(transform.z),
-            .direction = transform.direction,
-            .action = std::to_underlying(Action::act_stand), // TODO: save real action
-            .payload = payload ? *payload : GameObject::Payload{},
-            .id = id,
-        };
-    }
 
     // this function is so complex to reduce the binary differences between the original and saved map.
     // It tries to save original objects on the same position and with the same ID
@@ -456,17 +423,12 @@ private:
     	world.emplace<GlobalEditorState>();
     	world.emplace<History>();
 
+    	world.add<ObjectPrototype>(world.entity().emplace<VidRef>());
+
     	world.observer<GlobalEditorState>()
 			.event(flecs::OnSet)
 			.each([world](flecs::entity _, const GlobalEditorState& state) {
-				if (world.target<ObjectPrototype>().is_valid())
-					world.target<ObjectPrototype>().destruct();
-
-				if (state.selectedNvid) {
-					auto prototype = world.entity().emplace<VidRef>(state.selectedNvid);
-
-					world.add<ObjectPrototype>(prototype);
-				}
+				world.target<ObjectPrototype>().set<VidRef>(state.selectedNvid);
 			});
 
         return world;
@@ -487,14 +449,11 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 	const auto referenceSizeTile = baseTiles[1]; //TODO: crutch
 	const auto region = BoundingBox::fromPositions(x - referenceSizeTile->sizeX/2, y - referenceSizeTile->sizeY/2, x + referenceSizeTile->sizeX/2, y + referenceSizeTile->sizeY/2);
 
-	// Structural changes (destruct, adding VidRef to a new entity) can't happen inline while a
-	// query is iterating the same table - defer() queues them and applies them once iteration ends.
 	world.defer([&] {
 		world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
 			if (!ok)
 				return;
 
-			// flecs::pair<Transform, Local> is needed (rather than plain Transform) because Transform is only ever stored as a (Transform, Local/World) pair
 			entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
 				if ((vid && (vid->category != ObjectCategory::Terrain || std::ranges::find(substrateVids, vid) != substrateVids.end())) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
 					return;
