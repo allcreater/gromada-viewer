@@ -56,10 +56,7 @@ private:
     int m_selectedSubstrateTile = 1;
 };
 
-// Save-to-file dialog with a confirm-overwrite step and an error step, so a callback that throws
-// (bad path, write failure, whatever the wrapped export/save function decides to throw) surfaces to
-// the user instead of failing silently. All three steps reuse a single popup ID/window - switching
-// on m_step - rather than nesting popups, which avoids having to juggle multi-level CloseCurrentPopup.
+
 export class SaveDialog {
 public:
     SaveDialog(std::function<void(std::ostream&&)> saveCallback, const char* windowTitle)

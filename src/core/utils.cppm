@@ -14,6 +14,9 @@ export {
 		using Ts::operator()...;
 	};
 
+    template <typename T, typename... Options>
+    concept AnyOf = (std::is_same_v<T, Options> || ...);
+
 	template <typename T> struct type_from_member;
 	template <typename M, typename T> struct type_from_member<M T::*> {
 		using type = T;

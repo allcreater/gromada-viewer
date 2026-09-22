@@ -169,7 +169,6 @@ export class MapViewModel {
         auto& viewport = m_world.get_mut<Viewport>();
         auto& camera = m_world.get_mut<Camera>();
         const FrameInput input = captureFrameInput();
-        const bool wasPainting = std::holds_alternative<PaintingGesture>(m_gesture);
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
@@ -201,13 +200,36 @@ export class MapViewModel {
         updateViewport(viewport, camera);
 
         const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
-        updateGesture(input, mouseWorldPos, viewport);
 
-        const bool isPainting = std::holds_alternative<PaintingGesture>(m_gesture);
-        if (isPainting && !wasPainting)
-            m_world.get_mut<History>().beginTransaction();
-        else if (wasPainting && !isPainting)
-            m_world.get_mut<History>().commitTransaction();
+        // TODO: rewrite shorter, three visits is too much :)
+        {
+            // update the gesture itself
+            const EditorGesture srcGesture = std::exchange(m_gesture , updateGesture(input, mouseWorldPos, *m_editorState.get()));
+
+            // and then do side effects of gesture
+
+            std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
+                if constexpr (AnyOf<DstType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
+                    m_world.get_mut<History>().beginTransaction();
+                }
+            }, m_gesture, srcGesture);
+
+            std::visit(overloaded{
+                [&](BoxSelectGesture gesture, auto _) {
+                    applyBoxSelection(gesture.rect);
+                }, [&]<typename SrcType>(DraggingObjectsGesture gesture, SrcType _) {
+                    moveSelectedObjects(viewport, input);
+                }, [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
+                }
+            }, m_gesture, srcGesture);
+
+
+            std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
+                if constexpr (AnyOf<SrcType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
+                    m_world.get_mut<History>().commitTransaction();
+                }
+            }, m_gesture, srcGesture);
+        }
 
         const bool is_placingGesture = std::holds_alternative<PlacingGesture>(m_gesture);
         updatePrototype(is_placingGesture, input, mouseWorldPos);
@@ -235,10 +257,10 @@ export class MapViewModel {
             m_gesture = IdleGesture{};
     }
 
-    void updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const Viewport& viewport) {
-        const auto is_placementMode = std::holds_alternative<PlacementState>(m_editorState->state);
-        const auto is_selectionMode = std::holds_alternative<SelectionState>(m_editorState->state);
-        const auto is_terrainDrawMode = std::holds_alternative<TerrainDrawState>(m_editorState->state);
+    EditorGesture updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const GlobalEditorState& editorState) const {
+        const auto is_placementMode = std::holds_alternative<PlacementState>(editorState.state);
+        const auto is_selectionMode = std::holds_alternative<SelectionState>(editorState.state);
+        const auto is_terrainDrawMode = std::holds_alternative<TerrainDrawState>(editorState.state);
 
         // isPanning is deliberately not checked here: updatePanningGesture already forced m_gesture
         // to PanningGesture this frame if panning is active, so this code only ever runs otherwise.
@@ -250,50 +272,53 @@ export class MapViewModel {
             return DraggingObjectsGesture{};
         };
 
-        std::visit(overloaded{
-            [&](PanningGesture&) {
+        return std::visit(overloaded{
+            [&](PanningGesture gesture) -> EditorGesture {
+                return gesture;
                 // handled by updatePanningGesture before this call; nothing to do here
             },
-            [&](IdleGesture) {
+            [&](IdleGesture gesture) -> EditorGesture {
                 if (!canStartGesture)
-                    return;
+                    return gesture;
                 if (input.leftMouseDragging)
-                    m_gesture = enterDragGesture();
-                else if (is_placementMode && input.mousePosValid)
-                    m_gesture = PlacingGesture{};
-                else if (is_terrainDrawMode && input.leftMouseDown)
-                    m_gesture = PaintingGesture{};
+                    return enterDragGesture();
+                if (is_placementMode && input.mousePosValid)
+                   return PlacingGesture{};
+                if (is_terrainDrawMode && input.leftMouseDown)
+                    return PaintingGesture{};
+                return gesture;
             },
-            [&](BoxSelectGesture& gesture) {
+            [&](BoxSelectGesture gesture) -> EditorGesture {
                 if (!input.leftMouseDragging) {
-                    m_gesture = IdleGesture{};
-                    return;
+                    return IdleGesture{};
                 }
                 gesture.rect.max = mouseWorldPos;
-                applyBoxSelection(gesture.rect);
+                return gesture;
             },
-            [&](DraggingObjectsGesture&) {
+            [&](DraggingObjectsGesture gesture) -> EditorGesture {
                 if (!input.leftMouseDragging) {
-                    m_gesture = IdleGesture{};
-                    return;
+                    return IdleGesture{};
                 }
-                moveSelectedObjects(viewport, input);
+                return gesture;
             },
-            [&](PlacingGesture&) {
+            [&](PlacingGesture gesture) -> EditorGesture {
                 if (!canStartGesture || !is_placementMode) {
-                    m_gesture = IdleGesture{};
-                } else if (input.leftMouseDragging) {
-                    m_gesture = enterDragGesture();
+                    return  IdleGesture{};
                 }
+                if (input.leftMouseDragging) {
+                    return enterDragGesture();
+                }
+                return gesture;
             },
-            [&](PaintingGesture&) {
+            [&](PaintingGesture gesture) -> EditorGesture {
                 if (!input.leftMouseDown || !is_terrainDrawMode) {
-                    m_gesture = IdleGesture{};
-                    return;
+                    return IdleGesture{};
                 }
-                const auto vid = m_editorState->selectedNvid;
+                const auto vid = editorState.selectedNvid;
                 if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
                     insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
+
+                return gesture;
             },
         }, m_gesture);
     }
@@ -490,7 +515,8 @@ export class MapViewModel {
 
     void moveSelectedObjects(const Viewport& viewport, const FrameInput& input) {
         const auto delta_ws = viewport.screenToWorldMat * glm::vec3{input.leftDragDelta, 0.0f};
-        m_selectionQuery.each([delta_ws](flecs::entity id, const Vid& vid, const Transform& _) {
+        m_selectionQuery.each([delta_ws, &history = m_world.get_mut<History>()](flecs::entity id, const Vid& vid, const Transform& _) {
+            history.stage(id);
             auto& transform_ls = id.get_mut<Transform, Local>();
 
             transform_ls.x += static_cast<int>(delta_ws.x);

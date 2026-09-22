@@ -23,7 +23,7 @@ export {
 		const GameResources&	parent() const;
 
 		const Vid&				vid() const noexcept { return *m_vid; }
-		std::uint16_t			nvid() const noexcept;
+		std::uint16_t			nvid() const;
 
 		operator const Vid&() const noexcept { return *m_vid; }
 		operator bool () const noexcept { return m_parent; }
@@ -140,7 +140,7 @@ const GameResources & VidRef::parent() const {
 	return *m_parent;
 }
 
-std::uint16_t VidRef::nvid() const noexcept {
+std::uint16_t VidRef::nvid() const {
 	if (m_vid == &nullVid) [[unlikely]] {
 		throw std::logic_error("Null VidRef does not have a valid index");
 	}
