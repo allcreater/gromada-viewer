@@ -49,10 +49,15 @@ private:
 		if (!std::filesystem::exists(mapsDirectory))
 			return {};
 
-		return std::filesystem::recursive_directory_iterator{mapsDirectory} | std::views::transform([&mapsDirectory](const auto& entry) {
+		auto maps = std::filesystem::recursive_directory_iterator{mapsDirectory}
+		| std::views::transform([&mapsDirectory](const auto& entry) {
 			return MapEntry{std::filesystem::relative(entry.path(), mapsDirectory).u8string(), entry.path()};
-		}) | std::views::filter([](const auto& entry) { return entry.path.extension() == ".map"; }) |
-			   std::ranges::to<std::vector>();
+		})
+		| std::views::filter([](const auto& entry) { return entry.path.extension() == ".map"; })
+		| std::ranges::to<std::vector>();
+
+		std::ranges::sort(maps, {}, &MapEntry::name);
+		return maps;
 	}
 
 
