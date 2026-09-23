@@ -201,49 +201,9 @@ export class MapViewModel {
 
         const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
 
-        // TODO: rewrite shorter, three visits is too much :)
-        {
-            // update the gesture itself
-            const EditorGesture srcGesture = std::exchange(m_gesture , updateGesture(input, mouseWorldPos, *m_editorState.get()));
-
-            // and then do side effects of gesture
-
-            std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
-                if constexpr (AnyOf<DstType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
-                    m_world.get_mut<History>().beginTransaction();
-                }
-            }, m_gesture, srcGesture);
-
-            std::visit(overloaded{
-                [&](BoxSelectGesture gesture, auto _) {
-                    applyBoxSelection(gesture.rect);
-                }, [&]<typename SrcType>(DraggingObjectsGesture gesture, SrcType _) {
-                    moveSelectedObjects(viewport, input);
-                }, [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
-                }
-            }, m_gesture, srcGesture);
-
-
-            std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
-                if constexpr (AnyOf<SrcType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
-                    m_world.get_mut<History>().commitTransaction();
-                }
-            }, m_gesture, srcGesture);
-        }
-
-        const bool is_placingGesture = std::holds_alternative<PlacingGesture>(m_gesture);
-        updatePrototype(is_placingGesture, input, mouseWorldPos);
-
-        // Placement
-        {
-            std::visit(overloaded{
-                [&](PlacementState) {
-                    const auto& prototype = m_world.target<ObjectPrototype>();
-                    if (is_placingGesture && input.leftMouseReleased && prototype.get<VidRef>())
-                        prototype.clone().child_of(m_world.component<ActiveLevel>());
-                },[](auto _){}
-            }, m_editorState->state);
-        }
+        const EditorGesture srcGesture = std::exchange(m_gesture , updateGesture(input, mouseWorldPos, *m_editorState.get()));
+        updatePrototype(std::holds_alternative<PlacingGesture>(m_gesture), input, mouseWorldPos);
+        dispatchGesture( viewport, input, mouseWorldPos, srcGesture );
 
         if (input.deletePressed) {
             deleteSelectedObjects();
@@ -314,13 +274,49 @@ export class MapViewModel {
                 if (!input.leftMouseDown || !is_terrainDrawMode) {
                     return IdleGesture{};
                 }
-                const auto vid = editorState.selectedNvid;
-                if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
-                    insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
 
                 return gesture;
             },
         }, m_gesture);
+    }
+
+    void dispatchGesture( Viewport &viewport, const FrameInput input, const glm::ivec2 mouseWorldPos, const EditorGesture srcGesture ) {
+        // TODO: rewrite shorter, three visits is too much :)
+
+        std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
+            if constexpr (AnyOf<DstType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
+                m_world.get_mut<History>().beginTransaction();
+            }
+        }, m_gesture, srcGesture);
+
+        std::visit(overloaded{
+                           [&](BoxSelectGesture gesture) {
+                               applyBoxSelection(gesture.rect);
+                           }, [&](DraggingObjectsGesture gesture) {
+                               moveSelectedObjects(viewport, input);
+                           }, [&](PlacingGesture gesture) {
+                               const auto& prototype = m_world.target<ObjectPrototype>();
+                                if ( !input.leftMouseReleased || !prototype.get<VidRef>())
+                                    return;
+
+                               auto& history = m_world.get_mut<History>();
+                               history.beginTransaction();
+                               history.stage(prototype.clone().child_of(m_world.component<ActiveLevel>()), true);
+                               history.commitTransaction();
+                           }, [&](PaintingGesture gesture) {
+                               const auto vid = m_editorState->selectedNvid;
+                               if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
+                                   insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
+                           }, [&]<typename DstType>(const DstType& dstGesture) {
+                           }
+                   }, m_gesture);
+
+
+        std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
+            if constexpr (AnyOf<SrcType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
+                m_world.get_mut<History>().commitTransaction();
+            }
+        }, m_gesture, srcGesture);
     }
 
     auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& worldTransform, auto&& boundsGetter) {

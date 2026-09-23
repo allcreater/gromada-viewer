@@ -86,7 +86,7 @@ public:
 	// long painting-gesture transaction) can still stage an entity a previous, already-committed
 	// sibling transaction touched: that entity may have changed since, and this transaction needs
 	// its own "before" to be able to roll itself back independently of the earlier one.
-	void stage(flecs::entity entity) {
+	void stage(flecs::entity entity, bool isNew = false) {
 		assert(!m_savepoints.empty() && "stage() called outside a transaction");
 
 		const auto currentTransactionStart = m_savepoints.back();
@@ -95,7 +95,10 @@ public:
 		if (alreadyStagedHere)
 			return;
 
-		m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
+		if (isNew)
+			m_current.push_back({.entity = entity, .before = std::nullopt, .after = snapshot(entity)});
+		else
+			m_current.push_back({.entity = entity, .before = snapshot(entity), .after = std::nullopt});
 	}
 
 	void commitTransaction() {
