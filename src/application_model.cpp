@@ -206,6 +206,10 @@ private:
 		entity.set<EditorOrdering>({.uid = state->object.id, .index = state->orderingIndex});
 	}
 
+	friend class std::unique_lock<History>;
+	void lock() { beginTransaction(); }
+	void unlock() { commitTransaction(); }
+
 	std::vector<std::size_t> m_savepoints;
 	std::vector<ChangeRecord> m_current;
 	std::unordered_set<std::uint64_t> m_touched;

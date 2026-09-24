@@ -300,9 +300,8 @@ export class MapViewModel {
                                     return;
 
                                auto& history = m_world.get_mut<History>();
-                               history.beginTransaction();
+                               std::unique_lock transaction{history};
                                history.stage(prototype.clone().child_of(m_world.component<ActiveLevel>()), true);
-                               history.commitTransaction();
                            }, [&](PaintingGesture gesture) {
                                const auto vid = m_editorState->selectedNvid;
                                if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
@@ -374,10 +373,9 @@ export class MapViewModel {
             ImGui::SameLine( );
             if (ImGui::Button("Delete")) {
                 auto& history = m_world.get_mut<History>();
-                history.beginTransaction();
+                std::unique_lock transaction{history};
                 history.stage(objectHandle);
                 setMapObjectEnabled(objectHandle, false); // soft delete - undoable
-                history.commitTransaction();
 
                 // TODO: this early exit is actually a crutch :(
                 ImGui::End();
@@ -523,14 +521,14 @@ export class MapViewModel {
 
     void deleteSelectedObjects() {
         auto& history = m_world.get_mut<History>();
-        history.beginTransaction();
+        std::unique_lock transaction{history};
+
         m_world.defer([&] {
             m_selectionQuery.each([&history](flecs::entity id, const Vid& vid, const Transform& _) {
                 history.stage(id);
                 setMapObjectEnabled(id, false); // soft delete - undoable
             });
         });
-        history.commitTransaction();
     }
 
 
