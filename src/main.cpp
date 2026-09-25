@@ -61,7 +61,7 @@ public:
 			.frame_userdata_cb = bind<&SappWrapper::frame>,
 			.cleanup_userdata_cb = bind<&SappWrapper::cleanup>,
 			.event_userdata_cb = bind<&SappWrapper::input, const sapp_event*>,
-			.window_title = "Gromada viewer",
+			.window_title = "Gromada editor",
 			.enable_clipboard = true,
 		};
 	}

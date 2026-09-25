@@ -104,6 +104,8 @@ public:
 				MyImUtils::Text("Build time: {}", BUILD_INFO_TIMESTAMP);
 				MyImUtils::Text("Commit: {}", BUILD_INFO_COMMIT_HASH);
 
+				ImGui::TextLinkOpenURL( "Project repository", "https://github.com/allcreater/gromada-viewer");
+
 				ImGui::EndTabItem();
 			}
 
