@@ -42,13 +42,13 @@ public:
 
                     ImGui::Spacing();
                     ImGui::TextUnformatted("Squads:");
-                    for (const auto& [squadIndex, squad] : std::views::enumerate(army.squads)) {
+                    for (std::size_t squadIndex = 0; const auto& squad : army.squads) { // NOTE: can't use std::views::enumerate until it will be supported by libc++
                         const auto members = squad
                             | std::views::transform([](std::uint32_t id) { return std::to_string(id); })
                             | std::views::join_with(std::string_view{", "})
                             | std::ranges::to<std::string>();
 
-                        MyImUtils::Text("  {}: [{}]", squadIndex, members);
+                        MyImUtils::Text("  {}: [{}]", squadIndex++, members);
                     }
                 }
 

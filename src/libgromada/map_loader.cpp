@@ -127,6 +127,7 @@ std::array<Army, 2> loadArmies(GromadaResourceNavigator& resourceNavigator) {
     std::array<Army, 2> armies;
     std::size_t numOfSections = resourceNavigator.visitSectionsOfType(
         SectionType::Army , [&](const Section& _, BinaryStreamReader reader) {
+        	// NOTE: original game supports random count, but reads only first 2 armies. We pin it just because all of the original maps have exactly 2 armies
             if(reader.read<std::uint8_t>() != 2)
                 throw std::runtime_error("Invalid map: should be exactly 2 armies");
 

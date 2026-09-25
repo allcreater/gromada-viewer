@@ -385,7 +385,7 @@ export class MapViewModel {
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
             processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
-            processObjectPropertiesTab(objectHandle.get_mut<GameObject::Payload>());
+            processObjectPropertiesTab(objectHandle);
             ImGui::End();
         }
     }
@@ -402,7 +402,7 @@ export class MapViewModel {
         ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
     }
 
-    void processObjectPropertiesTab(GameObject::Payload& somePayload ) {
+    void processObjectPropertiesTab(flecs::entity objectHandle ) {
         std::visit( overloaded{
         []( Payloads::VisualObject ) {
             ImGui::Text("Just a visual object, no payload");
@@ -410,7 +410,7 @@ export class MapViewModel {
         []( Payloads::MaterialObject &payload ) {
             ImGui::InputScalar("Actual HP",  ImGuiDataType_U8, &payload.hp);
         },
-        [this]( Payloads::AssetObject &payload ) {
+        [this, objectHandle]( Payloads::AssetObject &payload ) {
             if (ImGui::BeginTabBar("PayloadTabs")) {
                 if (ImGui::BeginTabItem("General")) {
                     ImGui::PushItemWidth(100.0f);
@@ -450,9 +450,18 @@ export class MapViewModel {
                 }
 
                 ImGui::EndTabBar();
+
+                bool isEnabled = objectHandle.has<SquadMember>();
+                ImGui::Checkbox( "Squad", &isEnabled);
+                objectHandle.add_if<SquadMember>(isEnabled);
+                if (isEnabled) {
+                    auto& squad = objectHandle.get_mut<SquadMember>();
+                    ImGui::SameLine();
+                    ImGui::InputScalar("##SquadNumber", ImGuiDataType_U16, &squad.number);
+                }
             }
         }
-        }, somePayload );
+        }, objectHandle.get_mut<GameObject::Payload>() );
     }
 
     void displayMapBounds(ImDrawList* draw_list, const Viewport& viewport, const Camera& camera, const MapHeaderRawData& mapHeader) {

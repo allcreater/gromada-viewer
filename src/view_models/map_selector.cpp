@@ -45,7 +45,7 @@ private:
 		std::filesystem::path path;
 	};
 
-	static std::vector<MapEntry> getMaps(const Model& model, const std::filesystem::path& mapsDirectory) {
+	static std::vector<MapEntry> getMaps(const std::filesystem::path& mapsDirectory) {
 		if (!std::filesystem::exists(mapsDirectory))
 			return {};
 
@@ -62,5 +62,5 @@ private:
 
 
 	std::filesystem::path m_mapsBaseDirectory;
-	std::vector<MapEntry> m_maps = getMaps(m_model, m_mapsBaseDirectory);
+	std::vector<MapEntry> m_maps = getMaps(m_mapsBaseDirectory);
 };

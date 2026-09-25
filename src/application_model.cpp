@@ -27,6 +27,9 @@ export struct Selected {};
 export struct ObjectPrototype {};
 export using Path = std::filesystem::path;
 export using Armies = std::array<Army, 2>;
+export struct SquadMember {
+	std::uint16_t number = 0;
+};
 
 export struct SelectionState {};
 export struct PlacementState {};
@@ -225,6 +228,7 @@ export struct EditorComponents {
 		world.component<ObjectPrototype>();
 		world.component<Path>();
 		world.component<Armies>().set(flecs::Singleton);
+		world.component<SquadMember>();
     	world.component<GlobalEditorState>().set(flecs::Singleton);
 		world.component<AudioEngine>().set(flecs::Singleton);
 		world.component<History>().set(flecs::Singleton);
@@ -295,9 +299,29 @@ public:
 	    this->delete_with(flecs::ChildOf, activeLevel);
 	    this->get_mut<History>().clear();
 
+		assert((map.armies[0].squads == map.armies[1].squads) && "Not an error, but original game maps have same squads arrays");
+		// NOTE: we deliberately build map by armies[1] - it's because original game also reads only last available squads list.
+		const auto objectIdToSquadIndex = [&squads = map.armies[1].squads] {
+			if (squads.size() > std::numeric_limits<std::uint16_t>::max())
+				throw std::length_error{"Too many Squad objects in map"};
+
+			std::unordered_map<std::uint32_t, std::uint16_t> result;
+			for (std::uint32_t squadIndex = 0; squadIndex < squads.size(); ++squadIndex) {
+				for (const auto& objectId : squads[squadIndex]) {
+					const auto [it, isInserted] = result.emplace(objectId, static_cast<std::uint16_t>(squadIndex));
+					assert(isInserted);
+				}
+			}
+			return result;
+		}();
+
 	    for (const auto& obj : map.objects) {
-	    	instantiateObject(*this, obj)
+	    	auto entity = instantiateObject(*this, obj)
 	    		.set<EditorOrdering>({.uid = obj.id, .index = static_cast<std::uint16_t>(&obj - map.objects.data())});
+
+	    	if (auto it = objectIdToSquadIndex.find(obj.id); it != objectIdToSquadIndex.end()) {
+	    		entity.set<SquadMember>(SquadMember{.number = it->second});
+	    	}
 	    }
 
 	    activeLevel.set<MapHeaderRawData>(map.header);
@@ -367,8 +391,8 @@ public:
 
         auto entities = prepareObjectsToExport();
 
-	    // translate coordinates so that (0,0) is top-left corner of the map
-	    updateMapBounds(entities, header);
+	    updateMapBounds(entities, header); // translate coordinates so that (0,0) is top-left corner of the map
+	    updateArmies(entities, activeLevel.ensure<Armies>());
 
 	    return Map {
 	        .header = header,
@@ -380,12 +404,12 @@ public:
 				assert(ordering.index == i++);
 				return makeGameObject(vid, transform, payload, ordering.uid);
 			}) | std::ranges::to<std::vector<GameObject>>(),
-            .armies = activeLevel.ensure<Armies>(),
+            .armies = activeLevel.get<Armies>(),
         };
 	}
 
 private:
-    void updateMapBounds(std::ranges::range auto&& entities, MapHeaderRawData& header) {
+    static void updateMapBounds(std::ranges::range auto&& entities, MapHeaderRawData& header) {
         const auto map_bounds = std::reduce(entities.begin(), entities.end(), BoundingBox{}, [](BoundingBox bb, flecs::entity obj) {
             const auto& transform = obj.get<Transform, Local>();
             return bb.extend(transform.x, transform.y);
@@ -401,6 +425,22 @@ private:
         header.width = map_bounds.width();
         header.observerX -= map_bounds.left;
         header.observerY -= map_bounds.top;
+    }
+
+	static void updateArmies(std::ranges::range auto&& entities, Armies& armies) {
+    	assert(armies[0].squads == armies[1].squads);
+
+    	auto squadsMap = entities
+    		| std::views::filter([](flecs::entity obj) { return obj.has<SquadMember>(); })
+    		| std::views::transform([](flecs::entity obj) {return std::pair{obj.get<SquadMember>().number, obj.get<EditorOrdering>().uid}; })
+    		| std::ranges::to<std::multimap>();
+
+    	armies[0].squads = armies[1].squads = squadsMap
+    		| std::views::chunk_by([](const auto& a, const auto& b) { return a.first == b.first; })
+    		| std::views::transform([](auto&& squad) {
+    			return squad | std::views::values | std::ranges::to<Army::Squad>();
+    		})
+    		| std::ranges::to<std::vector>();
     }
 
     void generateDefaultTerrain(VidRef vid, int width, int height, bool isSubstrate = false) {
