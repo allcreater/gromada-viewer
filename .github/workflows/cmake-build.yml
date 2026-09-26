@@ -75,3 +75,5 @@ jobs:
             build_dir/src
             !build_dir/src/cmake*
             !build_dir/src/CMakeFiles
+            !build_dir/src/libgromada
+            !build_dir/src/core
