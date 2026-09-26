@@ -111,6 +111,12 @@ public:
 		if (!m_savepoints.empty())
 			return; // an enclosing transaction is still open - it will diff/push on its own commit
 
+		// if one object changes state more than once - first state is what we really need
+		std::unordered_set<std::uint64_t> seenEntities;
+		std::erase_if(m_current, [&seenEntities](const ChangeRecord& change) {
+			return !seenEntities.insert(change.entity.id()).second;
+		});
+
 		std::erase_if(m_current, [this](ChangeRecord& change) {
 			change.after = snapshot(change.entity);
 			return change.before == change.after;
@@ -227,7 +233,6 @@ private:
 
 	std::vector<std::size_t> m_savepoints;
 	std::vector<ChangeRecord> m_current;
-	std::unordered_set<std::uint64_t> m_touched;
 
 	std::vector<UndoStep> m_undoStack;
 	std::vector<UndoStep> m_redoStack;
