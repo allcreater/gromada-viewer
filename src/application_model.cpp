@@ -50,7 +50,8 @@ export void flushDerivedState(flecs::world& world) {
 // A snapshot of everything that makes an entity "a map object"
 struct ObjectSnapshot {
     GameObject object;
-    std::uint32_t orderingIndex = 0;
+    std::optional<std::uint32_t> orderingIndex;
+    std::optional<std::uint16_t> squadNumber;
 
     bool operator==(const ObjectSnapshot&) const = default;
 };
@@ -181,9 +182,11 @@ private:
 			return std::nullopt;
 
 		const auto* ordering = entity.try_get<EditorOrdering>();
+		const auto* squadMember = entity.try_get<SquadMember>();
 		return ObjectSnapshot{
 			.object = makeGameObject(*vid, *transform, payload, ordering ? ordering->uid : 0),
-			.orderingIndex = ordering ? ordering->index : 0,
+			.orderingIndex = ordering ? std::optional{ordering->index} : std::nullopt,
+			.squadNumber = squadMember ? std::optional{squadMember->number} : std::nullopt,
 		};
 	}
 
@@ -206,7 +209,16 @@ private:
 		}
 
 		instantiateObject(entity.world(), state->object, entity);
-		entity.set<EditorOrdering>({.uid = state->object.id, .index = state->orderingIndex});
+
+		if (state->orderingIndex)
+			entity.set<EditorOrdering>({.uid = state->object.id, .index = *state->orderingIndex});
+		else
+			entity.remove<EditorOrdering>();
+
+		if (state->squadNumber)
+			entity.set<SquadMember>({.number = *state->squadNumber});
+		else
+			entity.remove<SquadMember>();
 	}
 
 	friend class std::unique_lock<History>;
@@ -343,12 +355,11 @@ public:
 	    std::deque<flecs::entity> unordered_objects;
 	    std::vector<flecs::entity> objects(query.count());
 
-	    // First step - collect all known objects and try to place them in the correct order
+	    // First step - collect all known objects and try to place them in the correct order.
 	    query.each([&](flecs::entity entity, const VidRef& vid, const Transform& transform) {
 	        if (auto* existing_object_attribs = entity.try_get<EditorOrdering>()) {
 	            const auto [id, index] = *existing_object_attribs;
-	            if (index < objects.size()) {
-	                assert(objects[index].id() == 0);
+	            if (index < objects.size() && objects[index].id() == 0) { // in case of collision - jyst treat object as unordered
                     objects[index] = entity;
                 } else {
                     unordered_objects.push_front(entity);
@@ -371,6 +382,9 @@ public:
 	    // Second step - fill in the gaps with new objects
 	    auto free_indices = std::views::iota(std::size_t{0}, objects.size()) | std::views::filter([&objects](std::size_t index) { return objects[index].id() == 0; });
 	    for (auto i : free_indices) {
+	        if (unordered_objects.empty())
+	            throw std::logic_error("Model::prepareObjectsToExport: ran out of objects to fill a free slot - internal ordering inconsistency");
+
 	        objects[i] = unordered_objects.front();
 	        {
 	            auto& ordering = objects[i].ensure<EditorOrdering>();
@@ -380,7 +394,8 @@ public:
 	        }
 	        unordered_objects.pop_front();
 	    }
-	    assert(unordered_objects.empty());
+	    if (!unordered_objects.empty())
+	        throw std::logic_error("Model::prepareObjectsToExport: leftover objects after filling all free slots - internal ordering inconsistency");
 
 	    return objects;
 	}
