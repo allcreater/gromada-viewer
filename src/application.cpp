@@ -47,7 +47,17 @@ public:
 
 	void on_frame() {
 		m_model.progress();
-		m_viewModel.updateUI();
+
+		try {
+			m_viewModel.updateUI();
+		} catch (const std::exception& e) {
+			if (e.what() != std::string_view{"Exit requested"})
+				throw;
+
+			ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
+			sapp_quit();
+			return;
+		}
 
         //ImGui::ShowDemoWindow();
 
@@ -87,8 +97,9 @@ private:
 			// use sokol-imgui with all default-options (we're not doing
 			// multi-sampled rendering or using non-default pixel formats)
 			simgui_setup({
-				//.no_default_font = true,
-				.logger = {.func = slog_func},
+					//.no_default_font = true,
+					.ini_filename = "GromadaEditor.ini",
+					.logger = {.func = slog_func},
 			});
 		}
 

@@ -66,7 +66,7 @@ public:
 
 	    ImGui::Checkbox("Show details", &m_showDetails);
 		if (ImGui::BeginTable(
-				"vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable)) {
+				"##vids_list_table", 4, ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable)) {
 			ImGui::TableSetupColumn("NVID", ImGuiTableColumnFlags_WidthFixed, 30.0f);
 			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 100.0f);
 			ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthStretch, 60.0f);
@@ -114,12 +114,12 @@ public:
 		    }
 
 		    if (m_showDetails && selectedSection()) {
-		        ImGui::SetNextWindowPos({320, 20}, ImGuiCond_FirstUseEver);
+		        ImGui::SetNextWindowPos({370, 20}, ImGuiCond_FirstUseEver);
 		        if (ImGui::Begin("Vid details", &m_showDetails)) {
 					VidUI(selectedSection());
 
 					ImGui::SetNextWindowPos({10, 530}, ImGuiCond_FirstUseEver);
-		            ImGui::SetNextWindowSize({300, 280}, ImGuiCond_FirstUseEver);
+		            ImGui::SetNextWindowSize({350, 280}, ImGuiCond_FirstUseEver);
 		            ShowFramesWindow(selectedSection());
 		        }
 		        ImGui::End();

@@ -179,7 +179,7 @@ bool BeginModalPopup(const char* name, bool& shouldOpen, ImGuiWindowFlags flags)
         shouldOpen = false;
     }
 
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     return ImGui::BeginPopupModal(name, nullptr, flags);
 }
 

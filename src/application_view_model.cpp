@@ -43,8 +43,8 @@ public:
 
 		m_mapViewModel.updateUI();
 
-		ImGui::SetNextWindowPos({10, 20}, ImGuiCond_Appearing);
-		ImGui::SetNextWindowSize(ImVec2{300, 500}, ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos({10, 20}, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2{350, 500}, ImGuiCond_FirstUseEver);
 		ImGui::Begin("Panel");
 		if (ImGui::BeginTabBar("Tabs")) {
 			if (ImGui::BeginTabItem("Vids")) {
@@ -98,11 +98,13 @@ public:
 					ImGui::EndTable();
 				}
 
-				ImGui::Separator();
+				ImGui::Dummy({20.0f, 30.0f});
 
 				MyImUtils::Text("Version: {}", BUILD_INFO_PROJECT_VERSION);
 				MyImUtils::Text("Build time: {}", BUILD_INFO_TIMESTAMP);
 				MyImUtils::Text("Commit: {}", BUILD_INFO_COMMIT_HASH);
+
+				ImGui::Dummy({20.0f, 30.0f});
 
 				ImGui::TextLinkOpenURL( "Project repository", "https://github.com/allcreater/gromada-viewer");
 
@@ -121,13 +123,16 @@ public:
 	}
 
 	void checkShortcuts() {
-		if (!ImGui::GetIO().WantTextInput) {
-			const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl);
-			if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Z)) {
-				undo();
-			} else if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Y)) {
-				redo();
-			}
+		if (ImGui::GetIO().WantTextInput)
+			return;
+
+		const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl);
+		if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+			undo();
+		} else if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Y)) {
+			redo();
+		} else if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_S)) {
+			beginSaveMap();
 		}
 	}
 
@@ -138,21 +143,22 @@ public:
 		        m_newMapDialog.open();
             }
 
+			if (ImGui::MenuItem("Save map", "Ctrl+S")) {
+				beginSaveMap();
+			}
+
+			ImGui::Separator();
+
 			if (ImGui::MenuItem("Export map JSON")) {
 				const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>();
 				m_exportMapDialog.open(activeMapPath ? std::format("{}.json", activeMapPath->stem().generic_string()) : std::string{"map.json"});
 			}
 
-		    if (ImGui::MenuItem("Save map")) {
-		    	const auto& mapsPath = m_model.get<const GameResources>().mapsPath();
-
-		    	const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>();
-		        m_saveMapDialog.open(activeMapPath && !activeMapPath->empty() ? activeMapPath->generic_string() : (mapsPath / "NEW_MAP.map").generic_string());
-		    }
-
 			if (ImGui::MenuItem("Export vids to CSV")) {
 				m_exportVidsDialog.open("vids.csv");
 			}
+
+			ImGui::Separator();
 
 			if (ImGui::MenuItem("Exit")) {
 				throw std::runtime_error("Exit requested");
@@ -235,6 +241,16 @@ private:
 		}
 	}
 
+	void beginSaveMap() {
+		if (m_saveMapDialog.isOpen())
+			return;
+
+		const auto& mapsPath = m_model.get<const GameResources>().mapsPath();
+
+		const auto* activeMapPath = m_model.component<ActiveLevel>().try_get<Path>();
+		m_saveMapDialog.open(activeMapPath && !activeMapPath->empty() ? activeMapPath->generic_string() : (mapsPath / "NEW_MAP.map").generic_string());
+	}
+
 	void exportMapAsJson(std::ostream&& stream) const {
 		ExportMapToJson(m_model.get<const GameResources>().vids(), m_model.saveMap(), stream);
 	}
@@ -250,7 +266,7 @@ private:
 	void baseTilesPalette() {
 		auto& state = m_model.get_mut<GlobalEditorState>();
 
-		ImGui::SetNextWindowSize( {120, 300}, ImGuiCond_Appearing );
+		ImGui::SetNextWindowSize( {120, 300}, ImGuiCond_FirstUseEver );
 		if (ImGui::Begin("Palette")) {
 
 			ImGui::BeginListBox("##Palette", {-FLT_MIN, -FLT_MIN});

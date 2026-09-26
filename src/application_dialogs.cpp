@@ -34,11 +34,12 @@ public:
         MyImUtils::ComboBox("Substrate", &m_selectedSubstrateTile, substrateTiles, [](const auto& vid) {
             return vid ? vid->getName() : "None";
         });
-
+        
         if (ImGui::Button("OK", ImVec2(120, 0))) {
             ImGui::CloseCurrentPopup();
             model.newMap(baseTiles[m_selectedTile], substrateTiles[m_selectedSubstrateTile], m_width, m_height);
         }
+        ImGui::SetItemDefaultFocus();
 
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0))) {
@@ -71,6 +72,10 @@ public:
         m_errorMessage.clear();
     }
 
+    bool isOpen() const {
+        return ImGui::IsPopupOpen(m_windowTitle);
+    }
+
     void updateUI() {
         if (!MyImUtils::BeginModalPopup(m_windowTitle, m_shouldOpen))
             return;
@@ -84,6 +89,7 @@ public:
                 else
                     trySave();
             }
+            ImGui::SetItemDefaultFocus();
 
             ImGui::SameLine();
             if (ImGui::Button("Cancel", ImVec2(120, 0))) {
@@ -96,6 +102,7 @@ public:
             if (ImGui::Button("Overwrite", ImVec2(120, 0))) {
                 trySave();
             }
+            ImGui::SetItemDefaultFocus();
 
             ImGui::SameLine();
             if (ImGui::Button("Cancel", ImVec2(120, 0))) {
@@ -111,6 +118,7 @@ public:
             if (ImGui::Button("OK", ImVec2(120, 0))) {
                 m_currentState = State::PathEditing;
             }
+            ImGui::SetItemDefaultFocus();
             break;
         }
 
@@ -162,6 +170,7 @@ public:
         if (ImGui::Button("OK", ImVec2(120, 0))) {
             ImGui::CloseCurrentPopup();
         }
+        ImGui::SetItemDefaultFocus();
 
         ImGui::EndPopup();
     }
