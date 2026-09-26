@@ -384,8 +384,16 @@ export class MapViewModel {
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
-            processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
-            processObjectPropertiesTab(objectHandle);
+
+            {
+                auto& history = m_world.get_mut<History>();
+                std::unique_lock transaction{history};
+                history.stage(objectHandle); // before any of the mutations below, per History's contract
+
+                processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
+                processObjectPropertiesTab(objectHandle);
+            }
+
             ImGui::End();
         }
     }
@@ -395,9 +403,9 @@ export class MapViewModel {
             return;
 
         static_assert(sizeof(worldTransform.x) == sizeof(int32_t));
-        ImGui::InputScalar("X",  ImGuiDataType_S32, &worldTransform.x, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
-        ImGui::InputScalar("Υ",  ImGuiDataType_S32, &worldTransform.y, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
-        ImGui::InputScalar("Z",  ImGuiDataType_S32, &worldTransform.z, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::InputScalar("X",  ImGuiDataType_S32, &worldTransform.x);
+        ImGui::InputScalar("Υ",  ImGuiDataType_S32, &worldTransform.y);
+        ImGui::InputScalar("Z",  ImGuiDataType_S32, &worldTransform.z);
         constexpr static std::uint8_t minDirection = 0, maxDirection = 255;
         ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
     }
