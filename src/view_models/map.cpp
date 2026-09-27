@@ -191,11 +191,6 @@ export class MapViewModel {
             }
         }
 
-        // Resolved before the camera/viewport update, so that starting to pan pre-empts whatever
-        // canvas gesture was in progress (box-select/drag-objects/placing) before updateGesture
-        // even looks at it - camera panning always wins.
-        updatePanningGesture(input);
-
         updateCamera(camera, levelInfo ? *levelInfo : MapHeaderRawData{}, input);
         updateViewport(viewport, camera);
 
@@ -210,20 +205,15 @@ export class MapViewModel {
         }
     }
 
-    void updatePanningGesture(const FrameInput& input) {
-        if (input.isPanning)
-            m_gesture = PanningGesture{};
-        else if (std::holds_alternative<PanningGesture>(m_gesture))
-            m_gesture = IdleGesture{};
-    }
-
     EditorGesture updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const GlobalEditorState& editorState) const {
+        // Camera panning always pre-empts whatever canvas gesture was in progress
+        if (input.isPanning)
+            return PanningGesture{};
+
         const auto is_placementMode = std::holds_alternative<PlacementState>(editorState.state);
         const auto is_selectionMode = std::holds_alternative<SelectionState>(editorState.state);
         const auto is_terrainDrawMode = std::holds_alternative<TerrainDrawState>(editorState.state);
 
-        // isPanning is deliberately not checked here: updatePanningGesture already forced m_gesture
-        // to PanningGesture this frame if panning is active, so this code only ever runs otherwise.
         const bool canStartGesture = input.windowHovered && !input.dragDropActive;
 
         auto enterDragGesture = [&]() -> EditorGesture {
@@ -234,8 +224,8 @@ export class MapViewModel {
 
         return std::visit(overloaded{
             [&](PanningGesture gesture) -> EditorGesture {
-                return gesture;
-                // handled by updatePanningGesture before this call; nothing to do here
+                assert(!input.isPanning);
+                return IdleGesture{}; // panning just ended
             },
             [&](IdleGesture gesture) -> EditorGesture {
                 if (!canStartGesture)
