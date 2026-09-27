@@ -162,6 +162,7 @@ export class MapViewModel {
 		}
 
         ImGui::MenuItem("Randomize directions", nullptr, &(m_editorState->randomizeObjectDirection));
+        ImGui::MenuItem("Expand tiles on drawing", nullptr, &(m_editorState->drawingAddsNewTiles));
 	}
 
 	void updateUI() {
@@ -295,7 +296,7 @@ export class MapViewModel {
                            }, [&](PaintingGesture gesture) {
                                const auto vid = m_editorState->selectedNvid;
                                if (!vid || (vid->type == ObjectClass::Terrain && Flags{vid->flags}[ObjectFlags::RandomDirection]))
-                                   insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y);
+                                   insertTile(m_world, vid, mouseWorldPos.x, mouseWorldPos.y, m_editorState->drawingAddsNewTiles);
                            }, [&]<typename DstType>(const DstType& dstGesture) {
                            }
                    }, m_gesture);

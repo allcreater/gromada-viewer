@@ -39,6 +39,7 @@ export struct GlobalEditorState {
 	VidRef selectedNvid;
 	std::variant<SelectionState, PlacementState, TerrainDrawState> state;
 	bool randomizeObjectDirection = true;
+	bool drawingAddsNewTiles = true;
 };
 
 export void flushDerivedState(flecs::world& world) {
@@ -362,6 +363,11 @@ public:
 
 	    // First step - collect all known objects and try to place them in the correct order.
 	    query.each([&](flecs::entity entity, const VidRef& vid, const Transform& transform) {
+	    	if (!vid) {
+	    		assert(false && "should not be active entities with null vid - probably something went wrong before");
+	    		return;
+	    	}
+
 	        if (auto* existing_object_attribs = entity.try_get<EditorOrdering>()) {
 	            const auto [id, index] = *existing_object_attribs;
 	            if (index < objects.size() && objects[index].id() == 0) { // in case of collision - jyst treat object as unordered
@@ -503,7 +509,7 @@ private:
 
 };
 
-export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y) {
+export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y, bool addNewTiles = false) {
 	const auto& substrateVids = world.get<const GameResources>().substrateTilesVids();
 	const auto& baseTiles = world.get<const GameResources>().baseTilesVids();
 	if (std::ranges::find(baseTiles, baseTerrainTile) == baseTiles.end())
@@ -514,7 +520,28 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 	bool ok = true;
 
 	const auto referenceSizeTile = baseTiles[1]; //TODO: crutch
-	const auto region = BoundingBox::fromPositions(x - referenceSizeTile->sizeX/2, y - referenceSizeTile->sizeY/2, x + referenceSizeTile->sizeX/2, y + referenceSizeTile->sizeY/2);
+	const int halfSizeX = referenceSizeTile->sizeX / 2;
+	const int halfSizeY = referenceSizeTile->sizeY / 2;
+	const auto region = BoundingBox::fromPositions(x - halfSizeX, y - halfSizeY, x + halfSizeX, y + halfSizeY);
+	const auto activeLevel = world.component<ActiveLevel>();
+
+	struct Corner {
+		CornerDirection direction;
+		int offsetX, offsetY;
+	};
+	const std::array corners{
+		Corner{CornerDirection::TopLeft, -halfSizeX, -halfSizeY},
+		Corner{CornerDirection::TopRight, halfSizeX, -halfSizeY},
+		Corner{CornerDirection::BottomLeft, -halfSizeX, halfSizeY},
+		Corner{CornerDirection::BottomRight, halfSizeX, halfSizeY},
+	};
+	std::array<bool, corners.size()> foundNeighbor{};
+
+	struct ReferenceCorner {
+		std::size_t index;
+		int x, y;
+	};
+	std::optional<ReferenceCorner> referenceCorner;
 
 	world.defer([&] {
 		world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, region, [&](flecs::entity entity) {
@@ -522,15 +549,20 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 				return;
 
 			entity.get([&](const VidRef& vid, const flecs::pair<Transform, Local>& transform) {
-				if ((vid && (vid->category != ObjectCategory::Terrain || std::ranges::find(substrateVids, vid) != substrateVids.end())) || !entity.has(flecs::ChildOf, world.component<ActiveLevel>()))
+				if ((vid && (vid->category != ObjectCategory::Terrain || std::ranges::find(substrateVids, vid) != substrateVids.end())) || !entity.has(flecs::ChildOf, activeLevel))
 					return;
 
-				const auto getDirection = [](int deltaX, int deltaY) -> CornerDirection {
-					return deltaX > 0 ? (deltaY > 0 ? CornerDirection::BottomRight : CornerDirection::TopRight) : (deltaY > 0 ? CornerDirection::BottomLeft : CornerDirection::TopLeft);
-				};
+				const auto cornerIt = std::ranges::find_if(corners, [deltaX = transform->x - x, deltaY = transform->y - y](const Corner& corner) {
+					return (corner.offsetX > 0) == (deltaX > 0) && (corner.offsetY > 0) == (deltaY > 0);
+				});
+				assert(cornerIt != corners.end() && "a tile found in the query region must fall into one of the 4 quadrants");
+				const auto cornerIndex = static_cast<std::size_t>(cornerIt - corners.begin());
+				foundNeighbor[cornerIndex] = true;
+				if (!referenceCorner)
+					referenceCorner = ReferenceCorner{cornerIndex, transform->x, transform->y};
 
 				const Tile sourceTile{vid, transform->direction};
-				const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, getDirection(transform->x - x, transform->y - y));
+				const auto substitution = trySubstituteTile(sourceTile, baseTerrainTile, cornerIt->direction);
 				if (!substitution) {
 					ok = false;
 					return;
@@ -540,6 +572,7 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 
 				history.stage(entity);
 				if (const auto tile = *substitution) {
+					assert(tile);
 					entity.set<VidRef>(tile)
 						.set<Transform, Local>({.x = transform->x, .y = transform->y, .z = 0, .direction = tile.direction});
 				} else {
@@ -549,6 +582,39 @@ export void insertTile(flecs::world& world, VidRef baseTerrainTile, int x, int y
 				}
 			});
 		});
+
+		if (!addNewTiles || !ok || !referenceCorner || !baseTerrainTile)
+			return;
+
+		const auto isPositionOccupied = [&](int posX, int posY) {
+			const auto targetRegion = BoundingBox::fromPositions(posX - halfSizeX, posY - halfSizeY, posX + halfSizeX, posY + halfSizeY);
+			bool occupied = false;
+			world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, targetRegion, [&](flecs::entity candidate) {
+				if (occupied)
+					return;
+				candidate.get([&](const flecs::pair<Transform, Local>& transform) {
+					occupied = (transform->x == posX && transform->y == posY);
+				});
+			});
+			return occupied;
+		};
+
+		const auto& refCorner = corners[referenceCorner->index];
+		for (std::size_t i = 0; const auto& corner : corners) {
+			if (foundNeighbor[i++])
+				continue;
+
+			const auto targetX = referenceCorner->x + (corner.offsetX - refCorner.offsetX);
+			const auto targetY = referenceCorner->y + (corner.offsetY - refCorner.offsetY);
+			if (isPositionOccupied(targetX, targetY))
+				continue;
+
+			auto entity = world.entity().child_of(activeLevel);
+			history.stage(entity, true);
+			assert(baseTerrainTile);
+			entity.set<VidRef>(baseTerrainTile)
+				.set<Transform, Local>({.x = targetX, .y = targetY, .z = 0, .direction = static_cast<std::uint8_t>(randomIndex(256))});
+		}
 	});
 
 	if (ok)
