@@ -275,9 +275,8 @@ private:
 					state.selectedNvid = vid;
 			}
 			ImGui::EndListBox();
-
-			ImGui::End();
 		}
+		ImGui::End();
 	}
 
 	Model& m_model;
