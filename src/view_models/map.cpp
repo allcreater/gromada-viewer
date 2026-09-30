@@ -26,7 +26,9 @@ import Gromada.Map;
 import Gromada.SoftwareRenderer;
 
 constexpr ImVec2 to_imvec(const auto vec) { return ImVec2{static_cast<float>(vec.x), static_cast<float>(vec.y)}; }
-constexpr glm::ivec2 from_imvec(const ImVec2 vec) { return glm::ivec2{static_cast<int>(vec.x), static_cast<int>(vec.y)}; }
+
+template <typename T = glm::ivec2>
+constexpr T from_imvec(const ImVec2 vec) { return T{static_cast<typename T::value_type>(vec.x), static_cast<typename T::value_type>(vec.y)}; }
 
 constexpr static ImU32 objectSelectionColor(ObjectCategory unitType);
 
@@ -38,7 +40,7 @@ struct SelectionRect {
 struct IdleGesture {};
 struct PanningGesture {};
 struct BoxSelectGesture { SelectionRect rect; };
-struct DraggingObjectsGesture {};
+struct DraggingObjectsGesture { glm::ivec2 appliedWs; };
 struct PlacingGesture {};
 struct PaintingGesture {};
 using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture, PaintingGesture>;
@@ -48,7 +50,7 @@ using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture
 struct FrameInput {
     glm::ivec2 mouseScreenPos;
     glm::ivec2 mouseDelta;
-    glm::ivec2 leftDragDelta;
+    glm::vec2 leftDragDelta;
     glm::fvec2 wsadDirection;
     float mouseWheel = 0.0f;
     bool leftMouseDown = false;
@@ -81,7 +83,7 @@ static FrameInput captureFrameInput(bool panInProgress) {
     return FrameInput{
         .mouseScreenPos = from_imvec(ImGui::GetMousePos()),
         .mouseDelta = from_imvec(io.MouseDelta),
-        .leftDragDelta = from_imvec(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
+        .leftDragDelta = from_imvec<glm::vec2>(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
         .wsadDirection = wsadDirection,
         .mouseWheel = io.MouseWheel,
         .leftMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left),
@@ -289,8 +291,9 @@ export class MapViewModel {
         std::visit(overloaded{
                            [&](BoxSelectGesture gesture) {
                                applyBoxSelection(gesture.rect);
-                           }, [&](DraggingObjectsGesture gesture) {
-                               moveSelectedObjects(viewport, input);
+                           }, [&](DraggingObjectsGesture& gesture) {
+                               const glm::ivec2 totalDragWs = glm::trunc(glm::vec2{viewport.screenToWorldMat * glm::vec3{input.leftDragDelta, 0.0f}});
+                               moveSelectedObjects(totalDragWs - std::exchange(gesture.appliedWs, totalDragWs));
                            }, [&](PlacingGesture gesture) {
                                const auto& prototype = m_world.target<ObjectPrototype>();
                                 if ( !input.leftMouseReleased || !prototype.get<VidRef>())
@@ -401,7 +404,7 @@ export class MapViewModel {
 
         static_assert(sizeof(worldTransform.x) == sizeof(int32_t));
         ImGui::InputScalar("X",  ImGuiDataType_S32, &worldTransform.x);
-        ImGui::InputScalar("Υ",  ImGuiDataType_S32, &worldTransform.y);
+        ImGui::InputScalar("Y",  ImGuiDataType_S32, &worldTransform.y);
         ImGui::InputScalar("Z",  ImGuiDataType_S32, &worldTransform.z);
         constexpr static std::uint8_t minDirection = 0, maxDirection = 255;
         ImGui::SliderScalar( "Direction", ImGuiDataType_U8, &worldTransform.direction, &minDirection, &maxDirection );
@@ -526,16 +529,17 @@ export class MapViewModel {
         });
     }
 
-    void moveSelectedObjects(const Viewport& viewport, const FrameInput& input) {
-        const auto delta_ws = viewport.screenToWorldMat * glm::vec3{input.leftDragDelta, 0.0f};
+    void moveSelectedObjects(glm::ivec2 delta_ws) {
+        if (delta_ws == glm::ivec2{})
+            return;
+
         m_selectionQuery.each([delta_ws, &history = m_world.get_mut<History>()](flecs::entity id, const Vid& vid, const Transform& _) {
             history.stage(id);
             auto& transform_ls = id.get_mut<Transform, Local>();
 
-            transform_ls.x += static_cast<int>(delta_ws.x);
-            transform_ls.y += static_cast<int>(delta_ws.y);
+            transform_ls.x += delta_ws.x;
+            transform_ls.y += delta_ws.y;
         });
-        ImGui::ResetMouseDragDelta();
     }
 
     void deleteSelectedObjects() {
