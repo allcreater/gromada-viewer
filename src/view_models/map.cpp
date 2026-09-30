@@ -63,11 +63,17 @@ struct FrameInput {
     bool dragDropActive = false;
 };
 
-static FrameInput captureFrameInput() {
+static FrameInput captureFrameInput(bool panInProgress) {
     const ImGuiIO& io = ImGui::GetIO();
-    const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+    const bool ctrlDown = io.KeyCtrl;
+    const bool windowHovered = ImGui::IsWindowHovered();
+    const bool keyboardFree = !io.WantTextInput;
+    const bool panButtonDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle);
 
-    glm::fvec2 wsadDirection = { ImGui::IsKeyDown( ImGuiKey_D) - ImGui::IsKeyDown(ImGuiKey_A), ImGui::IsKeyDown( ImGuiKey_S) - ImGui::IsKeyDown(ImGuiKey_W)};
+    glm::fvec2 wsadDirection{};
+    if (keyboardFree && !ctrlDown) {
+        wsadDirection = { ImGui::IsKeyDown( ImGuiKey_D) - ImGui::IsKeyDown(ImGuiKey_A), ImGui::IsKeyDown( ImGuiKey_S) - ImGui::IsKeyDown(ImGuiKey_W)};
+    }
     if (auto length = glm::dot(wsadDirection, wsadDirection); length > 0.0f) {
         wsadDirection *= glm::inversesqrt(length);
     }
@@ -81,11 +87,11 @@ static FrameInput captureFrameInput() {
         .leftMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left),
         .leftMouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
         .leftMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
-        .isPanning = ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ctrlDown,
+        .isPanning = panButtonDragging && (panInProgress || windowHovered),
         .ctrlDown = ctrlDown,
-        .shiftDown = ImGui::IsKeyDown(ImGuiKey_LeftShift),
-        .deletePressed = ImGui::IsKeyPressed(ImGuiKey_Delete),
-        .windowHovered = ImGui::IsWindowHovered(),
+        .shiftDown = io.KeyShift,
+        .deletePressed = keyboardFree && ImGui::IsKeyPressed(ImGuiKey_Delete),
+        .windowHovered = windowHovered,
         .mousePosValid = ImGui::IsMousePosValid(),
         .dragDropActive = ImGui::IsDragDropActive(),
     };
@@ -136,7 +142,7 @@ export class MapViewModel {
 		    prototype_transform.x = mouseWorldPos.x;
 		    prototype_transform.y = mouseWorldPos.y;
 
-			if (std::abs(input.mouseWheel) > 0.0f) {
+			if (std::abs(input.mouseWheel) > 0.0f && !input.ctrlDown) {
 				const auto step = 255 / static_cast<float>(prototype.get<const VidRef>()->directionsCount);
 				prototype_transform.direction -= (input.mouseWheel > 0 ? 1 : -1) * step; // Reverse direction is more intuitive
 			} else if (m_editorState->randomizeObjectDirection && Flags{prototype.get<const VidRef>()->flags}[ObjectFlags::RandomDirection] ) {
@@ -169,7 +175,7 @@ export class MapViewModel {
         const auto* levelInfo = m_world.component<ActiveLevel>().try_get<MapHeaderRawData>();
         auto& viewport = m_world.get_mut<Viewport>();
         auto& camera = m_world.get_mut<Camera>();
-        const FrameInput input = captureFrameInput();
+        const FrameInput input = captureFrameInput(std::holds_alternative<PanningGesture>(m_gesture));
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         {
@@ -474,15 +480,20 @@ export class MapViewModel {
 
     static void updateCamera(Camera& camera, const MapHeaderRawData& mapHeader, const FrameInput& input) {
         if (!input.dragDropActive && input.ctrlDown && input.mouseWheel != 0.0f) {
-            camera.magnificationFactor += static_cast<int>(glm::sign(input.mouseWheel));
-        }
-        camera.magnificationFactor = std::clamp(camera.magnificationFactor, 1, 8);
+            const auto newMagnification = std::clamp(camera.magnificationFactor + static_cast<int>(glm::sign(input.mouseWheel)), 1, 8);
+            const auto screenCenter = glm::vec2{from_imvec(ImGui::GetMainViewport()->Size)} * 0.5f;
+            const auto cursorOffset = glm::vec2{input.mouseScreenPos} - screenCenter;
 
+            camera.position += cursorOffset * (1.0f / camera.magnificationFactor - 1.0f / newMagnification);
+            camera.magnificationFactor = newMagnification;
+        }
+
+        const auto magnification = static_cast<float>(camera.magnificationFactor);
         if (input.isPanning) {
-            camera.position -= glm::vec2{input.mouseDelta};
+            camera.position -= glm::vec2{input.mouseDelta} / magnification;
         }
 
-        camera.velocity += (input.wsadDirection * 8000.0f - camera.velocity*5.0f) * ImGui::GetIO().DeltaTime;
+        camera.velocity += (input.wsadDirection * 8000.0f / magnification - camera.velocity*5.0f) * ImGui::GetIO().DeltaTime;
         camera.position += camera.velocity * ImGui::GetIO().DeltaTime;
         //camera.velocity = camera.velocity * 0.93f;
 

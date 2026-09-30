@@ -77,7 +77,7 @@ public:
 				constexpr std::array controls{
 					std::pair{"WSAD"sv, "Move camera"sv},
 					std::pair{"Ctrl+Wheel"sv, "Zoom in/out"sv},
-					std::pair{"Right mouse button / Ctrl + mouse"sv, "Move camera"sv},
+					std::pair{"Right/middle mouse button"sv, "Move camera"sv},
 					std::pair{"Left mouse button"sv, "Select object"sv},
 					std::pair{"Del"sv, "Delete selected objects"sv},
 				};
