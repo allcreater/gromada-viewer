@@ -17,6 +17,8 @@ endif()
 
 project(GromadaEditor
     VERSION 0.6.0
+    DESCRIPTION "Gromada map editor and resource viewer"
+    HOMEPAGE_URL "https://github.com/allcreater/gromada-viewer"
     LANGUAGES CXX
 )
 

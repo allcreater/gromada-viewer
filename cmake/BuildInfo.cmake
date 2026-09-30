@@ -36,8 +36,30 @@ function(setup_build_info TARGET_NAME)
         BUILD_INFO_PROJECT_VERSION="${PROJECT_VERSION}"
     )
     
+    if(WIN32)
+        add_windows_version_info(${TARGET_NAME} "${GIT_COMMIT_HASH}")
+    endif()
+
     message(STATUS "Build Info:")
     message(STATUS "  Commit (full): ${GIT_COMMIT_HASH}")
     message(STATUS "  Build date: ${BUILD_TIMESTAMP}")
     message(STATUS "  Version: ${PROJECT_VERSION}")
+endfunction()
+
+function(add_windows_version_info TARGET_NAME COMMIT_HASH)
+    foreach(component MAJOR MINOR PATCH TWEAK)
+        if(NOT PROJECT_VERSION_${component})
+            set(PROJECT_VERSION_${component} 0)
+        endif()
+    endforeach()
+
+    set(VERSION_INFO_AUTHOR "Anton Semenov")
+    string(TIMESTAMP VERSION_INFO_YEAR "%Y")
+    string(SUBSTRING "${COMMIT_HASH}" 0 7 VERSION_INFO_COMMIT_SHORT)
+
+    set(RC_FILE "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}_version_info.rc")
+    configure_file("${CMAKE_SOURCE_DIR}/cmake/version_info.rc.in" "${RC_FILE}" @ONLY)
+
+    enable_language(RC)
+    target_sources(${TARGET_NAME} PRIVATE "${RC_FILE}")
 endfunction()
