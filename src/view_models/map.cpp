@@ -39,7 +39,7 @@ struct SelectionRect {
 
 struct IdleGesture {};
 struct PanningGesture {};
-struct BoxSelectGesture { SelectionRect rect; };
+struct BoxSelectGesture { SelectionRect rect; std::vector<flecs::entity> baseSelection; }; // baseSelection is kept by additive (Shift) selection
 struct DraggingObjectsGesture { glm::ivec2 appliedWs; };
 struct PlacingGesture {};
 struct PaintingGesture {};
@@ -238,8 +238,9 @@ export class MapViewModel {
         const bool canStartGesture = input.windowHovered && !input.dragDropActive;
 
         auto enterDragGesture = [&]() -> EditorGesture {
-            if (input.shiftDown || is_selectionMode)
-                return BoxSelectGesture{{clickWorldPos, mouseWorldPos}};
+            const bool startsBoxSelect = is_selectionMode ? (input.shiftDown || !isOverSelectedObject(clickWorldPos)) : input.shiftDown;
+            if (startsBoxSelect)
+                return BoxSelectGesture{{clickWorldPos, mouseWorldPos}, input.shiftDown ? selectedEntities() : std::vector<flecs::entity>{}};
             return DraggingObjectsGesture{};
         };
 
@@ -304,8 +305,13 @@ export class MapViewModel {
         }, m_gesture, srcGesture);
 
         std::visit(overloaded{
-                           [&](BoxSelectGesture gesture) {
-                               applyBoxSelection(gesture.rect);
+                           [&](IdleGesture) {
+                               const bool isClick = input.leftMouseReleased && std::holds_alternative<IdleGesture>(srcGesture)
+                                   && input.windowHovered && !input.dragDropActive && std::holds_alternative<SelectionState>(m_editorState->state);
+                               if (isClick)
+                                   selectObjectAt(mouseWorldPos, input.shiftDown);
+                           }, [&](BoxSelectGesture gesture) {
+                               applyBoxSelection(gesture);
                            }, [&](DraggingObjectsGesture& gesture) {
                                const glm::ivec2 totalDragWs = glm::trunc(glm::vec2{viewport.screenToWorldMat * glm::vec3{input.leftDragDelta, 0.0f}});
                                moveSelectedObjects(totalDragWs - std::exchange(gesture.appliedWs, totalDragWs));
@@ -544,8 +550,43 @@ export class MapViewModel {
         vp.worldToScreenMat = glm::inverse(vp.screenToWorldMat);
     }
 
-    void applyBoxSelection(const SelectionRect& rect) {
+    // NOTE: All the rest functions is about selection
+
+    std::vector<flecs::entity> selectedEntities() const {
+        std::vector<flecs::entity> result;
+        m_selectionQuery.each([&](flecs::entity id, const Vid&, const Transform&) { result.push_back(id); });
+        return result;
+    }
+
+    bool isOverSelectedObject(glm::ivec2 pos) const {
+        return  m_selectionQuery.find([&](flecs::entity, const Vid& vid, const Transform& worldTransform) {
+            return PhysicalBoundsFn{}(vid, worldTransform).isPointInside(pos.x, pos.y);
+        });
+    }
+
+    // Picks the smallest object under the point, so small objects on top of big ones stay reachable
+    void selectObjectAt(glm::ivec2 pos, bool additive) {
+        flecs::entity picked;
+        int pickedArea = std::numeric_limits<int>::max();
+        m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(pos.x - 1, pos.y - 1, pos.x + 1, pos.y + 1), [&](flecs::entity entity) {
+            const auto& vid = entity.get<const VidRef>();
+            const int area = vid->sizeX * vid->sizeY;
+            if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && m_selectionType[vid->category] && area < pickedArea) {
+                picked = entity;
+                pickedArea = area;
+            }
+        });
+
+        if (!additive)
+            m_world.remove_all<Selected>();
+        if (picked)
+            picked.add_if<Selected>(!(additive && picked.has<Selected>()));
+    }
+
+    void applyBoxSelection(const BoxSelectGesture& box) {
+        const auto& rect = box.rect;
         m_world.remove_all<Selected>();
+        std::ranges::for_each(box.baseSelection, [](flecs::entity entity) { entity.add<Selected>(); });
         m_world.defer([&] {
             m_world.get<ObjectsView>().queryObjectsInRegion(ObjectsView::physicalBounds, BoundingBox::fromPositions(rect.min.x, rect.min.y, rect.max.x, rect.max.y), [this](flecs::entity entity) {
                 if (entity.has(flecs::ChildOf, m_world.component<ActiveLevel>()) && m_selectionType[entity.get<const VidRef>()->category]) {
@@ -580,7 +621,7 @@ export class MapViewModel {
         });
     }
 
-
+private:
     flecs::world& m_world;
     flecs::ref<GlobalEditorState> m_editorState = m_world.get_ref<GlobalEditorState>();
     flecs::query<const VidRef, const Transform> m_selectionQuery;
