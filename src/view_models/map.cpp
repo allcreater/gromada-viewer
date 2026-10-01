@@ -56,6 +56,7 @@ struct FrameInput {
     glm::fvec2 wsadDirection;
     float mouseWheel = 0.0f;
     bool leftMouseDown = false;
+    bool leftMouseClicked = false;
     bool leftMouseReleased = false;
     bool leftMouseDragging = false;
     bool isPanning = false;
@@ -91,6 +92,7 @@ static FrameInput captureFrameInput(bool panInProgress) {
         .wsadDirection = wsadDirection,
         .mouseWheel = io.MouseWheel,
         .leftMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left),
+        .leftMouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left),
         .leftMouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
         .leftMouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
         .isPanning = panButtonDragging && (panInProgress || windowHovered),
@@ -252,11 +254,11 @@ export class MapViewModel {
             [&](IdleGesture gesture) -> EditorGesture {
                 if (!canStartGesture)
                     return gesture;
+                if (is_placementMode && input.mousePosValid && !input.shiftDown) // Shift turns any tool into temporary selection
+                   return PlacingGesture{};
                 if (input.leftMouseDragging)
                     return enterDragGesture();
-                if (is_placementMode && input.mousePosValid)
-                   return PlacingGesture{};
-                if (is_terrainDrawMode && input.leftMouseDown)
+                if (is_terrainDrawMode && input.leftMouseDown && !input.shiftDown)
                     return PaintingGesture{};
                 return gesture;
             },
@@ -274,11 +276,8 @@ export class MapViewModel {
                 return gesture;
             },
             [&](PlacingGesture gesture) -> EditorGesture {
-                if (!canStartGesture || !is_placementMode) {
+                if (!canStartGesture || !is_placementMode || input.shiftDown) {
                     return  IdleGesture{};
-                }
-                if (input.leftMouseDragging) {
-                    return enterDragGesture();
                 }
                 return gesture;
             },
@@ -307,9 +306,12 @@ export class MapViewModel {
         std::visit(overloaded{
                            [&](IdleGesture) {
                                const bool isClick = input.leftMouseReleased && std::holds_alternative<IdleGesture>(srcGesture)
-                                   && input.windowHovered && !input.dragDropActive && std::holds_alternative<SelectionState>(m_editorState->state);
+                                   && input.windowHovered && !input.dragDropActive
+                                   && (input.shiftDown || std::holds_alternative<SelectionState>(m_editorState->state));
                                if (isClick)
                                    selectObjectAt(mouseWorldPos, input.shiftDown);
+                               if (isClick || std::holds_alternative<BoxSelectGesture>(srcGesture))
+                                   switchToSelectionToolIfAnySelected();
                            }, [&](BoxSelectGesture gesture) {
                                applyBoxSelection(gesture);
                            }, [&](DraggingObjectsGesture& gesture) {
@@ -317,7 +319,7 @@ export class MapViewModel {
                                moveSelectedObjects(totalDragWs - std::exchange(gesture.appliedWs, totalDragWs));
                            }, [&](PlacingGesture gesture) {
                                const auto& prototype = m_world.target<ObjectPrototype>();
-                                if ( !input.leftMouseReleased || !prototype.get<VidRef>())
+                                if ( !input.leftMouseClicked || !prototype.get<VidRef>())
                                     return;
 
                                auto& history = m_world.get_mut<History>();
@@ -551,6 +553,14 @@ export class MapViewModel {
     }
 
     // NOTE: All the rest functions is about selection
+
+    void switchToSelectionToolIfAnySelected() {
+        if (std::holds_alternative<SelectionState>(m_editorState->state) || selectedEntities().empty())
+            return;
+
+        m_editorState->state = SelectionState{};
+        m_world.modified<GlobalEditorState>();
+    }
 
     std::vector<flecs::entity> selectedEntities() const {
         std::vector<flecs::entity> result;
