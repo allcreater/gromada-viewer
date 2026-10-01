@@ -143,6 +143,7 @@ private:
 
 	void selectedSection(VidRef vid) {
 		m_model.get_mut<GlobalEditorState>().selectedNvid = vid;
+		m_model.get_mut<GlobalEditorState>().state = PlacementState{};
 		m_model.modified<GlobalEditorState>();
 		flushDerivedState(m_model);
 	}
