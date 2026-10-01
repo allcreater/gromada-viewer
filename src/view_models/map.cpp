@@ -43,12 +43,14 @@ struct BoxSelectGesture { SelectionRect rect; };
 struct DraggingObjectsGesture { glm::ivec2 appliedWs; };
 struct PlacingGesture {};
 struct PaintingGesture {};
-using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture, PaintingGesture>;
+struct CancelledGesture {}; // Esc pressed mid-gesture; waits for the mouse button release
+using EditorGesture = std::variant<IdleGesture, PanningGesture, BoxSelectGesture, DraggingObjectsGesture, PlacingGesture, PaintingGesture, CancelledGesture>;
 
 // Snapshot of raw ImGui input, captured once per frame. This is the single seam through which
 // map-editing logic reads user input; nothing below should call ImGui::IsKey*/IsMouse* directly.
 struct FrameInput {
     glm::ivec2 mouseScreenPos;
+    glm::ivec2 leftClickScreenPos;
     glm::ivec2 mouseDelta;
     glm::vec2 leftDragDelta;
     glm::fvec2 wsadDirection;
@@ -60,6 +62,7 @@ struct FrameInput {
     bool ctrlDown = false;
     bool shiftDown = false;
     bool deletePressed = false;
+    bool escapePressed = false;
     bool windowHovered = false;
     bool mousePosValid = false;
     bool dragDropActive = false;
@@ -82,6 +85,7 @@ static FrameInput captureFrameInput(bool panInProgress) {
 
     return FrameInput{
         .mouseScreenPos = from_imvec(ImGui::GetMousePos()),
+        .leftClickScreenPos = from_imvec(io.MouseClickedPos[ImGuiMouseButton_Left]),
         .mouseDelta = from_imvec(io.MouseDelta),
         .leftDragDelta = from_imvec<glm::vec2>(ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)),
         .wsadDirection = wsadDirection,
@@ -93,6 +97,7 @@ static FrameInput captureFrameInput(bool panInProgress) {
         .ctrlDown = ctrlDown,
         .shiftDown = io.KeyShift,
         .deletePressed = keyboardFree && ImGui::IsKeyPressed(ImGuiKey_Delete),
+        .escapePressed = keyboardFree && ImGui::IsKeyPressed(ImGuiKey_Escape),
         .windowHovered = windowHovered,
         .mousePosValid = ImGui::IsMousePosValid(),
         .dragDropActive = ImGui::IsDragDropActive(),
@@ -205,7 +210,8 @@ export class MapViewModel {
 
         const auto mouseWorldPos = viewport.screenToWorldPos(input.mouseScreenPos);
 
-        const EditorGesture srcGesture = std::exchange(m_gesture , updateGesture(input, mouseWorldPos, *m_editorState.get()));
+        const auto clickWorldPos = viewport.screenToWorldPos(input.leftClickScreenPos);
+        const EditorGesture srcGesture = std::exchange(m_gesture , updateGesture(input, mouseWorldPos, clickWorldPos, *m_editorState.get()));
         updatePrototype(std::holds_alternative<PlacingGesture>(m_gesture), input, mouseWorldPos);
         dispatchGesture( viewport, input, mouseWorldPos, srcGesture );
 
@@ -214,10 +220,16 @@ export class MapViewModel {
         }
     }
 
-    EditorGesture updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, const GlobalEditorState& editorState) const {
+    EditorGesture updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, glm::ivec2 clickWorldPos, const GlobalEditorState& editorState) const {
         // Camera panning always pre-empts whatever canvas gesture was in progress
         if (input.isPanning)
             return PanningGesture{};
+
+        const bool isCancellable = std::holds_alternative<BoxSelectGesture>(m_gesture)
+            || std::holds_alternative<DraggingObjectsGesture>(m_gesture)
+            || std::holds_alternative<PaintingGesture>(m_gesture);
+        if (input.escapePressed && isCancellable)
+            return CancelledGesture{};
 
         const auto is_placementMode = std::holds_alternative<PlacementState>(editorState.state);
         const auto is_selectionMode = std::holds_alternative<SelectionState>(editorState.state);
@@ -227,7 +239,7 @@ export class MapViewModel {
 
         auto enterDragGesture = [&]() -> EditorGesture {
             if (input.shiftDown || is_selectionMode)
-                return BoxSelectGesture{{mouseWorldPos, mouseWorldPos}};
+                return BoxSelectGesture{{clickWorldPos, mouseWorldPos}};
             return DraggingObjectsGesture{};
         };
 
@@ -276,6 +288,9 @@ export class MapViewModel {
 
                 return gesture;
             },
+            [&](CancelledGesture gesture) -> EditorGesture {
+                return input.leftMouseDown ? EditorGesture{gesture} : IdleGesture{};
+            },
         }, m_gesture);
     }
 
@@ -313,9 +328,20 @@ export class MapViewModel {
 
         std::visit( [&]<typename DstType, typename SrcType>(const DstType& dstGesture, const SrcType& srcGesture) {
             if constexpr (AnyOf<SrcType, PaintingGesture, DraggingObjectsGesture> && !std::same_as<SrcType, DstType>) {
-                m_world.get_mut<History>().commitTransaction();
+                auto& history = m_world.get_mut<History>();
+                if constexpr (std::same_as<DstType, CancelledGesture>)
+                    history.rollbackTransaction();
+                else
+                    history.commitTransaction();
             }
         }, m_gesture, srcGesture);
+
+        const bool gestureJustCancelled = std::holds_alternative<CancelledGesture>(m_gesture) && !std::holds_alternative<CancelledGesture>(srcGesture);
+        if (input.escapePressed && !gestureJustCancelled) {
+            m_world.remove_all<Selected>();
+            m_editorState->state = SelectionState{};
+            m_world.modified<GlobalEditorState>();
+        }
     }
 
     auto computeBBScreenSize (const Viewport& viewport, const Vid& vid, const Transform& worldTransform, auto&& boundsGetter) {

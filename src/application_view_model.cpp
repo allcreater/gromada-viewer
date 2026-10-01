@@ -80,6 +80,7 @@ public:
 					std::pair{"Right/middle mouse button"sv, "Move camera"sv},
 					std::pair{"Left mouse button"sv, "Select object"sv},
 					std::pair{"Del"sv, "Delete selected objects"sv},
+					std::pair{"Escape"sv, "Cancel dragging/selection/drawing"sv},
 				};
 
 				if (ImGui::BeginTable("Controls", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
