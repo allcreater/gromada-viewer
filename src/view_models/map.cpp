@@ -146,7 +146,8 @@ export class MapViewModel {
 
 		auto& prototype_transform = prototype.ensure<Transform, Local>();
 		if (enabled) {
-			prototype.enable();
+			if (!prototype.enabled())
+				setMapObjectEnabled(prototype, true);
 
 		    prototype_transform.x = mouseWorldPos.x;
 		    prototype_transform.y = mouseWorldPos.y;
@@ -159,7 +160,8 @@ export class MapViewModel {
             }
 		}
 		else {
-			prototype.disable();
+			if (prototype.enabled())
+				setMapObjectEnabled(prototype, false);
 		}
     }
 

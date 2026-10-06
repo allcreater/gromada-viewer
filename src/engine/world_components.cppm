@@ -29,7 +29,7 @@ export {
         std::uint16_t nvid;
     };
 
-    // Enables/disables a map object together with its linked children. The single entry point
+    // Enables/disables a map object together with its linked children (recursively). The single entry point
     // for hiding objects from the document (soft delete, undo/redo of one): plain enable()/
     // disable() on the object alone would leave its linked children rendering as ghosts.
     // Disabled objects are skipped by all queries, so they are invisible to rendering,
@@ -43,13 +43,8 @@ export {
 
         entity.world().defer([&] {
             entity.children(flecs::ChildOf, [enabled](flecs::entity child) {
-                if (!child.has<LinkedObject>())
-                    return;
-
-                if (enabled)
-                    child.enable();
-                else
-                    child.disable();
+                if (child.has<LinkedObject>())
+                    setMapObjectEnabled(child, enabled); // linked objects may chain
             });
         });
     }
