@@ -19,28 +19,17 @@ public:
 		auto& groups = favorites().groups;
 		std::optional<std::uint32_t> groupToDelete;
 		for (auto& group : groups) {
-			if (group.visible && groupWindow(group))
+			if (group.detached && groupWindow(group))
 				groupToDelete = group.id;
 		}
+
+		if (auto id = sharedWindow(groups))
+			groupToDelete = id;
 
 		if (groupToDelete) {
 			std::erase_if(groups, [&](const auto& group) { return group.id == *groupToDelete; });
 			ImGui::MarkIniSettingsDirty();
 		}
-	}
-
-	void onMenu() {
-		for (auto& group : favorites().groups) {
-			ImGui::PushID(group.id);
-			if (ImGui::MenuItem(group.name.c_str(), nullptr, &group.visible))
-				ImGui::MarkIniSettingsDirty();
-			ImGui::PopID();
-		}
-
-		if (!favorites().groups.empty())
-			ImGui::Separator();
-
-		newGroupMenu();
 	}
 
 	void vidContextMenu(VidRef vid) {
@@ -72,50 +61,119 @@ private:
 		bool deleteRequested = false;
 
 		ImGui::SetNextWindowSize({220, 300}, ImGuiCond_FirstUseEver);
-		const auto title = std::format("{}###favorites_{}", group.name, group.id);
-		if (ImGui::Begin(title.c_str(), &group.visible)) {
-			if (ImGui::BeginListBox("##vids", {-FLT_MIN, -FLT_MIN})) {
-				const auto selectedVid = m_model.get<GlobalEditorState>().selectedNvid;
-				std::optional<VidRef> vidToRemove;
-				for (const auto vid : group.vids) {
-					ImGui::PushID(vid.nvid());
-					if (ImGui::Selectable(std::format("{:>4}  {}", vid.nvid(), vid->getName()).c_str(), vid == selectedVid))
-						selectVid(vid);
-
-					if (ImGui::BeginPopupContextItem()) {
-						if (ImGui::MenuItem("Remove"))
-							vidToRemove = vid;
-						ImGui::EndPopup();
-					}
-					ImGui::PopID();
-				}
-
-				if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
-					if (ImGui::BeginMenu("Rename")) {
-						if (auto name = nameInput(group.name)) {
-							group.name = std::move(*name);
-							ImGui::MarkIniSettingsDirty();
-							ImGui::CloseCurrentPopup();
-						}
-						ImGui::EndMenu();
-					}
-					deleteRequested = ImGui::MenuItem("Delete group");
-					ImGui::EndPopup();
-				}
-				ImGui::EndListBox();
-
-				if (vidToRemove) {
-					std::erase(group.vids, *vidToRemove);
-					ImGui::MarkIniSettingsDirty();
-				}
-			}
+		if (ImGui::Begin(std::format("{}###favorites_{}", group.name, group.id).c_str())) {
+			deleteRequested = groupContent(group);
 		}
 		ImGui::End();
 
-		if (!group.visible)
+		return deleteRequested;
+	}
+
+	// returns id of the group requested for deletion
+	std::optional<std::uint32_t> sharedWindow(std::vector<Group>& groups) {
+		const auto isShared = [](const Group& group) { return !group.detached; };
+		auto current = std::ranges::find_if(groups, [&](const Group& group) { return isShared(group) && group.id == m_sharedGroupId; });
+		if (current == groups.end())
+			current = std::ranges::find_if(groups, isShared);
+		if (current == groups.end())
+			return std::nullopt;
+
+		std::optional<std::uint32_t> groupToDelete;
+		ImGui::SetNextWindowSize({220, 300}, ImGuiCond_FirstUseEver);
+		if (ImGui::Begin("Favorites###favorites_shared")) {
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			if (ImGui::BeginCombo("##group", current->name.c_str())) {
+				for (const auto& group : groups | std::views::filter(isShared)) {
+					ImGui::PushID(group.id);
+					if (ImGui::Selectable(group.name.c_str(), group.id == current->id))
+						m_sharedGroupId = group.id;
+					ImGui::PopID();
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::PushID(current->id);
+			if (groupContent(*current))
+				groupToDelete = current->id;
+			ImGui::PopID();
+		}
+		ImGui::End();
+
+		return groupToDelete;
+	}
+
+	// returns true if deletion requested
+	bool groupContent(Group& group) {
+		if (!ImGui::BeginListBox("##vids", {-FLT_MIN, -FLT_MIN}))
+			return false;
+
+		bool deleteRequested = false;
+		const auto selectedVid = m_model.get<GlobalEditorState>().selectedNvid;
+		std::optional<VidRef> vidToRemove;
+		std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>> vidsToSwap;
+
+		const auto vidsCount = std::ssize(group.vids);
+		for (std::ptrdiff_t index = 0; index < vidsCount; ++index) {
+			const auto vid = group.vids[index];
+			ImGui::PushID(vid.nvid());
+			if (ImGui::Selectable(std::format("{:>4}  {}", vid.nvid(), vid->getName()).c_str(), vid == selectedVid))
+				selectVid(vid);
+
+			if (const auto target = index + itemDragDirection(); target != index && target >= 0 && target < vidsCount)
+				vidsToSwap = {index, target};
+
+			if (ImGui::BeginPopupContextItem()) {
+				if (ImGui::MenuItem("Remove"))
+					vidToRemove = vid;
+
+				ImGui::EndPopup();
+			}
+			ImGui::PopID();
+		}
+
+		if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
+			if (ImGui::BeginMenu("Rename")) {
+				if (auto name = nameInput(group.name)) {
+					group.name = std::move(*name);
+					ImGui::MarkIniSettingsDirty();
+					ImGui::CloseCurrentPopup();
+				}
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::MenuItem("Separate window", nullptr, &group.detached))
+				ImGui::MarkIniSettingsDirty();
+
+			deleteRequested = ImGui::MenuItem("Delete group");
+			ImGui::EndPopup();
+		}
+		ImGui::EndListBox();
+
+		if (vidsToSwap) {
+			std::swap(group.vids[vidsToSwap->first], group.vids[vidsToSwap->second]);
 			ImGui::MarkIniSettingsDirty();
+		}
+
+		if (vidToRemove) {
+			std::erase(group.vids, *vidToRemove);
+			ImGui::MarkIniSettingsDirty();
+		}
 
 		return deleteRequested;
+	}
+
+	// -1/+1 while the last item is being dragged above/below itself
+	static int itemDragDirection() {
+		if (!ImGui::IsItemActive())
+			return 0;
+
+		const auto mouseY = ImGui::GetMousePos().y;
+		if (mouseY < ImGui::GetItemRectMin().y)
+			return -1;
+		if (mouseY > ImGui::GetItemRectMax().y)
+			return 1;
+		return 0;
 	}
 
 	Group* newGroupMenu() {
@@ -124,6 +182,8 @@ private:
 			if (auto name = nameInput({})) {
 				auto& favs = favorites();
 				newGroup = &favs.groups.emplace_back(favs.nextGroupId++, std::move(*name));
+				m_sharedGroupId = newGroup->id;
+
 				ImGui::MarkIniSettingsDirty();
 				ImGui::CloseCurrentPopup();
 			}
@@ -136,6 +196,7 @@ private:
 		if (ImGui::IsWindowAppearing()) {
 			m_nameBuffer = {};
 			initialName.copy(m_nameBuffer.data(), m_nameBuffer.size() - 1);
+
 			ImGui::SetKeyboardFocusHere();
 		}
 
@@ -150,6 +211,7 @@ private:
 		auto& state = m_model.get_mut<GlobalEditorState>();
 		state.selectedNvid = vid;
 		state.state = PlacementState{};
+
 		m_model.modified<GlobalEditorState>();
 		flushDerivedState(m_model);
 	}
@@ -179,7 +241,7 @@ private:
 			for (const auto& group : favoritesOf(handler).groups) {
 				const auto nvids = group.vids | std::views::transform([](VidRef vid) { return std::to_string(vid.nvid()); }) | std::views::join_with(',') |
 								   std::ranges::to<std::string>();
-				buffer->appendf("[%s][%s]\nId=%u\nVisible=%d\nVids=%s\n\n", handler->TypeName, group.name.c_str(), group.id, group.visible, nvids.c_str());
+				buffer->appendf("[%s][%s]\nId=%u\nDetached=%d\nVids=%s\n\n", handler->TypeName, group.name.c_str(), group.id, group.detached, nvids.c_str());
 			}
 		};
 		ImGui::AddSettingsHandler(&handler);
@@ -196,8 +258,8 @@ private:
 		const auto value = line.substr(separator + 1);
 		if (key == "Id")
 			std::from_chars(value.data(), value.data() + value.size(), group.id);
-		else if (key == "Visible")
-			group.visible = value != "0";
+		else if (key == "Detached")
+			group.detached = value != "0";
 		else if (key == "Vids")
 			group.vids = parseVids(value, resources);
 	}
@@ -215,4 +277,5 @@ private:
 
 	Model& m_model;
 	std::array<char, 64> m_nameBuffer{};
+	std::uint32_t m_sharedGroupId = 0;
 };

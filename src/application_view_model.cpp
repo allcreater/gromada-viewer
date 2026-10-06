@@ -186,11 +186,6 @@ public:
 		    ImGui::EndMenu();
 		}
 
-		if (ImGui::BeginMenu("Favorites")) {
-			m_favoritesViewModel.onMenu();
-			ImGui::EndMenu();
-		}
-
 		m_newMapDialog.updateUI(m_model);
 		m_exportMapDialog.updateUI();
 		m_saveMapDialog.updateUI();

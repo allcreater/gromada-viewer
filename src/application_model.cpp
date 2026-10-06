@@ -47,7 +47,7 @@ export struct FavoriteVids {
 		std::uint32_t id;
 		std::string name;
 		std::vector<VidRef> vids;
-		bool visible = true;
+		bool detached = false;
 	};
 
 	std::vector<Group> groups;
