@@ -46,8 +46,9 @@ auto makeComparator(const ImGuiTableSortSpecs& sortSpecs) {
 
 export class VidsWindowViewModel {
 public:
-	explicit VidsWindowViewModel(Model& model)
-		: m_model{model} {
+	VidsWindowViewModel(Model& model, std::function<void(VidRef)> vidContextMenu)
+		: m_model{model}
+		, m_vidContextMenu{std::move(vidContextMenu)} {
 
 		m_model.observer<GlobalEditorState>()
 			.event(flecs::OnSet)
@@ -87,6 +88,10 @@ public:
 
 				if (ImGui::Selectable(std::to_string(vid.nvid()).c_str(), isElementSelected, ImGuiSelectableFlags_SpanAllColumns)) {
 					selectedSection(vid);
+				}
+				if (ImGui::BeginPopupContextItem()) {
+					m_vidContextMenu(vid);
+					ImGui::EndPopup();
 				}
 				if (isElementSelected) {
 					ImGui::SetItemDefaultFocus();
@@ -150,6 +155,7 @@ private:
 
 private:
 	Model& m_model;
+	std::function<void(VidRef)> m_vidContextMenu;
     bool m_showDetails = false;
 	bool m_showFrameNumbers = false;
 	std::vector<VidRef> m_sortedVids{std::from_range, m_model.get<const GameResources>().vidRefs()};

@@ -17,6 +17,7 @@ add_executable (GromadaEditor
 		"engine/objects_view.cppm"
 		"engine/world_components.cppm"
 		"engine/audio_engine.cppm"
+		"view_models/favorites.cpp"
 		"view_models/vids.cpp"
 		"view_models/map.cpp"
 		"view_models/map_selector.cpp"

@@ -42,6 +42,18 @@ export struct GlobalEditorState {
 	bool drawingAddsNewTiles = true;
 };
 
+export struct FavoriteVids {
+	struct Group {
+		std::uint32_t id;
+		std::string name;
+		std::vector<VidRef> vids;
+		bool visible = true;
+	};
+
+	std::vector<Group> groups;
+	std::uint32_t nextGroupId = 0;
+};
+
 export void flushDerivedState(flecs::world& world) {
 	world.progress(0.0f);
 }
@@ -248,6 +260,7 @@ export struct EditorComponents {
 		world.component<Armies>().set(flecs::Singleton);
 		world.component<SquadMember>();
     	world.component<GlobalEditorState>().set(flecs::Singleton);
+		world.component<FavoriteVids>().set(flecs::Singleton);
 		world.component<AudioEngine>().set(flecs::Singleton);
 		world.component<History>().set(flecs::Singleton);
 	}
@@ -494,6 +507,7 @@ private:
         world.emplace<GameResources>(resourcesPath);
         world.emplace<AudioEngine>();
     	world.emplace<GlobalEditorState>();
+    	world.emplace<FavoriteVids>();
     	world.emplace<History>();
 
     	world.add<ObjectPrototype>(world.entity().emplace<VidRef>());

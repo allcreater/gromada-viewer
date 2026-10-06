@@ -15,6 +15,7 @@ import application.model;
 import application.dialogs;
 import :map;
 import :map_selector;
+import :favorites;
 import :vids_window;
 import :map_properties;
 import :sounds_window;
@@ -118,6 +119,8 @@ public:
 
 		ImGui::End();
 
+		m_favoritesViewModel.updateUI();
+
 		if (std::holds_alternative<TerrainDrawState>(m_model.get<GlobalEditorState>().state)) {
 			baseTilesPalette();
 		}
@@ -181,6 +184,11 @@ public:
 		if (ImGui::BeginMenu("Map")) {
 		    m_mapViewModel.onMenu();
 		    ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Favorites")) {
+			m_favoritesViewModel.onMenu();
+			ImGui::EndMenu();
 		}
 
 		m_newMapDialog.updateUI(m_model);
@@ -282,7 +290,8 @@ private:
 
 	Model& m_model;
 
-	VidsWindowViewModel m_vidsViewModel{m_model};
+	FavoritesViewModel m_favoritesViewModel{m_model};
+	VidsWindowViewModel m_vidsViewModel{m_model, std::bind_front(&FavoritesViewModel::vidContextMenu, &m_favoritesViewModel)};
 	MapViewModel m_mapViewModel{m_model};
 	MapsSelectorViewModel m_mapsSelectorViewModel{m_model};
     MapPropertiesViewModel m_mapPropertiesViewModel{m_model};
