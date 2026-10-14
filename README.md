@@ -1,6 +1,8 @@
 # gromada-viewer
 Cross-platform asset viewer and map editor of the classic game "Gromada" developed by Buka Entertainment (1999)
 
+![Gromada Editor screenshot](docs/screenshot.webp)
+
 # Usage
 * Native: Just put the binaries to the root game directory and run the program.
 * We have a [Web version! Just drop game resources to the browser :)](https://allcreater.github.io/gromada-viewer/) Only `fw.res` is required, `maps` directory is optional for map viewing
