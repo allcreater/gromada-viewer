@@ -377,8 +377,22 @@ export class MapViewModel {
         });
     }
 
+    // Keeps one transaction open while a property widget is held, so a slider drag or typing is a single undo step
+    void beginPropertiesEdit(flecs::entity objectHandle) {
+        auto& history = m_world.get_mut<History>();
+        if (!std::exchange(m_isEditingProperties, true))
+            history.beginTransaction();
+        history.stage(objectHandle);
+    }
+
+    void endPropertiesEdit() {
+        if (std::exchange(m_isEditingProperties, false))
+            m_world.get_mut<History>().commitTransaction();
+    }
+
     void updateSelectedObjectsPropertiesWindow(ImDrawList* draw_list, Viewport& viewport) {
         if (m_selectionUIState.selectedObjects.empty()) {
+            endPropertiesEdit();
             m_selectionUIState.selectedObject = -1;
         } else {
             m_selectionUIState.selectedObject = std::clamp(m_selectionUIState.selectedObject, 0, static_cast<int>(m_selectionUIState.selectedObjects.size()) - 1);
@@ -408,6 +422,7 @@ export class MapViewModel {
 
             ImGui::SameLine( );
             if (ImGui::Button("Delete")) {
+                endPropertiesEdit();
                 auto& history = m_world.get_mut<History>();
                 std::unique_lock transaction{history};
                 history.stage(objectHandle);
@@ -421,14 +436,13 @@ export class MapViewModel {
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
             draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
 
-            {
-                auto& history = m_world.get_mut<History>();
-                std::unique_lock transaction{history};
-                history.stage(objectHandle); // before any of the mutations below, per History's contract
+            beginPropertiesEdit(objectHandle); // before any of the mutations below, per History's contract
+            processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
+            processObjectPropertiesTab(objectHandle);
 
-                processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform
-                processObjectPropertiesTab(objectHandle);
-            }
+            const bool isWidgetHeld = ImGui::IsAnyItemActive() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+            if (!isWidgetHeld)
+                endPropertiesEdit();
 
             ImGui::End();
         }
@@ -638,6 +652,7 @@ private:
     flecs::ref<GlobalEditorState> m_editorState = m_world.get_ref<GlobalEditorState>();
     flecs::query<const VidRef, const Transform> m_selectionQuery;
     EditorGesture m_gesture = IdleGesture{};
+    bool m_isEditingProperties = false;
     Flags<ObjectCategory> m_selectionType {0b01111110}; // Default selection type
 
     struct SelectionUIState {
