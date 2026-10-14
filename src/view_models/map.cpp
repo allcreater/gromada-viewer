@@ -222,6 +222,9 @@ export class MapViewModel {
         if (input.deletePressed) {
             deleteSelectedObjects();
         }
+
+        if (const auto cursor = cursorFor(input, mouseWorldPos))
+            ImGui::SetMouseCursor(*cursor);
     }
 
     EditorGesture updateGesture(const FrameInput& input, glm::ivec2 mouseWorldPos, glm::ivec2 clickWorldPos, const GlobalEditorState& editorState) const {
@@ -242,7 +245,7 @@ export class MapViewModel {
         const bool canStartGesture = input.windowHovered && !input.dragDropActive;
 
         auto enterDragGesture = [&]() -> EditorGesture {
-            const bool startsBoxSelect = is_selectionMode ? (input.shiftDown || !isOverSelectedObject(clickWorldPos)) : input.shiftDown;
+            const bool startsBoxSelect = is_selectionMode ? !canDragSelectionAt(clickWorldPos, input) : input.shiftDown;
             if (startsBoxSelect)
                 return BoxSelectGesture{{clickWorldPos, mouseWorldPos}, input.shiftDown ? selectedEntities() : std::vector<flecs::entity>{}};
             return DraggingObjectsGesture{};
@@ -588,6 +591,21 @@ export class MapViewModel {
         return  m_selectionQuery.find([&](flecs::entity, const Vid& vid, const Transform& worldTransform) {
             return PhysicalBoundsFn{}(vid, worldTransform).isPointInside(pos.x, pos.y);
         });
+    }
+
+    bool canDragSelectionAt(glm::ivec2 pos, const FrameInput& input) const {
+        return std::holds_alternative<SelectionState>(m_world.get<const GlobalEditorState>().state) && !input.shiftDown && isOverSelectedObject(pos);
+    }
+
+    std::optional<ImGuiMouseCursor> cursorFor(const FrameInput& input, glm::ivec2 mouseWorldPos) const {
+        if (std::holds_alternative<DraggingObjectsGesture>(m_gesture))
+            return ImGuiMouseCursor_ResizeAll;
+
+        const bool isIdleOverCanvas = std::holds_alternative<IdleGesture>(m_gesture) && input.windowHovered && !input.dragDropActive;
+        if (isIdleOverCanvas && canDragSelectionAt(mouseWorldPos, input))
+            return ImGuiMouseCursor_ResizeAll;
+
+        return std::nullopt;
     }
 
     // Picks the smallest object under the point, so small objects on top of big ones stay reachable
