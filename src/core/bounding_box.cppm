@@ -18,8 +18,8 @@ export struct BoundingBox {
 		};
 	}
 
-	[[nodiscard]] static constexpr BoundingBox fromPositionAndSize(int x, int y, int sizeX, int sizeY) noexcept { 
-		return fromPositions(x, y, x + sizeX, y + sizeY);
+	[[nodiscard]] static constexpr BoundingBox fromCenterAndSize(int x, int y, int sizeX, int sizeY) noexcept {
+		return fromPositions(x - sizeX / 2, y - sizeY / 2, x + sizeX / 2, y + sizeY / 2);
 	}
 
     constexpr int width() const noexcept { return right - left; }
