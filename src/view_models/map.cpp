@@ -434,7 +434,7 @@ export class MapViewModel {
             }
 
             auto [min, max] = computeBBScreenSize(viewport, vidComponent, transform, VisualBoundsFn{});
-            draw_list->AddRect(min, max, IM_COL32(100, 255, 100, 255), 0.0f, ImDrawFlags_None, 2.0f);
+            MyImUtils::DrawCornerFrame(draw_list, min, max, IM_COL32(100, 255, 200, 220));
 
             beginPropertiesEdit(objectHandle); // before any of the mutations below, per History's contract
             processObjectTransformTab( objectHandle.get_mut<Transform, Local>() ); // NOTE: yes, the local transform of the root object is world transform

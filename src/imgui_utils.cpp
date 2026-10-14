@@ -72,7 +72,7 @@ void Text(std::format_string<Args...> fmt, Args&&... args);
 
 export void ToggleButton(const char* label, bool active, auto&& onClick);
 
-
+export void DrawCornerFrame(ImDrawList* draw_list, ImVec2 min, ImVec2 max, ImU32 color, float thickness = 2.0f);
 
 //
 // --- Implementation ---
@@ -203,5 +203,19 @@ void ToggleButton(const char* label, bool active, auto&& onClick) {
         ImGui::PopStyleColor(2);
     }
 }
+
+void DrawCornerFrame(ImDrawList* draw_list, ImVec2 min, ImVec2 max, ImU32 color, float thickness) {
+    const ImVec2 arm{(max.x - min.x) * 0.1f, (max.y - min.y) * 0.1f};
+    const auto drawCorner = [&](ImVec2 corner, float dx, float dy) {
+        const std::array points{ImVec2{corner.x + dx, corner.y}, corner, ImVec2{corner.x, corner.y + dy}};
+        draw_list->AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, thickness);
+    };
+
+    drawCorner(min, arm.x, arm.y);
+    drawCorner({max.x, min.y}, -arm.x, arm.y);
+    drawCorner(max, -arm.x, -arm.y);
+    drawCorner({min.x, max.y}, arm.x, -arm.y);
+}
+
 
 }
