@@ -28,12 +28,14 @@ public:
 		  m_dataDesc{m_data.data(), std::dextents<int, 2>{height, width}} {}
 
 	void resize(glm::ivec2 newSize) {
-		if (m_dataDesc.extent(0) == newSize.y || m_dataDesc.extent(1) == newSize.x || newSize.x <= 0 || newSize.y <= 0)
+		if (size() == newSize || newSize.x <= 0 || newSize.y <= 0)
 			return;
 
 		Framebuffer copy{newSize.x, newSize.y};
 		std::swap(*this, copy);
 	}
+
+	[[nodiscard]] glm::ivec2 size() const { return {m_dataDesc.extent(1), m_dataDesc.extent(0)}; }
 
 	void clear(RGBA8 color) { std::ranges::fill(m_data, color); }
 

@@ -97,6 +97,7 @@ private:
 			// use sokol-imgui with all default-options (we're not doing
 			// multi-sampled rendering or using non-default pixel formats)
 			simgui_setup({
+					.max_vertices = 1 << 18,
 					//.no_default_font = true,
 					.ini_filename = "GromadaEditor.ini",
 					.logger = {.func = slog_func},
