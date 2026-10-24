@@ -27,7 +27,14 @@ set(CMAKE_CXX_MODULE_STD OFF)
 
 message("Cmake version is ${CMAKE_VERSION}, standard library is ${CMAKE_CXX_STANDARD_LIBRARY}")
 
-set(GVIEWER_RENDER_BACKEND "GLCORE" CACHE STRING "Rendering backend")
+# Some Windows OpenGL implementations race on buffer updates, causing flickering frames
+if (WIN32)
+    set(GVIEWER_DEFAULT_RENDER_BACKEND "D3D11")
+else()
+    set(GVIEWER_DEFAULT_RENDER_BACKEND "GLCORE")
+endif()
+
+set(GVIEWER_RENDER_BACKEND "${GVIEWER_DEFAULT_RENDER_BACKEND}" CACHE STRING "Rendering backend")
 set_property(CACHE GVIEWER_RENDER_BACKEND PROPERTY STRINGS GLCORE GLES3 D3D11 METAL WGPU VULKAN)
 
 add_subdirectory(3rd_party/)
