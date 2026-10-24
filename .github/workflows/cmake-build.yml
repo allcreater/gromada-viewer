@@ -67,13 +67,12 @@ jobs:
       - name: Build
         run: cmake --build build_dir
 
+      - name: Install
+        run: cmake --install build_dir --prefix dist
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
           name: build-${{ inputs.cmake_preset }}
-          path: |
-            build_dir/src
-            !build_dir/src/cmake*
-            !build_dir/src/CMakeFiles
-            !build_dir/src/libgromada
-            !build_dir/src/core
+          path: dist
+          if-no-files-found: error

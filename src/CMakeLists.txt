@@ -70,3 +70,17 @@ target_sources(GromadaEditor PRIVATE
 if(EMSCRIPTEN)
 	set_target_properties(GromadaEditor PROPERTIES SUFFIX ".html")
 endif()
+
+install(TARGETS GromadaEditor RUNTIME DESTINATION .)
+
+if(MSVC)
+	install(FILES $<TARGET_PDB_FILE:GromadaEditor> DESTINATION . OPTIONAL)
+endif()
+
+if(EMSCRIPTEN)
+	install(FILES
+		"$<TARGET_FILE_DIR:GromadaEditor>/$<TARGET_FILE_BASE_NAME:GromadaEditor>.js"
+		"$<TARGET_FILE_DIR:GromadaEditor>/$<TARGET_FILE_BASE_NAME:GromadaEditor>.wasm"
+		DESTINATION .
+	)
+endif()
