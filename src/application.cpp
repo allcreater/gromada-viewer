@@ -17,6 +17,7 @@ import application.model;
 import application.view_model;
 
 import DataExporters;
+import default_settings;
 
 template <>
 inline std::string argparse::details::repr<std::filesystem::path>(const std::filesystem::path& p) {
@@ -43,6 +44,7 @@ public:
 		}
 
 		setupFont();
+		loadDefaultSettingsIfMissing();
     }
 
 	void on_frame() {
@@ -175,6 +177,13 @@ private:
 		io.Fonts->Clear();
 		io.Fonts->AddFontFromFileTTF(fontPath.generic_string().c_str(), 0.0f, &cfg, nullptr);
 		io.Fonts->Build();
+	}
+
+	// Must be called after all settings handlers are registered, but before the first frame
+	static void loadDefaultSettingsIfMissing() {
+		const char* iniFilename = ImGui::GetIO().IniFilename;
+		if (iniFilename && !std::filesystem::exists(iniFilename))
+			ImGui::LoadIniSettingsFromMemory(defaultImGuiSettings.data(), defaultImGuiSettings.size());
 	}
 
 private:

@@ -1,0 +1,6 @@
+export module default_settings;
+
+import std;
+
+// Generated from GromadaEditor.ini
+export constexpr std::string_view defaultImGuiSettings = R"ini(@DEFAULT_INI_CONTENT@)ini";

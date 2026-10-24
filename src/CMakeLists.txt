@@ -55,6 +55,18 @@ set_target_properties(GromadaEditor PROPERTIES
 
 setup_build_info(GromadaEditor)
 
+set(DEFAULT_INI_PATH "${CMAKE_CURRENT_SOURCE_DIR}/GromadaEditor.ini")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${DEFAULT_INI_PATH}")
+file(READ "${DEFAULT_INI_PATH}" DEFAULT_INI_CONTENT)
+configure_file("default_settings.cppm.in" "${CMAKE_CURRENT_BINARY_DIR}/default_settings.cppm" @ONLY)
+
+target_sources(GromadaEditor PRIVATE
+	FILE_SET generated_modules
+	TYPE CXX_MODULES
+	BASE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
+	FILES "${CMAKE_CURRENT_BINARY_DIR}/default_settings.cppm"
+)
+
 if(EMSCRIPTEN)
 	set_target_properties(GromadaEditor PROPERTIES SUFFIX ".html")
 endif()
